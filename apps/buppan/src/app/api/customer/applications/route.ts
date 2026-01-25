@@ -38,15 +38,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // プラン取得
+    // プラン取得（価格情報含む）
     const plan = await prisma.plan.findUnique({
       where: { id: planId },
-      include: { service: true },
+      include: {
+        service: true,
+        pricings: {
+          orderBy: { minQuantity: "asc" },
+        },
+      },
     });
 
     if (!plan || !plan.isActive) {
       return NextResponse.json(
         { error: "選択されたプランは無効です" },
+        { status: 400 }
+      );
+    }
+
+    // 価格取得（顧客タイプに応じた価格、なければ最初の価格）
+    const pricing =
+      plan.pricings.find((p) => p.customerType === customer.type) ||
+      plan.pricings[0];
+
+    if (!pricing) {
+      return NextResponse.json(
+        { error: "プランの価格設定が見つかりません" },
         { status: 400 }
       );
     }
@@ -63,7 +80,7 @@ export async function POST(request: NextRequest) {
     const applicationNumber = `AP${dateStr}${randomNum}`;
 
     // 金額計算
-    const unitPrice = plan.initialFee + plan.monthlyFee;
+    const unitPrice = pricing.unitPrice;
     const totalAmount = unitPrice * lineCount;
 
     // 申込作成（トランザクション）

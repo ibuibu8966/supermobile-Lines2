@@ -11,14 +11,13 @@ import {
   CardHeader,
   CardTitle,
   Label,
-  RadioGroup,
-  RadioGroupItem,
   Checkbox,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
+  cn,
 } from "@repo/ui";
 import {
   ChevronLeft,
@@ -29,14 +28,21 @@ import {
   FileCheck,
 } from "lucide-react";
 
+interface PlanPricing {
+  id: string;
+  customerType: string;
+  minQuantity: number;
+  maxQuantity: number | null;
+  unitPrice: number;
+  description: string | null;
+}
+
 interface Plan {
   id: string;
   name: string;
-  description: string | null;
-  monthlyFee: number;
-  initialFee: number;
-  dataAmount: number | null;
+  code: string;
   isActive: boolean;
+  pricings: PlanPricing[];
 }
 
 export default function AdditionalApplyPage() {
@@ -70,7 +76,7 @@ export default function AdditionalApplyPage() {
       const res = await fetch("/api/plans");
       if (res.ok) {
         const data = await res.json();
-        setPlans(data.plans.filter((p: Plan) => p.isActive));
+        setPlans(data.filter((p: Plan) => p.isActive));
       }
     } catch (error) {
       console.error("Failed to fetch plans:", error);
@@ -80,6 +86,12 @@ export default function AdditionalApplyPage() {
   };
 
   const selectedPlan = plans.find((p) => p.id === selectedPlanId);
+
+  // プランの価格を取得（個人向けの最初の価格を使用）
+  const getPlanPrice = (plan: Plan) => {
+    const pricing = plan.pricings.find((p) => p.customerType === "INDIVIDUAL") || plan.pricings[0];
+    return pricing?.unitPrice || 0;
+  };
 
   const canProceedStep1 = () => {
     return selectedPlanId !== "" && lineCount >= 1;
@@ -134,6 +146,8 @@ export default function AdditionalApplyPage() {
     );
   }
 
+  const selectedPlanPrice = selectedPlan ? getPlanPrice(selectedPlan) : 0;
+
   return (
     <div className="max-w-2xl mx-auto">
       <div className="mb-6">
@@ -160,11 +174,12 @@ export default function AdditionalApplyPage() {
               {steps.map((s, index) => (
                 <div key={s.id} className="flex items-center">
                   <div
-                    className={`flex items-center justify-center w-8 h-8 rounded-full border-2 ${
+                    className={cn(
+                      "flex items-center justify-center w-8 h-8 rounded-full border-2",
                       step >= s.id
                         ? "border-primary bg-primary text-primary-foreground"
                         : "border-gray-300 text-gray-300"
-                    }`}
+                    )}
                   >
                     {step > s.id ? (
                       <Check className="h-4 w-4" />
@@ -173,17 +188,19 @@ export default function AdditionalApplyPage() {
                     )}
                   </div>
                   <span
-                    className={`ml-2 text-sm font-medium ${
+                    className={cn(
+                      "ml-2 text-sm font-medium",
                       step >= s.id ? "text-primary" : "text-gray-400"
-                    }`}
+                    )}
                   >
                     {s.name}
                   </span>
                   {index < steps.length - 1 && (
                     <div
-                      className={`w-16 h-0.5 mx-4 ${
+                      className={cn(
+                        "w-16 h-0.5 mx-4",
                         step > s.id ? "bg-primary" : "bg-gray-200"
-                      }`}
+                      )}
                     />
                   )}
                 </div>
@@ -204,55 +221,42 @@ export default function AdditionalApplyPage() {
                 <Label className="text-base font-medium">
                   プランを選択してください *
                 </Label>
-                <RadioGroup
-                  value={selectedPlanId}
-                  onValueChange={setSelectedPlanId}
-                  className="mt-3 space-y-3"
-                >
-                  {plans.map((plan) => (
-                    <div
-                      key={plan.id}
-                      className={`relative flex items-start p-4 border rounded-lg cursor-pointer hover:border-primary transition-colors ${
-                        selectedPlanId === plan.id
-                          ? "border-primary bg-primary/5"
-                          : "border-gray-200"
-                      }`}
-                      onClick={() => setSelectedPlanId(plan.id)}
-                    >
-                      <RadioGroupItem
-                        value={plan.id}
-                        id={plan.id}
-                        className="mt-1"
-                      />
-                      <div className="ml-3 flex-1">
-                        <label
-                          htmlFor={plan.id}
-                          className="font-medium cursor-pointer"
-                        >
-                          {plan.name}
-                        </label>
-                        {plan.description && (
-                          <p className="text-sm text-gray-500 mt-1">
-                            {plan.description}
-                          </p>
+                <div className="mt-3 space-y-3">
+                  {plans.map((plan) => {
+                    const price = getPlanPrice(plan);
+                    return (
+                      <div
+                        key={plan.id}
+                        className={cn(
+                          "relative flex items-start p-4 border rounded-lg cursor-pointer hover:border-primary transition-colors",
+                          selectedPlanId === plan.id
+                            ? "border-primary bg-primary/5"
+                            : "border-gray-200"
                         )}
-                        <div className="mt-2 flex flex-wrap gap-4 text-sm">
-                          <span>
-                            月額: <strong>{formatCurrency(plan.monthlyFee)}</strong>
-                          </span>
-                          <span>
-                            初期費用: <strong>{formatCurrency(plan.initialFee)}</strong>
-                          </span>
-                          {plan.dataAmount && (
-                            <span>
-                              データ: <strong>{plan.dataAmount}GB</strong>
-                            </span>
+                        onClick={() => setSelectedPlanId(plan.id)}
+                      >
+                        <div
+                          className={cn(
+                            "w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5",
+                            selectedPlanId === plan.id
+                              ? "border-primary bg-primary"
+                              : "border-gray-300"
+                          )}
+                        >
+                          {selectedPlanId === plan.id && (
+                            <Check className="h-3 w-3 text-white" />
                           )}
                         </div>
+                        <div className="ml-3 flex-1">
+                          <div className="font-medium">{plan.name}</div>
+                          <div className="mt-1 text-sm text-gray-500">
+                            単価: <strong>{formatCurrency(price)}</strong>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </RadioGroup>
+                    );
+                  })}
+                </div>
               </div>
 
               <div>
@@ -281,24 +285,15 @@ export default function AdditionalApplyPage() {
                   <h4 className="font-medium mb-2">お見積り</h4>
                   <div className="space-y-1 text-sm">
                     <div className="flex justify-between">
-                      <span>初期費用（{lineCount}回線）</span>
+                      <span>単価 × {lineCount}回線</span>
                       <span>
-                        {formatCurrency(selectedPlan.initialFee * lineCount)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>月額料金（{lineCount}回線）</span>
-                      <span>
-                        {formatCurrency(selectedPlan.monthlyFee * lineCount)}
+                        {formatCurrency(selectedPlanPrice * lineCount)}
                       </span>
                     </div>
                     <div className="border-t pt-2 mt-2 flex justify-between font-medium">
-                      <span>初回お支払い額</span>
+                      <span>合計</span>
                       <span>
-                        {formatCurrency(
-                          (selectedPlan.initialFee + selectedPlan.monthlyFee) *
-                            lineCount
-                        )}
+                        {formatCurrency(selectedPlanPrice * lineCount)}
                       </span>
                     </div>
                   </div>
@@ -325,15 +320,9 @@ export default function AdditionalApplyPage() {
                     <span className="font-medium">{lineCount}回線</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">初期費用</span>
+                    <span className="text-gray-500">合計金額</span>
                     <span className="font-medium">
-                      {formatCurrency(selectedPlan.initialFee * lineCount)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">月額料金</span>
-                    <span className="font-medium">
-                      {formatCurrency(selectedPlan.monthlyFee * lineCount)}
+                      {formatCurrency(selectedPlanPrice * lineCount)}
                     </span>
                   </div>
                 </div>
