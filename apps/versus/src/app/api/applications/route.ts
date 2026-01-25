@@ -334,8 +334,11 @@ export async function POST(request: NextRequest) {
     }, { status: 201 });
   } catch (error) {
     console.error("申込作成エラー:", error);
+    const errorMessage = error instanceof Error ? error.message : "不明なエラー";
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    console.error("Error details:", { message: errorMessage, stack: errorStack });
     return NextResponse.json(
-      { error: "申込の作成に失敗しました" },
+      { error: "申込の作成に失敗しました", details: errorMessage },
       { status: 500 }
     );
   }
