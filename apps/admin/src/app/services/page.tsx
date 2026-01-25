@@ -1,8 +1,201 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@repo/ui";
-import { ArrowLeft, Plus, Pencil, Settings } from "lucide-react";
+import { ArrowLeft, Plus, Pencil, Trash2, Loader2, X, Settings } from "lucide-react";
+
+interface UsageTag {
+  id: number;
+  code: string;
+  name: string;
+}
+
+interface PlanUsageTag {
+  usageTag: UsageTag;
+}
+
+interface PlanPricing {
+  id: string;
+  customerType: "INDIVIDUAL" | "CORPORATE";
+  minQuantity: number;
+  maxQuantity: number | null;
+  unitPrice: number;
+}
+
+interface Plan {
+  id: string;
+  code: string;
+  name: string;
+  isActive: boolean;
+  usageTags: PlanUsageTag[];
+  pricings: PlanPricing[];
+}
+
+interface Service {
+  id: string;
+  code: string;
+  name: string;
+  isActive: boolean;
+  _count: {
+    plans: number;
+    applications: number;
+    users: number;
+  };
+  plans: Plan[];
+}
 
 export default function ServicesPage() {
+  const [services, setServices] = useState<Service[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showInactive, setShowInactive] = useState(false);
+
+  // モーダル状態
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingService, setEditingService] = useState<Service | null>(null);
+  const [formData, setFormData] = useState({
+    code: "",
+    name: "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchServices = async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (showInactive) params.set("includeInactive", "true");
+
+      const res = await fetch("/api/services?" + params.toString());
+      const data = await res.json();
+      if (res.ok) {
+        setServices(data);
+      }
+    } catch (err) {
+      console.error("サービス取得エラー:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchServices();
+  }, [showInactive]);
+
+  const openCreateModal = () => {
+    setEditingService(null);
+    setFormData({
+      code: "",
+      name: "",
+    });
+    setError(null);
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (service: Service) => {
+    setEditingService(service);
+    setFormData({
+      code: service.code,
+      name: service.name,
+    });
+    setError(null);
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditingService(null);
+    setError(null);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+
+    try {
+      const url = editingService
+        ? "/api/services/" + editingService.id
+        : "/api/services";
+      const method = editingService ? "PATCH" : "POST";
+
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        closeModal();
+        fetchServices();
+      } else {
+        setError(data.error || "保存に失敗しました");
+      }
+    } catch (err) {
+      console.error("保存エラー:", err);
+      setError("保存に失敗しました");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (service: Service) => {
+    if (!confirm("「" + service.name + "」を削除しますか？\n\n※関連データがある場合は無効化されます。")) {
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/services/" + service.id, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        fetchServices();
+      } else {
+        const data = await res.json();
+        alert(data.error || "削除に失敗しました");
+      }
+    } catch (err) {
+      console.error("削除エラー:", err);
+      alert("削除に失敗しました");
+    }
+  };
+
+  const toggleActive = async (service: Service) => {
+    try {
+      const res = await fetch("/api/services/" + service.id, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive: !service.isActive }),
+      });
+
+      if (res.ok) {
+        fetchServices();
+      }
+    } catch (err) {
+      console.error("ステータス変更エラー:", err);
+    }
+  };
+
+  const formatPrice = (price: number) => {
+    return "¥" + price.toLocaleString();
+  };
+
+  const getPriceDisplay = (pricings: PlanPricing[], customerType: "INDIVIDUAL" | "CORPORATE") => {
+    const filtered = pricings.filter((p) => p.customerType === customerType);
+    if (filtered.length === 0) return "-";
+
+    const sorted = filtered.sort((a, b) => a.minQuantity - b.minQuantity);
+    const base = sorted[0];
+    const hasDiscount = sorted.length > 1;
+
+    return hasDiscount
+      ? formatPrice(base.unitPrice) + "/月〜"
+      : formatPrice(base.unitPrice) + "/月";
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b">
@@ -22,202 +215,202 @@ export default function ServicesPage() {
       </header>
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex justify-end mb-6">
-          <Button>
+        <div className="flex justify-between items-center mb-6">
+          <label className="flex items-center gap-2 text-sm text-gray-600">
+            <input
+              type="checkbox"
+              checked={showInactive}
+              onChange={(e) => setShowInactive(e.target.checked)}
+              className="rounded"
+            />
+            無効なサービスも表示
+          </label>
+          <Button onClick={openCreateModal}>
             <Plus className="h-4 w-4 mr-2" />
             新規サービス登録
           </Button>
         </div>
 
-        <div className="space-y-6">
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+          </div>
+        ) : services.length === 0 ? (
           <Card>
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <div>
-                  <CardTitle>物販サービス</CardTitle>
-                  <p className="text-sm text-muted-foreground mt-1">コード: buppan</p>
-                </div>
-                <div className="flex gap-2">
-                  <Badge variant="success">有効</Badge>
-                  <Button variant="outline" size="sm">
-                    <Pencil className="h-4 w-4 mr-2" />
-                    編集
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="flex justify-between items-center mb-4">
-                <h4 className="font-medium">プラン一覧</h4>
-                <Button variant="outline" size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  プラン追加
-                </Button>
-              </div>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-2 px-4">プラン名</th>
-                    <th className="text-left py-2 px-4">用途タグ</th>
-                    <th className="text-left py-2 px-4">個人料金</th>
-                    <th className="text-left py-2 px-4">法人料金</th>
-                    <th className="text-left py-2 px-4">ステータス</th>
-                    <th className="text-right py-2 px-4">操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="border-b hover:bg-gray-50">
-                    <td className="py-2 px-4">アダアフィプラン</td>
-                    <td className="py-2 px-4">
-                      <Badge variant="secondary">アダアフィ</Badge>
-                    </td>
-                    <td className="py-2 px-4">¥3,980/月</td>
-                    <td className="py-2 px-4">¥3,500/月〜</td>
-                    <td className="py-2 px-4">
-                      <Badge variant="success">有効</Badge>
-                    </td>
-                    <td className="py-2 px-4 text-right">
-                      <Button variant="ghost" size="sm">
-                        <Settings className="h-4 w-4" />
-                      </Button>
-                    </td>
-                  </tr>
-                  <tr className="border-b hover:bg-gray-50">
-                    <td className="py-2 px-4">ポケカプラン</td>
-                    <td className="py-2 px-4">
-                      <Badge variant="secondary">ポケカ認証</Badge>
-                    </td>
-                    <td className="py-2 px-4">¥2,980/月</td>
-                    <td className="py-2 px-4">¥2,500/月〜</td>
-                    <td className="py-2 px-4">
-                      <Badge variant="success">有効</Badge>
-                    </td>
-                    <td className="py-2 px-4 text-right">
-                      <Button variant="ghost" size="sm">
-                        <Settings className="h-4 w-4" />
-                      </Button>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+            <CardContent className="text-center py-12 text-gray-500">
+              サービスが登録されていません
             </CardContent>
           </Card>
-
-          <Card>
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <div>
-                  <CardTitle>バーサスサービス</CardTitle>
-                  <p className="text-sm text-muted-foreground mt-1">コード: versus</p>
-                </div>
-                <div className="flex gap-2">
-                  <Badge variant="success">有効</Badge>
-                  <Button variant="outline" size="sm">
-                    <Pencil className="h-4 w-4 mr-2" />
-                    編集
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="flex justify-between items-center mb-4">
-                <h4 className="font-medium">プラン一覧</h4>
-                <Button variant="outline" size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  プラン追加
-                </Button>
-              </div>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-2 px-4">プラン名</th>
-                    <th className="text-left py-2 px-4">用途タグ</th>
-                    <th className="text-left py-2 px-4">個人料金</th>
-                    <th className="text-left py-2 px-4">法人料金</th>
-                    <th className="text-left py-2 px-4">ステータス</th>
-                    <th className="text-right py-2 px-4">操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="border-b hover:bg-gray-50">
-                    <td className="py-2 px-4">バーサス標準プラン</td>
-                    <td className="py-2 px-4">
-                      <Badge variant="secondary">ポケカ認証</Badge>
-                    </td>
-                    <td className="py-2 px-4">¥4,980/月</td>
-                    <td className="py-2 px-4">¥4,500/月〜</td>
-                    <td className="py-2 px-4">
-                      <Badge variant="success">有効</Badge>
-                    </td>
-                    <td className="py-2 px-4 text-right">
-                      <Button variant="ghost" size="sm">
-                        <Settings className="h-4 w-4" />
+        ) : (
+          <div className="space-y-6">
+            {services.map((service) => (
+              <Card key={service.id} className={!service.isActive ? "opacity-60" : ""}>
+                <CardHeader>
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <CardTitle>{service.name}</CardTitle>
+                      <p className="text-sm text-muted-foreground mt-1">コード: {service.code}</p>
+                    </div>
+                    <div className="flex gap-2 items-center">
+                      <button onClick={() => toggleActive(service)}>
+                        <Badge variant={service.isActive ? "success" : "secondary"}>
+                          {service.isActive ? "有効" : "無効"}
+                        </Badge>
+                      </button>
+                      <Button variant="outline" size="sm" onClick={() => openEditModal(service)}>
+                        <Pencil className="h-4 w-4 mr-2" />
+                        編集
                       </Button>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <div>
-                  <CardTitle>Avarisサービス</CardTitle>
-                  <p className="text-sm text-muted-foreground mt-1">コード: avaris</p>
-                </div>
-                <div className="flex gap-2">
-                  <Badge variant="success">有効</Badge>
-                  <Button variant="outline" size="sm">
-                    <Pencil className="h-4 w-4 mr-2" />
-                    編集
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="flex justify-between items-center mb-4">
-                <h4 className="font-medium">プラン一覧</h4>
-                <Button variant="outline" size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  プラン追加
-                </Button>
-              </div>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-2 px-4">プラン名</th>
-                    <th className="text-left py-2 px-4">用途タグ</th>
-                    <th className="text-left py-2 px-4">個人料金</th>
-                    <th className="text-left py-2 px-4">法人料金</th>
-                    <th className="text-left py-2 px-4">ステータス</th>
-                    <th className="text-right py-2 px-4">操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="border-b hover:bg-gray-50">
-                    <td className="py-2 px-4">MNPプラン</td>
-                    <td className="py-2 px-4">
-                      <Badge variant="secondary">MNP弾</Badge>
-                    </td>
-                    <td className="py-2 px-4">¥5,980/月</td>
-                    <td className="py-2 px-4">¥5,500/月〜</td>
-                    <td className="py-2 px-4">
-                      <Badge variant="success">有効</Badge>
-                    </td>
-                    <td className="py-2 px-4 text-right">
-                      <Button variant="ghost" size="sm">
-                        <Settings className="h-4 w-4" />
+                      <Button variant="ghost" size="sm" onClick={() => handleDelete(service)}>
+                        <Trash2 className="h-4 w-4 text-red-500" />
                       </Button>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </CardContent>
-          </Card>
-        </div>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex justify-between items-center mb-4">
+                    <h4 className="font-medium">プラン一覧</h4>
+                    <Link href={"/plans?serviceId=" + service.id}>
+                      <Button variant="outline" size="sm">
+                        <Plus className="h-4 w-4 mr-2" />
+                        プラン追加
+                      </Button>
+                    </Link>
+                  </div>
+                  {service.plans.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500 text-sm">
+                      プランが登録されていません
+                    </div>
+                  ) : (
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left py-2 px-4">プラン名</th>
+                          <th className="text-left py-2 px-4">用途タグ</th>
+                          <th className="text-left py-2 px-4">個人料金</th>
+                          <th className="text-left py-2 px-4">法人料金</th>
+                          <th className="text-left py-2 px-4">ステータス</th>
+                          <th className="text-right py-2 px-4">操作</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {service.plans.map((plan) => (
+                          <tr key={plan.id} className="border-b hover:bg-gray-50">
+                            <td className="py-2 px-4">{plan.name}</td>
+                            <td className="py-2 px-4">
+                              <div className="flex gap-1 flex-wrap">
+                                {plan.usageTags.length > 0 ? (
+                                  plan.usageTags.map((pt) => (
+                                    <Badge key={pt.usageTag.id} variant="secondary">
+                                      {pt.usageTag.name}
+                                    </Badge>
+                                  ))
+                                ) : (
+                                  <span className="text-gray-400">-</span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="py-2 px-4">
+                              {getPriceDisplay(plan.pricings, "INDIVIDUAL")}
+                            </td>
+                            <td className="py-2 px-4">
+                              {getPriceDisplay(plan.pricings, "CORPORATE")}
+                            </td>
+                            <td className="py-2 px-4">
+                              <Badge variant={plan.isActive ? "success" : "secondary"}>
+                                {plan.isActive ? "有効" : "無効"}
+                              </Badge>
+                            </td>
+                            <td className="py-2 px-4 text-right">
+                              <Link href={"/plans/" + plan.id}>
+                                <Button variant="ghost" size="sm">
+                                  <Settings className="h-4 w-4" />
+                                </Button>
+                              </Link>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </main>
+
+      {/* モーダル */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div className="flex items-center justify-between px-6 py-4 border-b">
+              <h2 className="text-lg font-semibold">
+                {editingService ? "サービス編集" : "新規サービス登録"}
+              </h2>
+              <button
+                onClick={closeModal}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <form onSubmit={handleSubmit}>
+              <div className="px-6 py-4 space-y-4">
+                {error && (
+                  <div className="bg-red-50 text-red-600 px-4 py-2 rounded text-sm">
+                    {error}
+                  </div>
+                )}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    コード
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.code}
+                    onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-md"
+                    placeholder="buppan"
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    一意の識別コード（例: buppan, versus, avaris）
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    サービス名
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-md"
+                    placeholder="物販サービス"
+                    required
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 px-6 py-4 border-t bg-gray-50">
+                <Button type="button" variant="outline" onClick={closeModal}>
+                  キャンセル
+                </Button>
+                <Button type="submit" disabled={saving}>
+                  {saving ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      保存中...
+                    </>
+                  ) : (
+                    "保存"
+                  )}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
