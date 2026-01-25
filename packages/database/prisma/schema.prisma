@@ -81,10 +81,11 @@ enum ApplicationLineStatus {
 }
 
 enum KycImageType {
-  ID_FRONT
-  ID_BACK
-  SELFIE
-  ADDRESS_PROOF
+  ID_FRONT           // 身分証（表）- 個人の免許証、法人代表者の身分証
+  ID_BACK            // 身分証（裏）
+  SELFIE             // 自撮り（任意）
+  ADDRESS_PROOF      // 住所証明（任意）
+  CORPORATE_REGISTRY // 登記簿謄本（法人用）
 }
 
 enum KycImageStatus {

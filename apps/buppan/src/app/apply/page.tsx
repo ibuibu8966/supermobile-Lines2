@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
   Button,
@@ -14,7 +15,7 @@ import {
   Label,
   Checkbox,
 } from "@repo/ui";
-import { ArrowLeft, ArrowRight, Check, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Loader2, Upload, X, Eye, EyeOff } from "lucide-react";
 
 interface UsageTag {
   id: number;
@@ -45,8 +46,9 @@ interface Plan {
 const steps = [
   { id: 1, name: "プラン選択" },
   { id: 2, name: "お客様情報" },
-  { id: 3, name: "回線数・金額" },
-  { id: 4, name: "確認・送信" },
+  { id: 3, name: "本人確認" },
+  { id: 4, name: "回線数・金額" },
+  { id: 5, name: "確認・送信" },
 ];
 
 const prefectures = [
@@ -58,6 +60,111 @@ const prefectures = [
   "徳島県", "香川県", "愛媛県", "高知県", "福岡県", "佐賀県", "長崎県",
   "熊本県", "大分県", "宮崎県", "鹿児島県", "沖縄県",
 ];
+
+// ファイルアップロードコンポーネント
+function FileUpload({
+  label,
+  file,
+  onFileChange,
+  accept = "image/*",
+  required = false,
+}: {
+  label: string;
+  file: File | null;
+  onFileChange: (file: File | null) => void;
+  accept?: string;
+  required?: boolean;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (file) {
+      const url = URL.createObjectURL(file);
+      setPreview(url);
+      return () => URL.revokeObjectURL(url);
+    } else {
+      setPreview(null);
+    }
+  }, [file]);
+
+  const handleClick = () => {
+    inputRef.current?.click();
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0] || null;
+    onFileChange(selectedFile);
+  };
+
+  const handleRemove = () => {
+    onFileChange(null);
+    if (inputRef.current) {
+      inputRef.current.value = "";
+    }
+  };
+
+  return (
+    <div className="space-y-2">
+      <Label>
+        {label} {required && <span className="text-red-500">*</span>}
+      </Label>
+      <input
+        ref={inputRef}
+        type="file"
+        accept={accept}
+        onChange={handleChange}
+        className="hidden"
+      />
+      {file && preview ? (
+        <div className="relative border rounded-lg p-2 bg-gray-50">
+          <div className="flex items-center gap-3">
+            {file.type.startsWith("image/") ? (
+              <Image
+                src={preview}
+                alt="プレビュー"
+                width={80}
+                height={80}
+                className="object-cover rounded"
+              />
+            ) : (
+              <div className="w-20 h-20 bg-gray-200 rounded flex items-center justify-center text-xs text-gray-500">
+                PDF
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate">{file.name}</p>
+              <p className="text-xs text-gray-500">
+                {(file.size / 1024 / 1024).toFixed(2)} MB
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleRemove}
+              className="p-1 hover:bg-gray-200 rounded"
+            >
+              <X className="h-5 w-5 text-gray-500" />
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={handleClick}
+          className="w-full border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-primary hover:bg-gray-50 transition-colors"
+        >
+          <div className="flex flex-col items-center gap-2 text-gray-500">
+            <Upload className="h-8 w-8" />
+            <span className="text-sm">クリックしてファイルを選択</span>
+            <span className="text-xs">
+              {accept.includes("pdf") ? "画像またはPDF" : "画像ファイル"}（最大10MB）
+            </span>
+          </div>
+        </button>
+      )}
+    </div>
+  );
+}
 
 export default function ApplyPage() {
   const router = useRouter();
@@ -73,6 +180,17 @@ export default function ApplyPage() {
   const [lineCount, setLineCount] = useState(1);
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [agreePrivacy, setAgreePrivacy] = useState(false);
+
+  // パスワード
+  const [password, setPassword] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
+
+  // KYC書類
+  const [idFront, setIdFront] = useState<File | null>(null);
+  const [idBack, setIdBack] = useState<File | null>(null);
+  const [corporateRegistry, setCorporateRegistry] = useState<File | null>(null);
 
   // 顧客情報
   const [customerData, setCustomerData] = useState({
@@ -151,21 +269,23 @@ export default function ApplyPage() {
     setError(null);
 
     try {
-      const payload = {
-        planId: selectedPlanId,
-        lineCount,
-        customer: {
-          type: customerType,
-          ...customerData,
-        },
-        agreeTerms,
-        agreePrivacy,
-      };
+      const formData = new FormData();
+      formData.append("planId", selectedPlanId);
+      formData.append("lineCount", lineCount.toString());
+      formData.append("customerType", customerType);
+      formData.append("password", password);
+      formData.append("customer", JSON.stringify(customerData));
+      formData.append("agreeTerms", agreeTerms.toString());
+      formData.append("agreePrivacy", agreePrivacy.toString());
+
+      // KYC書類
+      if (idFront) formData.append("idFront", idFront);
+      if (idBack) formData.append("idBack", idBack);
+      if (corporateRegistry) formData.append("corporateRegistry", corporateRegistry);
 
       const res = await fetch("/api/applications", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: formData,
       });
 
       const data = await res.json();
@@ -184,6 +304,10 @@ export default function ApplyPage() {
   };
 
   const canProceedStep2 = (): boolean => {
+    // パスワードチェック
+    if (password.length < 8) return false;
+    if (password !== passwordConfirm) return false;
+
     if (customerType === "CORPORATE") {
       if (!customerData.companyName || !customerData.companyNameKana) {
         return false;
@@ -202,6 +326,25 @@ export default function ApplyPage() {
       customerData.city !== "" &&
       customerData.address !== ""
     );
+  };
+
+  const canProceedStep3 = (): boolean => {
+    // KYC書類チェック
+    if (customerType === "INDIVIDUAL") {
+      return idFront !== null && idBack !== null;
+    } else {
+      return idFront !== null && idBack !== null && corporateRegistry !== null;
+    }
+  };
+
+  const getPasswordError = (): string | null => {
+    if (password && password.length < 8) {
+      return "パスワードは8文字以上で入力してください";
+    }
+    if (passwordConfirm && password !== passwordConfirm) {
+      return "パスワードが一致しません";
+    }
+    return null;
   };
 
   return (
@@ -237,7 +380,7 @@ export default function ApplyPage() {
                   )}
                 </div>
                 <span
-                  className={"ml-2 text-sm " +
+                  className={"ml-2 text-sm hidden sm:inline " +
                     (currentStep >= step.id
                       ? "text-gray-900"
                       : "text-gray-500")}
@@ -246,7 +389,7 @@ export default function ApplyPage() {
                 </span>
                 {index < steps.length - 1 && (
                   <div
-                    className={"w-12 h-0.5 mx-4 " +
+                    className={"w-8 sm:w-12 h-0.5 mx-2 sm:mx-4 " +
                       (currentStep > step.id ? "bg-primary" : "bg-gray-200")}
                   />
                 )}
@@ -512,6 +655,56 @@ export default function ApplyPage() {
                 </div>
               </div>
 
+              <div className="space-y-4">
+                <h4 className="font-medium">マイページ用パスワード</h4>
+                <p className="text-sm text-muted-foreground">
+                  お申込み完了後、マイページにログインするためのパスワードを設定してください
+                </p>
+                <div>
+                  <Label htmlFor="password">パスワード *</Label>
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="8文字以上"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="passwordConfirm">パスワード（確認）*</Label>
+                  <div className="relative">
+                    <Input
+                      id="passwordConfirm"
+                      type={showPasswordConfirm ? "text" : "password"}
+                      placeholder="パスワードを再入力"
+                      value={passwordConfirm}
+                      onChange={(e) => setPasswordConfirm(e.target.value)}
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPasswordConfirm(!showPasswordConfirm)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      {showPasswordConfirm ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    </button>
+                  </div>
+                </div>
+                {getPasswordError() && (
+                  <p className="text-sm text-red-500">{getPasswordError()}</p>
+                )}
+              </div>
+
               <div className="flex justify-between pt-4">
                 <Button variant="outline" onClick={() => setCurrentStep(1)}>
                   <ArrowLeft className="h-4 w-4 mr-2" />
@@ -527,6 +720,84 @@ export default function ApplyPage() {
         )}
 
         {currentStep === 3 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>本人確認書類</CardTitle>
+              <CardDescription>
+                {customerType === "INDIVIDUAL"
+                  ? "運転免許証の表面・裏面をアップロードしてください"
+                  : "登記簿謄本と代表者の身分証明書をアップロードしてください"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {customerType === "INDIVIDUAL" ? (
+                <div className="space-y-4">
+                  <h4 className="font-medium">運転免許証</h4>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <FileUpload
+                      label="免許証（表面）"
+                      file={idFront}
+                      onFileChange={setIdFront}
+                      required
+                    />
+                    <FileUpload
+                      label="免許証（裏面）"
+                      file={idBack}
+                      onFileChange={setIdBack}
+                      required
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  <div className="space-y-4">
+                    <h4 className="font-medium">法人確認書類</h4>
+                    <FileUpload
+                      label="登記簿謄本（履歴事項全部証明書）"
+                      file={corporateRegistry}
+                      onFileChange={setCorporateRegistry}
+                      accept="image/*,.pdf"
+                      required
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      発行から3ヶ月以内のものをご用意ください
+                    </p>
+                  </div>
+                  <div className="space-y-4">
+                    <h4 className="font-medium">代表者身分証明書</h4>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <FileUpload
+                        label="身分証明書（表面）"
+                        file={idFront}
+                        onFileChange={setIdFront}
+                        required
+                      />
+                      <FileUpload
+                        label="身分証明書（裏面）"
+                        file={idBack}
+                        onFileChange={setIdBack}
+                        required
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-between pt-4">
+                <Button variant="outline" onClick={() => setCurrentStep(2)}>
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  戻る
+                </Button>
+                <Button onClick={() => setCurrentStep(4)} disabled={!canProceedStep3()}>
+                  次へ
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {currentStep === 4 && (
           <Card>
             <CardHeader>
               <CardTitle>回線数と金額</CardTitle>
@@ -559,11 +830,11 @@ export default function ApplyPage() {
               </div>
 
               <div className="flex justify-between pt-4">
-                <Button variant="outline" onClick={() => setCurrentStep(2)}>
+                <Button variant="outline" onClick={() => setCurrentStep(3)}>
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   戻る
                 </Button>
-                <Button onClick={() => setCurrentStep(4)}>
+                <Button onClick={() => setCurrentStep(5)}>
                   次へ
                   <ArrowRight className="h-4 w-4 ml-2" />
                 </Button>
@@ -572,7 +843,7 @@ export default function ApplyPage() {
           </Card>
         )}
 
-        {currentStep === 4 && (
+        {currentStep === 5 && (
           <Card>
             <CardHeader>
               <CardTitle>お申込み内容の確認</CardTitle>
@@ -603,6 +874,16 @@ export default function ApplyPage() {
                     〒{customerData.postalCode} {customerData.prefecture}{customerData.city}{customerData.address}
                     {customerData.building && " " + customerData.building}
                   </p>
+                </div>
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <h4 className="font-medium mb-2">本人確認書類</h4>
+                  <ul className="text-sm text-muted-foreground space-y-1">
+                    {customerType === "CORPORATE" && corporateRegistry && (
+                      <li>・登記簿謄本: {corporateRegistry.name}</li>
+                    )}
+                    {idFront && <li>・身分証明書（表）: {idFront.name}</li>}
+                    {idBack && <li>・身分証明書（裏）: {idBack.name}</li>}
+                  </ul>
                 </div>
                 <div className="p-4 bg-gray-50 rounded-lg">
                   <h4 className="font-medium mb-2">月額料金</h4>
@@ -640,7 +921,7 @@ export default function ApplyPage() {
               </div>
 
               <div className="flex justify-between pt-4">
-                <Button variant="outline" onClick={() => setCurrentStep(3)}>
+                <Button variant="outline" onClick={() => setCurrentStep(4)}>
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   戻る
                 </Button>
