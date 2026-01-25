@@ -1,49 +1,44 @@
+import { auth } from "@/auth";
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
-import { getToken } from "next-auth/jwt";
+
+export const runtime = "nodejs";
 
 // 認証不要のパス
 const publicPaths = ["/login", "/api/auth"];
 
-export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+export default auth((req) => {
+  const { pathname } = req.nextUrl;
 
   const isPublicPath = publicPaths.some(
     (path) => pathname === path || pathname.startsWith(path + "/")
   );
 
-  // JWTトークンを取得
-  const token = await getToken({
-    req: request,
-    secret: process.env.AUTH_SECRET,
-  });
-
-  const isLoggedIn = !!token;
+  const isLoggedIn = !!req.auth;
 
   // 公開パスは認証不要
   if (isPublicPath) {
     // ログイン済みでログインページにアクセスした場合はリダイレクト
     if (isLoggedIn && pathname === "/login") {
-      return NextResponse.redirect(new URL("/", request.url));
+      return NextResponse.redirect(new URL("/", req.url));
     }
     return NextResponse.next();
   }
 
   // 非公開パスで未ログインの場合はログインページにリダイレクト
   if (!isLoggedIn) {
-    const loginUrl = new URL("/login", request.url);
+    const loginUrl = new URL("/login", req.url);
     loginUrl.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
   // 管理者権限チェック（ADMINまたはSUPER_ADMIN）
-  const userRole = token?.role as string | undefined;
+  const userRole = req.auth?.user?.role;
   if (userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
-    return NextResponse.redirect(new URL("/login?error=AccessDenied", request.url));
+    return NextResponse.redirect(new URL("/login?error=AccessDenied", req.url));
   }
 
   return NextResponse.next();
-}
+});
 
 export const config = {
   matcher: [
