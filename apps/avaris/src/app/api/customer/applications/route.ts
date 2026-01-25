@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
           lineCount,
           unitPrice,
           totalAmount,
-          status: "APPROVED", // 追加申込は本人確認済みなので承認済み
+          status: "KYC_APPROVED", // 追加申込は本人確認済み
         },
       });
 
