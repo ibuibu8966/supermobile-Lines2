@@ -14,16 +14,16 @@ datasource db {
 // ==================== ENUMS ====================
 
 enum SimStatus {
-  IN_STOCK    // 在庫（販売可能）
-  ACTIVE      // 利用中
-  RETURNING   // 返却待ち
-  RETIRED     // 廃棄/契約終了
-  CANCELLED   // 解約済み
+  IN_STOCK // 在庫（販売可能）
+  ACTIVE // 利用中
+  RETURNING // 返却待ち
+  RETIRED // 廃棄/契約終了
+  CANCELLED // 解約済み
 }
 
 enum SimType {
-  INDIVIDUAL  // 個人回線
-  CORPORATE   // 法人回線
+  INDIVIDUAL // 個人回線
+  CORPORATE // 法人回線
 }
 
 enum CarrierType {
@@ -34,16 +34,16 @@ enum CarrierType {
 }
 
 enum ContractStatus {
-  PENDING     // 準備中
-  SHIPPED     // 発送済み
-  ACTIVE      // 利用中
-  ENDED       // 契約終了
-  CANCELLED   // キャンセル
+  PENDING // 準備中
+  SHIPPED // 発送済み
+  ACTIVE // 利用中
+  ENDED // 契約終了
+  CANCELLED // キャンセル
 }
 
 enum CustomerType {
-  INDIVIDUAL  // 個人
-  CORPORATE   // 法人
+  INDIVIDUAL // 個人
+  CORPORATE // 法人
 }
 
 enum CustomerStatus {
@@ -59,24 +59,24 @@ enum UserRole {
 }
 
 enum ApplicationStatus {
-  SUBMITTED       // 申込済み
-  KYC_PENDING     // 本人確認待ち
-  KYC_APPROVED    // 本人確認OK
-  KYC_REJECTED    // 本人確認NG
+  SUBMITTED // 申込済み
+  KYC_PENDING // 本人確認待ち
+  KYC_APPROVED // 本人確認OK
+  KYC_REJECTED // 本人確認NG
   PAYMENT_PENDING // 入金待ち
-  PAID            // 入金済み
-  SHIPPING        // 発送中
-  COMPLETED       // 完了
-  CANCELLED       // キャンセル
+  PAID // 入金済み
+  SHIPPING // 発送中
+  COMPLETED // 完了
+  CANCELLED // キャンセル
 }
 
 enum ApplicationLineStatus {
-  UNASSIGNED  // 未割当
-  ASSIGNED    // SIM割当済み
-  SHIPPED     // 発送済み
-  ACTIVE      // 利用中
-  CANCELLED   // 解約済み
-  RETURNED    // 返却済み
+  UNASSIGNED // 未割当
+  ASSIGNED // SIM割当済み
+  SHIPPED // 発送済み
+  ACTIVE // 利用中
+  CANCELLED // 解約済み
+  RETURNED // 返却済み
 }
 
 enum KycImageType {
@@ -95,54 +95,52 @@ enum KycImageStatus {
 // ==================== SIM管理 ====================
 
 model Supplier {
-  id        Int       @id @default(autoincrement())
-  code      String    @unique @db.VarChar(50)
-  name      String    @db.VarChar(100)
-  isActive  Boolean   @default(true)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id        Int      @id @default(autoincrement())
+  code      String   @unique @db.VarChar(50)
+  name      String   @db.VarChar(100)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  sims      Sim[]
+  sims Sim[]
 
   @@index([isActive])
 }
 
 model Sim {
-  iccid                 String      @id @db.VarChar(20)
-  msisdn                String?     @db.VarChar(20)
-  supplierId            Int
-  simType               SimType     @default(INDIVIDUAL)
-  carrierType           CarrierType?
-  ownerCompany          String?     @db.VarChar(100)
-  plan                  String?     @db.VarChar(100)
-  customerType          String?     @db.VarChar(50)
+  iccid       String       @id @db.VarChar(20)
+  msisdn      String?      @db.VarChar(20)
+  supplierId  Int
+  simType     SimType      @default(INDIVIDUAL)
+  carrierType CarrierType?
+  plan        String?      @db.VarChar(100)
 
   // 仕入れ先契約期間
   supplierContractStart DateTime?
   supplierContractEnd   DateTime?
 
   // MNP関連
-  isMnpEligible         Boolean     @default(false)
-  mnpReservationNumber  String?     @db.VarChar(20)
-  mnpExpiryDate         DateTime?
+  isMnpEligible        Boolean   @default(false)
+  mnpReservationNumber String?   @db.VarChar(20)
+  mnpExpiryDate        DateTime?
 
   // 自動解約
-  isAutoCancel          Boolean     @default(false)
-  autoCancelDate        DateTime?
+  isAutoCancel   Boolean   @default(false)
+  autoCancelDate DateTime?
 
   // 現在の状態
-  currentContractId     String?     @db.VarChar(30)
-  status                SimStatus   @default(IN_STOCK)
+  currentContractId String?   @db.VarChar(30)
+  status            SimStatus @default(IN_STOCK)
 
   // 消費済み用途タグ（高速検索用）
-  consumedTagIds        Int[]       @default([])
+  consumedTagIds Int[] @default([])
 
-  createdAt             DateTime    @default(now())
-  updatedAt             DateTime    @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  supplier              Supplier    @relation(fields: [supplierId], references: [id])
-  contracts             Contract[]
-  applicationLines      ApplicationLine[]
+  supplier         Supplier          @relation(fields: [supplierId], references: [id])
+  contracts        Contract[]
+  applicationLines ApplicationLine[]
 
   @@index([status])
   @@index([supplierId])
@@ -153,69 +151,65 @@ model Sim {
 }
 
 model Contract {
-  id                  String          @id @default(cuid())
-  iccid               String          @db.VarChar(20)
-  serviceName         String          @db.VarChar(50)
-  customerId          String?         @db.VarChar(100)
-  externalContractId  String?         @db.VarChar(100)
+  id          String  @id @default(cuid())
+  iccid       String  @db.VarChar(20)
+  serviceName String  @db.VarChar(50)
+  customerId  String?
 
-  contractStart       DateTime?
-  contractEnd         DateTime?
-  status              ContractStatus  @default(PENDING)
+  contractStart DateTime?
+  contractEnd   DateTime?
+  status        ContractStatus @default(PENDING)
 
-  shippedAt           DateTime?
-  arrivedAt           DateTime?
-  returnedAt          DateTime?
+  shippedAt  DateTime?
+  arrivedAt  DateTime?
+  returnedAt DateTime?
 
-  msisdnSnapshot      String?         @db.VarChar(20)
+  msisdnSnapshot String? @db.VarChar(20)
 
-  syncSourceId        Int?
-  lastSyncAt          DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  createdAt           DateTime        @default(now())
-  updatedAt           DateTime        @updatedAt
-
-  sim                 Sim             @relation(fields: [iccid], references: [iccid], onDelete: Cascade)
-  usageTags           ContractUsageTag[]
-  syncSource          ServiceSource?  @relation(fields: [syncSourceId], references: [id])
+  sim              Sim                @relation(fields: [iccid], references: [iccid], onDelete: Cascade)
+  customer         Customer?          @relation(fields: [customerId], references: [id])
+  usageTags        ContractUsageTag[]
+  applicationLines ApplicationLine[]
 
   @@index([iccid])
   @@index([serviceName])
   @@index([customerId])
   @@index([status])
   @@index([contractStart, contractEnd])
-  @@index([syncSourceId])
 }
 
 model UsageTag {
-  id           Int       @id @default(autoincrement())
-  code         String    @unique @db.VarChar(50)
-  name         String    @db.VarChar(100)
-  category     String?   @db.VarChar(50)
-  description  String?   @db.Text
-  isActive     Boolean   @default(true)
-  displayOrder Int       @default(0)
+  id           Int     @id @default(autoincrement())
+  code         String  @unique @db.VarChar(50)
+  name         String  @db.VarChar(100)
+  category     String? @db.VarChar(50)
+  description  String? @db.Text
+  isActive     Boolean @default(true)
+  displayOrder Int     @default(0)
 
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   contractTags ContractUsageTag[]
   rules        UsageRule[]
-  plans        Plan[]
+  planTags     PlanUsageTag[]
 
   @@index([isActive])
   @@index([category])
 }
 
 model ContractUsageTag {
-  id          String    @id @default(cuid())
-  contractId  String
-  usageTagId  Int
-  appliedAt   DateTime  @default(now())
-  note        String?   @db.Text
+  id         String   @id @default(cuid())
+  contractId String
+  usageTagId Int
+  appliedAt  DateTime @default(now())
+  note       String?  @db.Text
 
-  contract    Contract  @relation(fields: [contractId], references: [id], onDelete: Cascade)
-  usageTag    UsageTag  @relation(fields: [usageTagId], references: [id], onDelete: Cascade)
+  contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  usageTag UsageTag @relation(fields: [usageTagId], references: [id], onDelete: Cascade)
 
   @@unique([contractId, usageTagId])
   @@index([usageTagId])
@@ -223,83 +217,38 @@ model ContractUsageTag {
 }
 
 model UsageRule {
-  id              Int         @id @default(autoincrement())
+  id              Int          @id @default(autoincrement())
   usageTagId      Int
-  supplierFilter  String?     @db.VarChar(50)
+  supplierFilter  String?      @db.VarChar(50)
   carrierFilter   CarrierType?
-  planFilter      String?     @db.VarChar(100)
-  excludedTagIds  Int[]       @default([])
-  minContractDays Int         @default(0)
-  requiresMnp     Boolean     @default(false)
-  conditions      Json        @default("{}")
-  priority        Int         @default(0)
-  isActive        Boolean     @default(true)
+  planFilter      String?      @db.VarChar(100)
+  excludedTagIds  Int[]        @default([])
+  minContractDays Int          @default(0)
+  requiresMnp     Boolean      @default(false)
+  conditions      Json         @default("{}")
+  priority        Int          @default(0)
+  isActive        Boolean      @default(true)
 
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  usageTag        UsageTag    @relation(fields: [usageTagId], references: [id], onDelete: Cascade)
+  usageTag UsageTag @relation(fields: [usageTagId], references: [id], onDelete: Cascade)
 
   @@index([usageTagId])
   @@index([priority])
   @@index([isActive])
 }
 
-// ==================== 外部連携 ====================
-
-model ServiceSource {
-  id              Int       @id @default(autoincrement())
-  code            String    @unique @db.VarChar(50)
-  displayName     String    @db.VarChar(100)
-  supabaseUrl     String    @db.VarChar(255)
-  serviceRoleKey  String    @db.Text
-  tableName       String    @db.VarChar(100)
-  columnMappings  Json      @default("{}")
-  defaultTagIds   Int[]     @default([])
-  isEnabled       Boolean   @default(true)
-  syncIntervalMin Int       @default(60)
-  lastSyncAt      DateTime?
-  lastSyncStatus  String?   @db.Text
-
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-
-  contracts       Contract[]
-
-  @@index([isEnabled])
-}
-
-model SyncLog {
-  id              String    @id @default(cuid())
-  serviceSourceId Int?
-  operation       String    @db.VarChar(50)
-  status          String    @db.VarChar(20)
-  recordsChecked  Int       @default(0)
-  recordsCreated  Int       @default(0)
-  recordsUpdated  Int       @default(0)
-  recordsFailed   Int       @default(0)
-  errorMessage    String?   @db.Text
-  metadata        Json      @default("{}")
-  startedAt       DateTime  @default(now())
-  completedAt     DateTime?
-
-  @@index([serviceSourceId])
-  @@index([operation])
-  @@index([status])
-  @@index([startedAt])
-}
-
 // ==================== サービス・顧客・申込 ====================
 
 model Service {
-  id        String    @id @default(cuid())
-  code      String    @unique @db.VarChar(50)
-  name      String    @db.VarChar(100)
-  isActive  Boolean   @default(true)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id        String   @id @default(cuid())
+  code      String   @unique @db.VarChar(50)
+  name      String   @db.VarChar(100)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  customers    Customer[]
   applications Application[]
   plans        Plan[]
   users        User[]
@@ -308,16 +257,16 @@ model Service {
 }
 
 model User {
-  id        String    @id @default(cuid())
-  email     String    @unique
-  password  String    @db.Text
-  role      UserRole  @default(CUSTOMER)
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String   @db.Text
+  role      UserRole @default(CUSTOMER)
   serviceId String?
-  isActive  Boolean   @default(true)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  service   Service?  @relation(fields: [serviceId], references: [id])
+  service   Service?   @relation(fields: [serviceId], references: [id])
   customers Customer[]
 
   @@index([role])
@@ -326,70 +275,79 @@ model User {
 }
 
 model Customer {
-  id                    String         @id @default(cuid())
-  serviceId             String
-  userId                String?
-  type                  CustomerType   @default(INDIVIDUAL)
-  email                 String
-  phone                 String         @db.VarChar(20)
+  id     String       @id @default(cuid())
+  userId String?
+  type   CustomerType @default(INDIVIDUAL)
+  email  String       @unique
+  phone  String       @db.VarChar(20)
 
   // 個人情報
-  lastName              String         @db.VarChar(50)
-  firstName             String         @db.VarChar(50)
-  lastNameKana          String         @db.VarChar(50)
-  firstNameKana         String         @db.VarChar(50)
-  birthDate             DateTime?
-  postalCode            String         @db.VarChar(10)
-  prefecture            String         @db.VarChar(20)
-  city                  String         @db.VarChar(100)
-  address               String         @db.VarChar(200)
-  building              String?        @db.VarChar(200)
+  lastName      String    @db.VarChar(50)
+  firstName     String    @db.VarChar(50)
+  lastNameKana  String    @db.VarChar(50)
+  firstNameKana String    @db.VarChar(50)
+  birthDate     DateTime?
+  postalCode    String    @db.VarChar(10)
+  prefecture    String    @db.VarChar(20)
+  city          String    @db.VarChar(100)
+  address       String    @db.VarChar(200)
+  building      String?   @db.VarChar(200)
 
   // 法人情報
-  companyName           String?        @db.VarChar(100)
-  companyNameKana       String?        @db.VarChar(100)
-  establishedDate       DateTime?
-  companyPostalCode     String?        @db.VarChar(10)
-  companyPrefecture     String?        @db.VarChar(20)
-  companyCity           String?        @db.VarChar(100)
-  companyAddress        String?        @db.VarChar(200)
-  companyBuilding       String?        @db.VarChar(200)
+  companyName       String?   @db.VarChar(100)
+  companyNameKana   String?   @db.VarChar(100)
+  establishedDate   DateTime?
+  companyPostalCode String?   @db.VarChar(10)
+  companyPrefecture String?   @db.VarChar(20)
+  companyCity       String?   @db.VarChar(100)
+  companyAddress    String?   @db.VarChar(200)
+  companyBuilding   String?   @db.VarChar(200)
 
-  status                CustomerStatus @default(ACTIVE)
-  note                  String?        @db.Text
+  status CustomerStatus @default(ACTIVE)
+  note   String?        @db.Text
 
-  createdAt             DateTime       @default(now())
-  updatedAt             DateTime       @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  service      Service       @relation(fields: [serviceId], references: [id])
   user         User?         @relation(fields: [userId], references: [id])
   applications Application[]
+  contracts    Contract[]
 
-  @@index([serviceId])
   @@index([userId])
-  @@index([email])
   @@index([type])
   @@index([status])
 }
 
 model Plan {
-  id         String    @id @default(cuid())
-  serviceId  String
-  code       String    @db.VarChar(50)
-  name       String    @db.VarChar(100)
-  usageTagId Int?
-  isActive   Boolean   @default(true)
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  id        String   @id @default(cuid())
+  serviceId String
+  code      String   @db.VarChar(50)
+  name      String   @db.VarChar(100)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  service      Service       @relation(fields: [serviceId], references: [id])
-  usageTag     UsageTag?     @relation(fields: [usageTagId], references: [id])
+  service      Service        @relation(fields: [serviceId], references: [id])
+  usageTags    PlanUsageTag[]
   pricings     PlanPricing[]
   applications Application[]
 
   @@unique([serviceId, code])
   @@index([serviceId])
   @@index([isActive])
+}
+
+model PlanUsageTag {
+  id         String   @id @default(cuid())
+  planId     String
+  usageTagId Int
+  createdAt  DateTime @default(now())
+
+  plan     Plan     @relation(fields: [planId], references: [id], onDelete: Cascade)
+  usageTag UsageTag @relation(fields: [usageTagId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, usageTagId])
+  @@index([usageTagId])
 }
 
 model PlanPricing {
@@ -419,12 +377,11 @@ model Application {
   unitPrice         Int
   totalAmount       Int
   status            ApplicationStatus @default(SUBMITTED)
-  appliedAt         DateTime          @default(now())
   paidAt            DateTime?
   note              String?           @db.Text
 
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   customer  Customer          @relation(fields: [customerId], references: [id])
   service   Service           @relation(fields: [serviceId], references: [id])
@@ -436,7 +393,7 @@ model Application {
   @@index([serviceId])
   @@index([planId])
   @@index([status])
-  @@index([appliedAt])
+  @@index([createdAt])
 }
 
 model ApplicationLine {
@@ -444,21 +401,24 @@ model ApplicationLine {
   applicationId String
   lineNumber    Int
   simId         String?               @db.VarChar(20)
+  contractId    String?
   msisdn        String?               @db.VarChar(20)
   status        ApplicationLineStatus @default(UNASSIGNED)
   shippedAt     DateTime?
   returnedAt    DateTime?
   note          String?               @db.Text
 
-  createdAt     DateTime              @default(now())
-  updatedAt     DateTime              @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   sim         Sim?        @relation(fields: [simId], references: [iccid])
+  contract    Contract?   @relation(fields: [contractId], references: [id])
 
   @@unique([applicationId, lineNumber])
   @@index([applicationId])
   @@index([simId])
+  @@index([contractId])
   @@index([status])
 }
 
@@ -471,8 +431,8 @@ model KycImage {
   reviewedAt    DateTime?
   reviewNote    String?        @db.Text
 
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
 

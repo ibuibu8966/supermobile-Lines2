@@ -57,7 +57,7 @@ supermobile-Lines/
 
 | アプリ | 用途 | 対象ユーザー | 認証 |
 |--------|------|-------------|------|
-| admin | SIM一元管理・同期・ルール設定・サービス/プラン管理 | 運営者 | Auth.js（管理者のみ） |
+| admin | SIM一元管理・ルール設定・サービス/プラン管理 | 運営者 | Auth.js（管理者のみ） |
 | buppan | 物販LP・申込・マイページ・管理 | 顧客・運営者 | Auth.js |
 | versus | バーサスLP・申込・マイページ・管理 | 顧客・運営者 | Auth.js |
 | avaris | AvarisLP・申込・マイページ・管理 | 顧客・運営者 | Auth.js |
@@ -80,6 +80,7 @@ supermobile-Lines/
 - `supplierId`: 仕入れ先
 - `simType`: INDIVIDUAL/CORPORATE（個人回線/法人回線）
 - `carrierType`: DOCOMO/AU/SOFTBANK/RAKUTEN
+- `plan`: 仕入れ先でのプラン名
 - `isMnpEligible`: MNP可否
 - `isAutoCancel`: 翌月自動解約フラグ
 - `status`: IN_STOCK/ACTIVE/RETURNING/RETIRED/CANCELLED
@@ -90,10 +91,11 @@ supermobile-Lines/
 - `id`: CUID
 - `iccid`: SIMへの参照
 - `serviceName`: サービス名
-- `customerId`: 外部顧客ID
+- `customerId`: Customerへのリレーション（任意）
 - `contractStart/End`: 契約期間
 - `status`: PENDING/SHIPPED/ACTIVE/ENDED/CANCELLED
 - `shippedAt/arrivedAt/returnedAt`: 配送追跡
+- `applicationLines`: 紐付いたApplicationLine一覧
 
 #### UsageTag（用途タグマスタ）
 - `id`: 自動採番
@@ -124,11 +126,10 @@ supermobile-Lines/
 
 #### Customer（顧客）
 - `id`: CUID
-- `serviceId`: サービス
 - `userId`: Auth.jsユーザーID
 - `type`: INDIVIDUAL（個人）/ CORPORATE（法人）
-- `email`: メールアドレス
-- `phone`: 電話番号
+- `email`: メールアドレス（ユニーク制約あり）
+- `phone`: 電話番号（固定電話・携帯電話両対応）
 - **個人情報**
   - `lastName/firstName`: 姓・名
   - `lastNameKana/firstNameKana`: 姓カナ・名カナ
@@ -140,6 +141,9 @@ supermobile-Lines/
   - `companyPostalCode/companyPrefecture/companyCity/companyAddress/companyBuilding`: 法人住所
 - `status`: ACTIVE/SUSPENDED/DELETED
 - `note`: 顧客メモ（管理者用）
+- `contracts`: 紐付いたContract一覧
+
+**補足**: 1顧客が複数サービス（物販・バーサス・Avaris）を利用可能。同じメールアドレスで複数サービス申込時は同一顧客として管理。
 
 #### User（Auth.js認証）
 - `id`: CUID
@@ -159,8 +163,8 @@ supermobile-Lines/
 - `unitPrice`: 単価（申込時点の価格を保存）
 - `totalAmount`: 合計金額
 - `status`: SUBMITTED/KYC_PENDING/KYC_APPROVED/KYC_REJECTED/PAYMENT_PENDING/PAID/SHIPPING/COMPLETED/CANCELLED
-- `appliedAt`: 申込日時
 - `paidAt`: 入金日時
+- `createdAt`: 申込日時（appliedAtは削除、createdAtで代用）
 - `note`: 申込メモ（管理者用）
 
 #### ApplicationLine（申込回線）
@@ -168,6 +172,7 @@ supermobile-Lines/
 - `applicationId`: 申込
 - `lineNumber`: 回線番号（申込内の連番）
 - `simId`: 割当SIMのICCID（発送時に紐付け）
+- `contractId`: 紐付いたContract（発送時に自動作成）
 - `msisdn`: 電話番号（SIMマスタから自動取得）
 - `status`: UNASSIGNED/ASSIGNED/SHIPPED/ACTIVE/CANCELLED/RETURNED
 - `shippedAt`: 発送日時
@@ -188,8 +193,14 @@ supermobile-Lines/
 - `serviceId`: サービス
 - `code`: プランコード
 - `name`: プラン名
-- `usageTagId`: 関連用途タグ（SIM割当時に使用）
+- `usageTags`: 関連用途タグ（PlanUsageTag中間テーブル経由、複数指定可能）
 - `isActive`: 有効フラグ
+
+#### PlanUsageTag（プラン-用途タグ中間テーブル）
+- `id`: CUID
+- `planId`: プラン
+- `usageTagId`: 用途タグ
+- 1プランに複数の用途タグを紐付け可能
 
 #### PlanPricing（プラン料金テーブル）
 - `id`: CUID
@@ -219,20 +230,38 @@ supermobile-Lines/
    - ICCIDが入力される
    - SIMマスタから電話番号を自動取得
    - ApplicationLineに紐付け
-8. 全回線分スキャン完了 or 一部発送
-9. 発送処理 → SHIPPING → 顧客に届いたら COMPLETED
+8. 発送処理実行時:
+   - ApplicationLine.status → SHIPPED
+   - ApplicationLine.simId → スキャンしたICCID
+   - Contract自動作成（iccid, serviceName, customerId, 用途タグ）
+   - ApplicationLine.contractId → 作成したContractのID
+   - Sim.status → ACTIVE
+   - Sim.currentContractId → 作成したContractのID
+9. 顧客に届いたら COMPLETED
 ```
 
 ### 解約・返却フロー
 
+**パターン1: 返却して再販する場合**
 ```
 1. 顧客がマイページで解約申請 or 管理者が解約処理
 2. ApplicationLine.status → CANCELLED
 3. SIMが返却される
 4. バーコードスキャン or 手動で返却処理
 5. ApplicationLine.status → RETURNED
-6. Sim.status → IN_STOCK（再利用可能）
-7. Contract.status → ENDED（履歴として記録）
+6. Contract.status → ENDED（履歴として記録）
+7. Sim.status → IN_STOCK（再販可能）
+```
+
+**パターン2: 完全解約（再販不可）**
+```
+1. 顧客がマイページで解約申請 or 管理者が解約処理
+2. ApplicationLine.status → CANCELLED
+3. SIMが返却される
+4. 返却処理
+5. ApplicationLine.status → RETURNED
+6. Contract.status → CANCELLED
+7. Sim.status → RETIRED（廃棄・契約終了）
 ```
 
 ---
@@ -242,8 +271,10 @@ supermobile-Lines/
 | ロール | 説明 | 権限 |
 |--------|------|------|
 | CUSTOMER | 顧客 | マイページのみ |
-| ADMIN | 一般管理者 | 申込・顧客・回線の閲覧・編集 |
-| SUPER_ADMIN | スーパー管理者 | 全機能＋ユーザー管理＋設定変更 |
+| ADMIN | 一般管理者 | 担当サービスの申込・顧客・回線の閲覧・編集（User.serviceIdで制限） |
+| SUPER_ADMIN | スーパー管理者 | 全サービスの全機能＋ユーザー管理＋設定変更 |
+
+**補足**: ADMINは`User.serviceId`で紐付けられた特定サービスのみ管理可能。SUPER_ADMINは全サービスを横断して管理可能。
 
 ---
 
@@ -261,7 +292,6 @@ supermobile-Lines/
 /usage-tags         # 用途タグ管理
 /services           # サービス管理
 /plans              # プラン管理（料金テーブル含む）
-/sync               # 外部サービス同期
 /users              # ユーザー管理（SUPER_ADMINのみ）
 ```
 
@@ -426,4 +456,3 @@ pnpm --filter avaris dev     # localhost:3003
 ### Phase 4: 統合・連携
 1. 申込→SIM割当
 2. 解約→返却処理
-3. 外部サービス同期

@@ -32,10 +32,9 @@ export function createAuthConfig(prisma: PrismaClient): NextAuthConfig {
           const user = await prisma.user.findUnique({
             where: { email },
             include: {
-              customer: {
+              customers: {
                 select: {
                   id: true,
-                  serviceId: true,
                 },
               },
             },
@@ -56,7 +55,7 @@ export function createAuthConfig(prisma: PrismaClient): NextAuthConfig {
             email: user.email,
             role: user.role,
             serviceId: user.serviceId,
-            customerId: user.customer?.id ?? null,
+            customerId: user.customers?.[0]?.id ?? null,
           };
         },
       }),

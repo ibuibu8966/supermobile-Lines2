@@ -10,7 +10,6 @@ import {
   Smartphone,
   Tags,
   Settings,
-  RefreshCw,
   Building2,
   Package,
 } from "lucide-react";
@@ -45,12 +44,6 @@ const menuItems = [
     description: "サービスとプランの登録・編集",
     href: "/services",
     icon: Package,
-  },
-  {
-    title: "外部連携・同期",
-    description: "外部サービスとのデータ同期",
-    href: "/sync",
-    icon: RefreshCw,
   },
 ];
 

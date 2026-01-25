@@ -4,9 +4,9 @@ import { z } from 'zod'
 export const iccidSchema = z.string()
   .regex(/^\d{19,20}$/, 'ICCIDは19〜20桁の数字です')
 
-// 電話番号検証
+// 電話番号検証（固定電話・携帯電話両対応: 0始まり10〜11桁）
 export const msisdnSchema = z.string()
-  .regex(/^0[789]0\d{8}$/, '電話番号の形式が正しくありません')
+  .regex(/^0\d{9,10}$/, '電話番号の形式が正しくありません')
   .optional()
   .nullable()
 
