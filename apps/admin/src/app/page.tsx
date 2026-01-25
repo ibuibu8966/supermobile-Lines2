@@ -12,7 +12,10 @@ import {
   Settings,
   Building2,
   Package,
+  Users,
 } from "lucide-react";
+import { auth } from "@/auth";
+import { UserMenu } from "./user-menu";
 
 const menuItems = [
   {
@@ -45,39 +48,56 @@ const menuItems = [
     href: "/services",
     icon: Package,
   },
+  {
+    title: "ユーザー管理",
+    description: "管理者・顧客ユーザーの管理",
+    href: "/users",
+    icon: Users,
+    adminOnly: true,
+  },
 ];
 
-export default function AdminDashboard() {
+export default async function AdminDashboard() {
+  const session = await auth();
+  const isSuperAdmin = session?.user?.role === "SUPER_ADMIN";
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <h1 className="text-2xl font-bold text-gray-900">
-            スーパー回線管理くん
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">SIM統合管理システム</p>
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">
+                スーパー回線管理くん
+              </h1>
+              <p className="text-sm text-gray-500 mt-1">SIM統合管理システム</p>
+            </div>
+            <UserMenu user={session?.user} />
+          </div>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {menuItems.map((item) => (
-            <Link key={item.href} href={item.href}>
-              <Card className="h-full hover:shadow-md transition-shadow cursor-pointer">
-                <CardHeader>
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-primary/10 rounded-lg">
-                      <item.icon className="h-6 w-6 text-primary" />
+          {menuItems
+            .filter((item) => !item.adminOnly || isSuperAdmin)
+            .map((item) => (
+              <Link key={item.href} href={item.href}>
+                <Card className="h-full hover:shadow-md transition-shadow cursor-pointer">
+                  <CardHeader>
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-primary/10 rounded-lg">
+                        <item.icon className="h-6 w-6 text-primary" />
+                      </div>
+                      <CardTitle className="text-lg">{item.title}</CardTitle>
                     </div>
-                    <CardTitle className="text-lg">{item.title}</CardTitle>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <CardDescription>{item.description}</CardDescription>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
+                  </CardHeader>
+                  <CardContent>
+                    <CardDescription>{item.description}</CardDescription>
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
         </div>
 
         <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">

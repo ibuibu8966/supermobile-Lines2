@@ -90,9 +90,13 @@ export default function RulesPage() {
   }, [showInactive]);
 
   const openCreateModal = () => {
+    if (usageTags.length === 0) {
+      alert("先に用途タグを作成してください");
+      return;
+    }
     setEditingRule(null);
     setFormData({
-      usageTagId: usageTags[0]?.id || 0,
+      usageTagId: usageTags[0].id,
       supplierFilter: "",
       carrierFilter: "",
       excludedTagIds: [],
