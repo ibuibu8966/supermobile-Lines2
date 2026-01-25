@@ -1,0 +1,160 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { signOut, useSession } from "next-auth/react";
+import { Button, cn } from "@repo/ui";
+import {
+  LayoutDashboard,
+  Phone,
+  FileText,
+  Settings,
+  LogOut,
+  Menu,
+  X,
+  User,
+  ChevronRight,
+} from "lucide-react";
+
+const navigation = [
+  { name: "ダッシュボード", href: "/dashboard", icon: LayoutDashboard },
+  { name: "契約回線", href: "/dashboard/lines", icon: Phone },
+  { name: "申し込み履歴", href: "/dashboard/history", icon: FileText },
+  { name: "設定", href: "/dashboard/settings", icon: Settings },
+];
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const pathname = usePathname();
+  const { data: session } = useSession();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const handleSignOut = () => {
+    signOut({ callbackUrl: "/" });
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* モバイルサイドバー */}
+      <div
+        className={cn(
+          "fixed inset-0 z-50 lg:hidden",
+          sidebarOpen ? "block" : "hidden"
+        )}
+      >
+        <div
+          className="fixed inset-0 bg-black/50"
+          onClick={() => setSidebarOpen(false)}
+        />
+        <div className="fixed inset-y-0 left-0 w-64 bg-white shadow-xl">
+          <div className="flex h-16 items-center justify-between px-4 border-b">
+            <span className="text-lg font-bold">マイページ</span>
+            <button onClick={() => setSidebarOpen(false)}>
+              <X className="h-6 w-6" />
+            </button>
+          </div>
+          <nav className="p-4 space-y-1">
+            {navigation.map((item) => {
+              const isActive = pathname === item.href;
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  onClick={() => setSidebarOpen(false)}
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                    isActive
+                      ? "bg-primary text-primary-foreground"
+                      : "text-gray-700 hover:bg-gray-100"
+                  )}
+                >
+                  <item.icon className="h-5 w-5" />
+                  {item.name}
+                </Link>
+              );
+            })}
+          </nav>
+          <div className="absolute bottom-0 left-0 right-0 p-4 border-t">
+            <Button
+              variant="ghost"
+              className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
+              onClick={handleSignOut}
+            >
+              <LogOut className="h-5 w-5 mr-3" />
+              ログアウト
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* デスクトップサイドバー */}
+      <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
+        <div className="flex flex-col flex-grow bg-white border-r">
+          <div className="flex h-16 items-center px-6 border-b">
+            <span className="text-lg font-bold">マイページ</span>
+          </div>
+          <nav className="flex-1 p-4 space-y-1">
+            {navigation.map((item) => {
+              const isActive = pathname === item.href;
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                    isActive
+                      ? "bg-primary text-primary-foreground"
+                      : "text-gray-700 hover:bg-gray-100"
+                  )}
+                >
+                  <item.icon className="h-5 w-5" />
+                  {item.name}
+                </Link>
+              );
+            })}
+          </nav>
+          <div className="p-4 border-t">
+            {session?.user && (
+              <div className="flex items-center gap-3 px-3 py-2 mb-2">
+                <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center">
+                  <User className="h-4 w-4 text-gray-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900 truncate">
+                    {session.user.name || session.user.email}
+                  </p>
+                </div>
+              </div>
+            )}
+            <Button
+              variant="ghost"
+              className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
+              onClick={handleSignOut}
+            >
+              <LogOut className="h-5 w-5 mr-3" />
+              ログアウト
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* メインコンテンツ */}
+      <div className="lg:pl-64">
+        {/* モバイルヘッダー */}
+        <div className="sticky top-0 z-40 flex h-16 items-center gap-4 bg-white border-b px-4 lg:hidden">
+          <button onClick={() => setSidebarOpen(true)}>
+            <Menu className="h-6 w-6" />
+          </button>
+          <span className="text-lg font-bold">マイページ</span>
+        </div>
+
+        {/* ページコンテンツ */}
+        <main className="p-4 lg:p-8">{children}</main>
+      </div>
+    </div>
+  );
+}
