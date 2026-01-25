@@ -1,0 +1,396 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@repo/ui";
+import { Plus, Pencil, Trash2, Loader2, X, GripVertical } from "lucide-react";
+
+interface UsageTag {
+  id: number;
+  code: string;
+  name: string;
+  category: string | null;
+  description: string | null;
+  displayOrder: number;
+  isActive: boolean;
+  _count: {
+    contractTags: number;
+    rules: number;
+  };
+}
+
+export default function UsageTagsPage() {
+  const [usageTags, setUsageTags] = useState<UsageTag[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showInactive, setShowInactive] = useState(false);
+
+  // モーダル状態
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingTag, setEditingTag] = useState<UsageTag | null>(null);
+  const [formData, setFormData] = useState({
+    code: "",
+    name: "",
+    category: "",
+    description: "",
+    displayOrder: 0,
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchUsageTags = async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (showInactive) params.set("includeInactive", "true");
+
+      const res = await fetch(`/api/usage-tags?${params.toString()}`);
+      const data = await res.json();
+      if (res.ok) {
+        setUsageTags(data);
+      }
+    } catch (err) {
+      console.error("用途タグ取得エラー:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsageTags();
+  }, [showInactive]);
+
+  const openCreateModal = () => {
+    setEditingTag(null);
+    setFormData({
+      code: "",
+      name: "",
+      category: "",
+      description: "",
+      displayOrder: usageTags.length,
+    });
+    setError(null);
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (tag: UsageTag) => {
+    setEditingTag(tag);
+    setFormData({
+      code: tag.code,
+      name: tag.name,
+      category: tag.category || "",
+      description: tag.description || "",
+      displayOrder: tag.displayOrder,
+    });
+    setError(null);
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditingTag(null);
+    setError(null);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+
+    try {
+      const url = editingTag
+        ? `/api/usage-tags/${editingTag.id}`
+        : "/api/usage-tags";
+      const method = editingTag ? "PATCH" : "POST";
+
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...formData,
+          category: formData.category || null,
+          description: formData.description || null,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        closeModal();
+        fetchUsageTags();
+      } else {
+        setError(data.error || "保存に失敗しました");
+      }
+    } catch (err) {
+      console.error("保存エラー:", err);
+      setError("保存に失敗しました");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (tag: UsageTag) => {
+    if (!confirm(`「${tag.name}」を削除しますか？\n\n※使用中の場合は無効化されます。`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/usage-tags/${tag.id}`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        fetchUsageTags();
+      } else {
+        const data = await res.json();
+        alert(data.error || "削除に失敗しました");
+      }
+    } catch (err) {
+      console.error("削除エラー:", err);
+      alert("削除に失敗しました");
+    }
+  };
+
+  const toggleActive = async (tag: UsageTag) => {
+    try {
+      const res = await fetch(`/api/usage-tags/${tag.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive: !tag.isActive }),
+      });
+
+      if (res.ok) {
+        fetchUsageTags();
+      }
+    } catch (err) {
+      console.error("ステータス変更エラー:", err);
+    }
+  };
+
+  // カテゴリごとにグループ化
+  const groupedTags = usageTags.reduce<Record<string, UsageTag[]>>((acc, tag) => {
+    const category = tag.category || "未分類";
+    if (!acc[category]) {
+      acc[category] = [];
+    }
+    acc[category].push(tag);
+    return acc;
+  }, {});
+
+  return (
+    <div className="p-6">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">用途タグ管理</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          SIMの利用用途タグを管理
+        </p>
+      </div>
+
+      <div className="max-w-4xl">
+        <div className="flex justify-between items-center mb-6">
+          <label className="flex items-center gap-2 text-sm text-gray-600">
+            <input
+              type="checkbox"
+              checked={showInactive}
+              onChange={(e) => setShowInactive(e.target.checked)}
+              className="rounded"
+            />
+            無効なタグも表示
+          </label>
+          <Button onClick={openCreateModal}>
+            <Plus className="h-4 w-4 mr-2" />
+            新規タグ作成
+          </Button>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">
+              用途タグ一覧
+              <span className="text-sm font-normal text-gray-500 ml-2">
+                {usageTags.length}件
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="flex justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+              </div>
+            ) : usageTags.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">
+                用途タグが登録されていません
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {Object.entries(groupedTags).map(([category, tags]) => (
+                  <div key={category}>
+                    <h3 className="text-sm font-medium text-gray-500 mb-2 flex items-center gap-2">
+                      <span className="bg-gray-100 px-2 py-1 rounded">{category}</span>
+                      <span className="text-xs">({tags.length})</span>
+                    </h3>
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left py-2 px-4 w-8"></th>
+                          <th className="text-left py-2 px-4">コード</th>
+                          <th className="text-left py-2 px-4">表示名</th>
+                          <th className="text-left py-2 px-4">使用数</th>
+                          <th className="text-left py-2 px-4">ステータス</th>
+                          <th className="text-right py-2 px-4">操作</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {tags.map((tag) => (
+                          <tr key={tag.id} className="border-b hover:bg-gray-50">
+                            <td className="py-2 px-4">
+                              <GripVertical className="h-4 w-4 text-gray-300" />
+                            </td>
+                            <td className="py-2 px-4 font-mono text-xs">{tag.code}</td>
+                            <td className="py-2 px-4">
+                              <Badge variant="secondary">{tag.name}</Badge>
+                            </td>
+                            <td className="py-2 px-4 text-gray-500 text-xs">
+                              契約: {tag._count.contractTags} / ルール: {tag._count.rules}
+                            </td>
+                            <td className="py-2 px-4">
+                              <button onClick={() => toggleActive(tag)}>
+                                <Badge variant={tag.isActive ? "success" : "secondary"}>
+                                  {tag.isActive ? "有効" : "無効"}
+                                </Badge>
+                              </button>
+                            </td>
+                            <td className="py-2 px-4 text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => openEditModal(tag)}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDelete(tag)}
+                                >
+                                  <Trash2 className="h-4 w-4 text-red-500" />
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* モーダル */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div className="flex items-center justify-between px-6 py-4 border-b">
+              <h2 className="text-lg font-semibold">
+                {editingTag ? "用途タグ編集" : "新規用途タグ作成"}
+              </h2>
+              <button
+                onClick={closeModal}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <form onSubmit={handleSubmit}>
+              <div className="px-6 py-4 space-y-4">
+                {error && (
+                  <div className="bg-red-50 text-red-600 px-4 py-2 rounded text-sm">
+                    {error}
+                  </div>
+                )}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    コード
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.code}
+                    onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-md"
+                    placeholder="pokeka"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    表示名
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-md"
+                    placeholder="ポケカ認証"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    カテゴリ
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-md"
+                    placeholder="認証系"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    説明
+                  </label>
+                  <textarea
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-md"
+                    rows={2}
+                    placeholder="このタグの説明..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    表示順
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.displayOrder}
+                    onChange={(e) => setFormData({ ...formData, displayOrder: parseInt(e.target.value) || 0 })}
+                    className="w-full px-3 py-2 border rounded-md"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 px-6 py-4 border-t bg-gray-50">
+                <Button type="button" variant="outline" onClick={closeModal}>
+                  キャンセル
+                </Button>
+                <Button type="submit" disabled={saving}>
+                  {saving ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      保存中...
+                    </>
+                  ) : (
+                    "保存"
+                  )}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
