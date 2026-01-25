@@ -15,10 +15,12 @@ import {
   X,
   User,
   ChevronRight,
+  Plus,
 } from "lucide-react";
 
 const navigation = [
   { name: "ダッシュボード", href: "/dashboard", icon: LayoutDashboard },
+  { name: "追加申込", href: "/dashboard/apply", icon: Plus },
   { name: "契約回線", href: "/dashboard/lines", icon: Phone },
   { name: "申し込み履歴", href: "/dashboard/history", icon: FileText },
   { name: "設定", href: "/dashboard/settings", icon: Settings },

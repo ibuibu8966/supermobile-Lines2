@@ -249,7 +249,7 @@ export default async function DashboardPage() {
 
       {/* クイックリンク */}
       <div className="grid gap-4 md:grid-cols-2">
-        <Link href="/apply">
+        <Link href="/dashboard/apply">
           <Card className="hover:border-primary transition-colors cursor-pointer">
             <CardContent className="pt-6">
               <div className="flex items-center gap-4">

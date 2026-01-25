@@ -1,21 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@repo/ui";
 import { Plus, Upload, ChevronDown, ChevronRight, Search, Loader2 } from "lucide-react";
-
-interface UsageTag {
-  id: number;
-  code: string;
-  name: string;
-}
-
-interface SimLocationTag {
-  id: number;
-  code: string;
-  name: string;
-}
+import { toast } from "sonner";
+import { useQueryState } from "nuqs";
+import { useSims, useSimLocationTags, type Sim } from "@/hooks/use-sims";
 
 interface Contract {
   id: string;
@@ -31,33 +22,12 @@ interface Contract {
     type: string;
   } | null;
   usageTags: Array<{
-    usageTag: UsageTag;
+    usageTag: {
+      id: number;
+      code: string;
+      name: string;
+    };
   }>;
-}
-
-interface Sim {
-  iccid: string;
-  msisdn: string | null;
-  simType: string;
-  carrierType: string | null;
-  status: string;
-  isMnpEligible: boolean;
-  supplier: {
-    id: number;
-    code: string;
-    name: string;
-  };
-  simLocationTag: SimLocationTag | null;
-  simLocationTagId: number | null;
-  contracts: Contract[];
-  consumedTags: UsageTag[];
-}
-
-interface PaginationInfo {
-  page: number;
-  pageSize: number;
-  total: number;
-  totalPages: number;
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -92,62 +62,31 @@ const CARRIER_LABELS: Record<string, string> = {
 };
 
 export default function SimsPage() {
-  const [sims, setSims] = useState<Sim[]>([]);
-  const [pagination, setPagination] = useState<PaginationInfo | null>(null);
-  const [loading, setLoading] = useState(true);
+  // URL状態管理
+  const [search, setSearch] = useQueryState("search", { defaultValue: "" });
+  const [statusFilter, setStatusFilter] = useQueryState("status", { defaultValue: "" });
+  const [carrierFilter, setCarrierFilter] = useQueryState("carrier", { defaultValue: "" });
+  const [simLocationFilter, setSimLocationFilter] = useQueryState("simLocation", { defaultValue: "" });
+  const [page, setPage] = useQueryState("page", {
+    defaultValue: "1",
+    parse: (v) => v,
+    serialize: (v) => v,
+  });
+
+  // ローカル状態
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
-  const [simLocationTags, setSimLocationTags] = useState<SimLocationTag[]>([]);
-  const [simLocationFilter, setSimLocationFilter] = useState("");
+  const [searchInput, setSearchInput] = useState(search);
 
-  // フィルタ
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [carrierFilter, setCarrierFilter] = useState("");
-  const [page, setPage] = useState(1);
+  // SWRでデータ取得
+  const { sims, pagination, isLoading, isValidating, mutate } = useSims({
+    search,
+    status: statusFilter,
+    carrier: carrierFilter,
+    simLocationTagId: simLocationFilter,
+    page: parseInt(page),
+  });
 
-  // SIMの場所タグを取得
-  useEffect(() => {
-    const fetchSimLocationTags = async () => {
-      try {
-        const res = await fetch("/api/sim-location-tags");
-        if (res.ok) {
-          const data = await res.json();
-          setSimLocationTags(data);
-        }
-      } catch (error) {
-        console.error("SIMの場所タグ取得エラー:", error);
-      }
-    };
-    fetchSimLocationTags();
-  }, []);
-
-  const fetchSims = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (search) params.set("search", search);
-      if (statusFilter) params.set("status", statusFilter);
-      if (carrierFilter) params.set("carrier", carrierFilter);
-      if (simLocationFilter) params.set("simLocationTagId", simLocationFilter);
-      params.set("page", page.toString());
-
-      const res = await fetch(`/api/sims?${params.toString()}`);
-      const data = await res.json();
-
-      if (res.ok) {
-        setSims(data.data);
-        setPagination(data.pagination);
-      }
-    } catch (error) {
-      console.error("SIM取得エラー:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [search, statusFilter, carrierFilter, simLocationFilter, page]);
-
-  useEffect(() => {
-    fetchSims();
-  }, [fetchSims]);
+  const { simLocationTags } = useSimLocationTags();
 
   const toggleExpand = (iccid: string) => {
     setExpandedRows((prev) => {
@@ -162,8 +101,8 @@ export default function SimsPage() {
   };
 
   const handleSearch = () => {
-    setPage(1);
-    fetchSims();
+    setSearch(searchInput);
+    setPage("1");
   };
 
   const formatDate = (dateStr: string | null) => {
@@ -180,6 +119,21 @@ export default function SimsPage() {
   };
 
   const updateSimLocationTag = async (iccid: string, simLocationTagId: number | null) => {
+    if (!pagination) return;
+
+    // 楽観的更新
+    mutate(
+      {
+        data: sims.map((sim) =>
+          sim.iccid === iccid
+            ? { ...sim, simLocationTagId, simLocationTag: simLocationTagId ? simLocationTags.find(t => t.id === simLocationTagId) || null : null }
+            : sim
+        ),
+        pagination,
+      },
+      false
+    );
+
     try {
       const res = await fetch(`/api/sims/${iccid}`, {
         method: "PATCH",
@@ -187,10 +141,14 @@ export default function SimsPage() {
         body: JSON.stringify({ simLocationTagId }),
       });
       if (res.ok) {
-        fetchSims();
+        toast.success("SIMの場所を更新しました");
+        mutate();
+      } else {
+        throw new Error("更新に失敗しました");
       }
-    } catch (error) {
-      console.error("SIMの場所更新エラー:", error);
+    } catch {
+      toast.error("SIMの場所の更新に失敗しました");
+      mutate(); // サーバーから最新データを取得してロールバック
     }
   };
 
@@ -209,8 +167,8 @@ export default function SimsPage() {
                 type="text"
                 placeholder="ICCID / 電話番号で検索..."
                 className="px-4 py-2 border rounded-md w-64 pr-10"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSearch()}
               />
               <button
@@ -225,7 +183,7 @@ export default function SimsPage() {
               value={carrierFilter}
               onChange={(e) => {
                 setCarrierFilter(e.target.value);
-                setPage(1);
+                setPage("1");
               }}
             >
               <option value="">キャリア</option>
@@ -239,7 +197,7 @@ export default function SimsPage() {
               value={statusFilter}
               onChange={(e) => {
                 setStatusFilter(e.target.value);
-                setPage(1);
+                setPage("1");
               }}
             >
               <option value="">ステータス</option>
@@ -253,7 +211,7 @@ export default function SimsPage() {
               value={simLocationFilter}
               onChange={(e) => {
                 setSimLocationFilter(e.target.value);
-                setPage(1);
+                setPage("1");
               }}
             >
               <option value="">SIMの場所</option>
@@ -280,17 +238,20 @@ export default function SimsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">
+            <CardTitle className="text-base flex items-center gap-2">
               SIM一覧（親子表示）
               {pagination && (
-                <span className="text-sm font-normal text-gray-500 ml-2">
+                <span className="text-sm font-normal text-gray-500">
                   {pagination.total}件
                 </span>
+              )}
+              {isValidating && !isLoading && (
+                <Loader2 className="h-4 w-4 animate-spin text-blue-400" />
               )}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {loading ? (
+            {isLoading ? (
               <div className="flex justify-center items-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
               </div>
@@ -395,7 +356,7 @@ export default function SimsPage() {
                           <td className="py-3 px-4">{sim.supplier.name}</td>
                         </tr>
                         {expandedRows.has(sim.iccid) &&
-                          sim.contracts.map((contract) => (
+                          sim.contracts.map((contract: Contract) => (
                             <tr
                               key={contract.id}
                               className="bg-gray-50/50 border-b"
@@ -448,7 +409,7 @@ export default function SimsPage() {
                     variant="outline"
                     size="sm"
                     disabled={pagination.page <= 1}
-                    onClick={() => setPage((p) => p - 1)}
+                    onClick={() => setPage((parseInt(page) - 1).toString())}
                   >
                     前へ
                   </Button>
@@ -456,7 +417,7 @@ export default function SimsPage() {
                     variant="outline"
                     size="sm"
                     disabled={pagination.page >= pagination.totalPages}
-                    onClick={() => setPage((p) => p + 1)}
+                    onClick={() => setPage((parseInt(page) + 1).toString())}
                   >
                     次へ
                   </Button>

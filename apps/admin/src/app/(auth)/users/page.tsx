@@ -1,27 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@repo/ui";
 import { Plus, Pencil, Trash2, Loader2, X, Eye, EyeOff } from "lucide-react";
-
-interface Service {
-  id: string;
-  code: string;
-  name: string;
-}
-
-interface User {
-  id: string;
-  email: string;
-  role: "CUSTOMER" | "ADMIN" | "SUPER_ADMIN";
-  serviceId: string | null;
-  service: Service | null;
-  isActive: boolean;
-  createdAt: string;
-  _count: {
-    customers: number;
-  };
-}
+import { toast } from "sonner";
+import { useQueryState } from "nuqs";
+import { useUsers, useServices, type User } from "@/hooks/use-users";
 
 const ROLE_LABELS: Record<string, string> = {
   CUSTOMER: "顧客",
@@ -36,12 +20,23 @@ const ROLE_VARIANTS: Record<string, "default" | "secondary" | "success" | "warni
 };
 
 export default function UsersPage() {
-  const [users, setUsers] = useState<User[]>([]);
-  const [services, setServices] = useState<Service[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showInactive, setShowInactive] = useState(false);
-  const [filterRole, setFilterRole] = useState<string>("");
-  const [filterServiceId, setFilterServiceId] = useState<string>("");
+  // URL状態管理
+  const [showInactive, setShowInactive] = useQueryState("inactive", {
+    defaultValue: "false",
+    parse: (v) => v,
+    serialize: (v) => v,
+  });
+  const [filterRole, setFilterRole] = useQueryState("role", { defaultValue: "" });
+  const [filterServiceId, setFilterServiceId] = useQueryState("service", { defaultValue: "" });
+
+  // SWRでデータ取得
+  const { users, isLoading, isValidating, mutate } = useUsers({
+    includeInactive: showInactive === "true",
+    role: filterRole,
+    serviceId: filterServiceId,
+  });
+
+  const { services } = useServices();
 
   // モーダル状態
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -55,46 +50,6 @@ export default function UsersPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const fetchUsers = async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (showInactive) params.set("includeInactive", "true");
-      if (filterRole) params.set("role", filterRole);
-      if (filterServiceId) params.set("serviceId", filterServiceId);
-
-      const res = await fetch(`/api/users?${params.toString()}`);
-      const data = await res.json();
-      if (res.ok) {
-        setUsers(data);
-      }
-    } catch (err) {
-      console.error("ユーザー取得エラー:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchServices = async () => {
-    try {
-      const res = await fetch("/api/services");
-      const data = await res.json();
-      if (res.ok) {
-        setServices(data);
-      }
-    } catch (err) {
-      console.error("サービス取得エラー:", err);
-    }
-  };
-
-  useEffect(() => {
-    fetchServices();
-  }, []);
-
-  useEffect(() => {
-    fetchUsers();
-  }, [showInactive, filterRole, filterServiceId]);
 
   const openCreateModal = () => {
     setEditingUser(null);
@@ -167,12 +122,12 @@ export default function UsersPage() {
 
       if (res.ok) {
         closeModal();
-        fetchUsers();
+        toast.success(editingUser ? "ユーザーを更新しました" : "ユーザーを作成しました");
+        mutate();
       } else {
         setError(data.error || "保存に失敗しました");
       }
-    } catch (err) {
-      console.error("保存エラー:", err);
+    } catch {
       setError("保存に失敗しました");
     } finally {
       setSaving(false);
@@ -190,18 +145,27 @@ export default function UsersPage() {
       });
 
       if (res.ok) {
-        fetchUsers();
+        toast.success("ユーザーを削除しました");
+        mutate();
       } else {
         const data = await res.json();
-        alert(data.error || "削除に失敗しました");
+        toast.error(data.error || "削除に失敗しました");
       }
-    } catch (err) {
-      console.error("削除エラー:", err);
-      alert("削除に失敗しました");
+    } catch {
+      toast.error("削除に失敗しました");
     }
   };
 
   const toggleActive = async (user: User) => {
+    // 楽観的更新
+    const previousUsers = users;
+    mutate(
+      users.map((u) =>
+        u.id === user.id ? { ...u, isActive: !u.isActive } : u
+      ),
+      false
+    );
+
     try {
       const res = await fetch(`/api/users/${user.id}`, {
         method: "PATCH",
@@ -210,10 +174,14 @@ export default function UsersPage() {
       });
 
       if (res.ok) {
-        fetchUsers();
+        toast.success(user.isActive ? "ユーザーを無効化しました" : "ユーザーを有効化しました");
+        mutate();
+      } else {
+        throw new Error("更新に失敗しました");
       }
-    } catch (err) {
-      console.error("ステータス変更エラー:", err);
+    } catch {
+      toast.error("ステータスの変更に失敗しました");
+      mutate(previousUsers, false);
     }
   };
 
@@ -254,8 +222,8 @@ export default function UsersPage() {
             <label className="flex items-center gap-2 text-sm text-gray-600">
               <input
                 type="checkbox"
-                checked={showInactive}
-                onChange={(e) => setShowInactive(e.target.checked)}
+                checked={showInactive === "true"}
+                onChange={(e) => setShowInactive(e.target.checked ? "true" : "false")}
                 className="rounded"
               />
               無効ユーザーも表示
@@ -269,15 +237,18 @@ export default function UsersPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">
+            <CardTitle className="text-base flex items-center gap-2">
               ユーザー一覧
-              <span className="text-sm font-normal text-gray-500 ml-2">
+              <span className="text-sm font-normal text-gray-500">
                 {users.length}件
               </span>
+              {isValidating && !isLoading && (
+                <Loader2 className="h-4 w-4 animate-spin text-blue-400" />
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {loading ? (
+            {isLoading ? (
               <div className="flex justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
               </div>

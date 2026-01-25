@@ -1,82 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@repo/ui";
 import { Search, Loader2, ExternalLink } from "lucide-react";
-
-interface Customer {
-  id: string;
-  type: string;
-  lastName: string;
-  firstName: string;
-  lastNameKana: string;
-  firstNameKana: string;
-  companyName: string | null;
-  companyNameKana: string | null;
-  email: string;
-  phone: string;
-  postalCode: string;
-  prefecture: string;
-  city: string;
-  address: string;
-  building: string | null;
-  companyPostalCode: string | null;
-  companyPrefecture: string | null;
-  companyCity: string | null;
-  companyAddress: string | null;
-  companyBuilding: string | null;
-}
-
-interface Service {
-  id: string;
-  code: string;
-  name: string;
-}
-
-interface Plan {
-  id: string;
-  code: string;
-  name: string;
-}
-
-interface KycImage {
-  id: string;
-  type: string;
-  storagePath: string;
-  status: string;
-  expiryDate: string | null;
-}
-
-interface Application {
-  id: string;
-  applicationNumber: string;
-  status: string;
-  lineCount: number;
-  unitPrice: number;
-  totalAmount: number;
-  comment1: string | null;
-  comment2: string | null;
-  createdAt: string;
-  customer: Customer;
-  service: Service;
-  plan: Plan;
-  kycImages: KycImage[];
-  stats: {
-    lineCount: number;
-    shippedCount: number;
-    unassignedCount: number;
-    returnedCount: number;
-  };
-  latestExpiryDate: string | null;
-}
-
-interface PaginationInfo {
-  page: number;
-  pageSize: number;
-  total: number;
-  totalPages: number;
-}
+import { toast } from "sonner";
+import { useQueryState } from "nuqs";
+import { useApplications, useServices, type Application } from "@/hooks/use-applications";
 
 const STATUS_LABELS: Record<string, string> = {
   SUBMITTED: "申込済み",
@@ -88,18 +18,6 @@ const STATUS_LABELS: Record<string, string> = {
   SHIPPING: "発送中",
   COMPLETED: "完了",
   CANCELLED: "キャンセル",
-};
-
-const STATUS_VARIANTS: Record<string, "default" | "success" | "destructive" | "secondary" | "outline"> = {
-  SUBMITTED: "default",
-  KYC_PENDING: "secondary",
-  KYC_APPROVED: "success",
-  KYC_REJECTED: "destructive",
-  PAYMENT_PENDING: "secondary",
-  PAID: "success",
-  SHIPPING: "default",
-  COMPLETED: "success",
-  CANCELLED: "destructive",
 };
 
 const KYC_VERIFY_OPTIONS = [
@@ -114,68 +32,50 @@ const PAYMENT_VERIFY_OPTIONS = [
 ];
 
 export default function ApplicationsPage() {
-  const [applications, setApplications] = useState<Application[]>([]);
-  const [pagination, setPagination] = useState<PaginationInfo | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [services, setServices] = useState<Service[]>([]);
+  // URL状態管理
+  const [search, setSearch] = useQueryState("search", { defaultValue: "" });
+  const [statusFilter, setStatusFilter] = useQueryState("status", { defaultValue: "" });
+  const [serviceFilter, setServiceFilter] = useQueryState("service", { defaultValue: "" });
+  const [customerTypeFilter, setCustomerTypeFilter] = useQueryState("customerType", { defaultValue: "" });
+  const [page, setPage] = useQueryState("page", {
+    defaultValue: "1",
+    parse: (v) => v,
+    serialize: (v) => v,
+  });
 
-  // フィルタ
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [serviceFilter, setServiceFilter] = useState("");
-  const [customerTypeFilter, setCustomerTypeFilter] = useState("");
-  const [page, setPage] = useState(1);
+  // ローカル状態
+  const [searchInput, setSearchInput] = useState(search);
 
-  // サービス一覧取得
-  useEffect(() => {
-    const fetchServices = async () => {
-      try {
-        const res = await fetch("/api/services");
-        if (res.ok) {
-          const data = await res.json();
-          setServices(data);
-        }
-      } catch (error) {
-        console.error("サービス取得エラー:", error);
-      }
-    };
-    fetchServices();
-  }, []);
+  // SWRでデータ取得
+  const { applications, pagination, isLoading, isValidating, mutate } = useApplications({
+    search,
+    status: statusFilter,
+    serviceId: serviceFilter,
+    customerType: customerTypeFilter,
+    page: parseInt(page),
+  });
 
-  const fetchApplications = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (search) params.set("search", search);
-      if (statusFilter) params.set("status", statusFilter);
-      if (serviceFilter) params.set("serviceId", serviceFilter);
-      if (customerTypeFilter) params.set("customerType", customerTypeFilter);
-      params.set("page", page.toString());
-
-      const res = await fetch(`/api/applications?${params.toString()}`);
-      const data = await res.json();
-
-      if (res.ok) {
-        setApplications(data.data);
-        setPagination(data.pagination);
-      }
-    } catch (error) {
-      console.error("申し込み取得エラー:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [search, statusFilter, serviceFilter, customerTypeFilter, page]);
-
-  useEffect(() => {
-    fetchApplications();
-  }, [fetchApplications]);
+  const { services } = useServices();
 
   const handleSearch = () => {
-    setPage(1);
-    fetchApplications();
+    setSearch(searchInput);
+    setPage("1");
   };
 
   const updateApplicationStatus = async (id: string, status: string) => {
+    if (!pagination) return;
+
+    // 楽観的更新
+    mutate(
+      {
+        data: applications.map((app) =>
+          app.id === id ? { ...app, status } : app
+        ),
+        pagination,
+      },
+      false
+    );
+
     try {
       const res = await fetch(`/api/applications/${id}`, {
         method: "PATCH",
@@ -183,10 +83,14 @@ export default function ApplicationsPage() {
         body: JSON.stringify({ status }),
       });
       if (res.ok) {
-        fetchApplications();
+        toast.success("ステータスを更新しました");
+        mutate();
+      } else {
+        throw new Error("更新に失敗しました");
       }
-    } catch (error) {
-      console.error("ステータス更新エラー:", error);
+    } catch {
+      toast.error("ステータスの更新に失敗しました");
+      mutate(); // サーバーから最新データを取得してロールバック
     }
   };
 
@@ -198,10 +102,13 @@ export default function ApplicationsPage() {
         body: JSON.stringify({ [field]: value }),
       });
       if (res.ok) {
-        fetchApplications();
+        toast.success("コメントを保存しました");
+        mutate();
+      } else {
+        throw new Error("更新に失敗しました");
       }
-    } catch (error) {
-      console.error("コメント更新エラー:", error);
+    } catch {
+      toast.error("コメントの保存に失敗しました");
     }
   };
 
@@ -210,14 +117,14 @@ export default function ApplicationsPage() {
     return new Date(dateStr).toLocaleDateString("ja-JP");
   };
 
-  const getCustomerName = (customer: Customer) => {
+  const getCustomerName = (customer: Application["customer"]) => {
     if (customer.type === "CORPORATE" && customer.companyName) {
       return customer.companyName;
     }
     return `${customer.lastName} ${customer.firstName}`;
   };
 
-  const getCustomerNameKana = (customer: Customer) => {
+  const getCustomerNameKana = (customer: Application["customer"]) => {
     if (customer.type === "CORPORATE" && customer.companyNameKana) {
       return customer.companyNameKana;
     }
@@ -251,8 +158,8 @@ export default function ApplicationsPage() {
               type="text"
               placeholder="申込番号/名前/会社名/メール/電話..."
               className="px-4 py-2 border rounded-md w-72 pr-10"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSearch()}
             />
             <button
@@ -267,7 +174,7 @@ export default function ApplicationsPage() {
             value={serviceFilter}
             onChange={(e) => {
               setServiceFilter(e.target.value);
-              setPage(1);
+              setPage("1");
             }}
           >
             <option value="">サービス</option>
@@ -282,7 +189,7 @@ export default function ApplicationsPage() {
             value={customerTypeFilter}
             onChange={(e) => {
               setCustomerTypeFilter(e.target.value);
-              setPage(1);
+              setPage("1");
             }}
           >
             <option value="">顧客区分</option>
@@ -294,7 +201,7 @@ export default function ApplicationsPage() {
             value={statusFilter}
             onChange={(e) => {
               setStatusFilter(e.target.value);
-              setPage(1);
+              setPage("1");
             }}
           >
             <option value="">ステータス</option>
@@ -309,17 +216,20 @@ export default function ApplicationsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">
+          <CardTitle className="text-base flex items-center gap-2">
             申し込み一覧
             {pagination && (
-              <span className="text-sm font-normal text-gray-500 ml-2">
+              <span className="text-sm font-normal text-gray-500">
                 {pagination.total}件
               </span>
+            )}
+            {isValidating && !isLoading && (
+              <Loader2 className="h-4 w-4 animate-spin text-blue-400" />
             )}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {loading ? (
+          {isLoading ? (
             <div className="flex justify-center items-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
             </div>
@@ -482,7 +392,7 @@ export default function ApplicationsPage() {
                   variant="outline"
                   size="sm"
                   disabled={pagination.page <= 1}
-                  onClick={() => setPage((p) => p - 1)}
+                  onClick={() => setPage((parseInt(page) - 1).toString())}
                 >
                   前へ
                 </Button>
@@ -490,7 +400,7 @@ export default function ApplicationsPage() {
                   variant="outline"
                   size="sm"
                   disabled={pagination.page >= pagination.totalPages}
-                  onClick={() => setPage((p) => p + 1)}
+                  onClick={() => setPage((parseInt(page) + 1).toString())}
                 >
                   次へ
                 </Button>
