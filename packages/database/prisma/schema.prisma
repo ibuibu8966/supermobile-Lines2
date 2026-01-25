@@ -137,10 +137,14 @@ model Sim {
   // 消費済み用途タグ（高速検索用）
   consumedTagIds Int[] @default([])
 
+  // SIMの場所
+  simLocationTagId Int?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   supplier         Supplier          @relation(fields: [supplierId], references: [id])
+  simLocationTag   SimLocationTag?   @relation(fields: [simLocationTagId], references: [id])
   contracts        Contract[]
   applicationLines ApplicationLine[]
 
@@ -150,6 +154,7 @@ model Sim {
   @@index([simType])
   @@index([isMnpEligible])
   @@index([carrierType])
+  @@index([simLocationTagId])
 }
 
 model Contract {
@@ -238,6 +243,50 @@ model UsageRule {
 
   @@index([usageTagId])
   @@index([priority])
+  @@index([isActive])
+}
+
+// ==================== タグマスタ ====================
+
+model SimLocationTag {
+  id           Int      @id @default(autoincrement())
+  code         String   @unique @db.VarChar(50)
+  name         String   @db.VarChar(100)
+  isActive     Boolean  @default(true)
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  sims Sim[]
+
+  @@index([isActive])
+}
+
+model LineTag {
+  id           Int      @id @default(autoincrement())
+  code         String   @unique @db.VarChar(50)
+  name         String   @db.VarChar(100)
+  isActive     Boolean  @default(true)
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  applicationLines ApplicationLine[]
+
+  @@index([isActive])
+}
+
+model LineReserveTag {
+  id           Int      @id @default(autoincrement())
+  code         String   @unique @db.VarChar(50)
+  name         String   @db.VarChar(100)
+  isActive     Boolean  @default(true)
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  applicationLines ApplicationLine[]
+
   @@index([isActive])
 }
 
@@ -382,6 +431,10 @@ model Application {
   paidAt            DateTime?
   note              String?           @db.Text
 
+  // 管理用コメント
+  comment1 String? @db.Text
+  comment2 String? @db.Text
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -410,18 +463,27 @@ model ApplicationLine {
   returnedAt    DateTime?
   note          String?               @db.Text
 
+  // 回線タグ
+  lineTagId        Int?
+  lineReserveTagId Int?
+  contractMonth    DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  sim         Sim?        @relation(fields: [simId], references: [iccid])
-  contract    Contract?   @relation(fields: [contractId], references: [id])
+  application    Application     @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  sim            Sim?            @relation(fields: [simId], references: [iccid])
+  contract       Contract?       @relation(fields: [contractId], references: [id])
+  lineTag        LineTag?        @relation(fields: [lineTagId], references: [id])
+  lineReserveTag LineReserveTag? @relation(fields: [lineReserveTagId], references: [id])
 
   @@unique([applicationId, lineNumber])
   @@index([applicationId])
   @@index([simId])
   @@index([contractId])
   @@index([status])
+  @@index([lineTagId])
+  @@index([lineReserveTagId])
 }
 
 model KycImage {
@@ -432,6 +494,9 @@ model KycImage {
   status        KycImageStatus @default(PENDING)
   reviewedAt    DateTime?
   reviewNote    String?        @db.Text
+
+  // 身分証明書の有効期限
+  expiryDate DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -13,11 +13,21 @@ import {
   Building2,
   Package,
   Users,
+  FileText,
+  MapPin,
+  Tag,
+  Bookmark,
 } from "lucide-react";
 import { auth } from "@/auth";
 import { UserMenu } from "./user-menu";
 
 const menuItems = [
+  {
+    title: "申し込み一覧",
+    description: "全サービスの申し込み一覧・管理",
+    href: "/applications",
+    icon: FileText,
+  },
   {
     title: "SIM一覧",
     description: "SIMカードの一覧表示・検索・詳細確認",
@@ -35,6 +45,24 @@ const menuItems = [
     description: "販売用途タグの登録・編集",
     href: "/usage-tags",
     icon: Tags,
+  },
+  {
+    title: "SIMの場所タグ管理",
+    description: "SIMカードの保管場所タグの登録・編集",
+    href: "/sim-location-tags",
+    icon: MapPin,
+  },
+  {
+    title: "回線タグ管理",
+    description: "回線タグの登録・編集",
+    href: "/line-tags",
+    icon: Tag,
+  },
+  {
+    title: "回線予備タグ管理",
+    description: "回線予備タグの登録・編集",
+    href: "/line-reserve-tags",
+    icon: Bookmark,
   },
   {
     title: "販売ルール管理",

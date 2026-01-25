@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@repo/database";
 import { z } from "zod";
 
-// ステータス更新スキーマ
-const updateStatusSchema = z.object({
+export const dynamic = "force-dynamic";
+
+const updateApplicationSchema = z.object({
   status: z.enum([
     "SUBMITTED",
     "KYC_PENDING",
@@ -15,12 +16,12 @@ const updateStatusSchema = z.object({
     "COMPLETED",
     "CANCELLED",
   ]).optional(),
-  note: z.string().optional(),
   comment1: z.string().max(1000).optional().nullable(),
   comment2: z.string().max(1000).optional().nullable(),
+  note: z.string().optional().nullable(),
 });
 
-// 申込詳細を取得
+// 詳細取得
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -32,8 +33,8 @@ export async function GET(
       where: { id },
       include: {
         customer: true,
-        plan: true,
         service: true,
+        plan: true,
         lines: {
           include: {
             sim: {
@@ -41,9 +42,11 @@ export async function GET(
                 simLocationTag: true,
               },
             },
-            contract: true,
             lineTag: true,
             lineReserveTag: true,
+          },
+          orderBy: {
+            lineNumber: "asc",
           },
         },
         kycImages: true,
@@ -52,22 +55,50 @@ export async function GET(
 
     if (!application) {
       return NextResponse.json(
-        { error: "申込が見つかりません" },
+        { error: "申し込みが見つかりません" },
         { status: 404 }
       );
     }
 
-    return NextResponse.json(application);
+    // 回線統計を計算
+    const shippedCount = application.lines.filter(
+      (l) => l.status === "SHIPPED" || l.status === "ACTIVE"
+    ).length;
+    const unassignedCount = application.lines.filter(
+      (l) => l.status === "UNASSIGNED"
+    ).length;
+    const returnedCount = application.lines.filter(
+      (l) => l.status === "RETURNED"
+    ).length;
+
+    // 最新の有効期限を取得
+    const expiryDates = application.kycImages
+      .filter((img) => img.expiryDate)
+      .map((img) => img.expiryDate);
+    const latestExpiryDate = expiryDates.length > 0
+      ? expiryDates.reduce((a, b) => (a! > b! ? a : b))
+      : null;
+
+    return NextResponse.json({
+      ...application,
+      stats: {
+        lineCount: application.lineCount,
+        shippedCount,
+        unassignedCount,
+        returnedCount,
+      },
+      latestExpiryDate,
+    });
   } catch (error) {
-    console.error("申込詳細取得エラー:", error);
+    console.error("申し込み詳細取得エラー:", error);
     return NextResponse.json(
-      { error: "申込詳細の取得に失敗しました" },
+      { error: "申し込み詳細の取得に失敗しました" },
       { status: 500 }
     );
   }
 }
 
-// 申込ステータスを更新
+// 更新
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -75,53 +106,30 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await request.json();
-    const validated = updateStatusSchema.parse(body);
+    const validated = updateApplicationSchema.parse(body);
 
-    const application = await prisma.application.findUnique({
+    const existing = await prisma.application.findUnique({
       where: { id },
     });
 
-    if (!application) {
+    if (!existing) {
       return NextResponse.json(
-        { error: "申込が見つかりません" },
+        { error: "申し込みが見つかりません" },
         { status: 404 }
       );
     }
 
-    // ステータスに応じた追加処理
-    const updateData: Record<string, unknown> = {};
-
-    if (validated.status !== undefined) {
-      updateData.status = validated.status;
-    }
-
-    if (validated.note !== undefined) {
-      updateData.note = validated.note;
-    }
-
-    if (validated.comment1 !== undefined) {
-      updateData.comment1 = validated.comment1;
-    }
-
-    if (validated.comment2 !== undefined) {
-      updateData.comment2 = validated.comment2;
-    }
-
-    // 入金確認時は日時を記録
-    if (validated.status === "PAID" && !application.paidAt) {
-      updateData.paidAt = new Date();
-    }
-
-    const updated = await prisma.application.update({
+    const application = await prisma.application.update({
       where: { id },
-      data: updateData,
+      data: validated,
       include: {
         customer: true,
+        service: true,
         plan: true,
       },
     });
 
-    return NextResponse.json(updated);
+    return NextResponse.json(application);
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -129,9 +137,9 @@ export async function PATCH(
         { status: 400 }
       );
     }
-    console.error("申込更新エラー:", error);
+    console.error("申し込み更新エラー:", error);
     return NextResponse.json(
-      { error: "申込の更新に失敗しました" },
+      { error: "申し込みの更新に失敗しました" },
       { status: 500 }
     );
   }

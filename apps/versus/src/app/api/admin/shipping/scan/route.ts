@@ -6,6 +6,9 @@ import { z } from "zod";
 const scanSchema = z.object({
   applicationLineId: z.string().min(1, "回線IDは必須です"),
   iccid: z.string().regex(/^\d{19,20}$/, "ICCIDは19〜20桁の数字です"),
+  contractMonth: z.coerce.date().optional(),
+  lineTagId: z.number().int().positive().optional().nullable(),
+  lineReserveTagId: z.number().int().positive().optional().nullable(),
 });
 
 // SIMスキャン処理
@@ -110,6 +113,9 @@ export async function POST(request: NextRequest) {
         simId: sim.iccid,
         msisdn: sim.msisdn,
         status: "ASSIGNED",
+        contractMonth: validated.contractMonth,
+        lineTagId: validated.lineTagId,
+        lineReserveTagId: validated.lineReserveTagId,
       },
     });
 

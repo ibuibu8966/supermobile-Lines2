@@ -56,7 +56,13 @@ export async function GET(request: NextRequest) {
           plan: true,
           lines: {
             include: {
-              sim: true,
+              sim: {
+                include: {
+                  simLocationTag: true,
+                },
+              },
+              lineTag: true,
+              lineReserveTag: true,
             },
           },
         },
@@ -96,6 +102,14 @@ export async function GET(request: NextRequest) {
           msisdn: line.msisdn,
           status: line.status,
           shippedAt: line.shippedAt,
+          contractMonth: line.contractMonth,
+          lineTag: line.lineTag,
+          lineReserveTag: line.lineReserveTag,
+          sim: line.sim ? {
+            iccid: line.sim.iccid,
+            msisdn: line.sim.msisdn,
+            simLocationTag: line.sim.simLocationTag,
+          } : null,
         })),
       })),
       pagination: {

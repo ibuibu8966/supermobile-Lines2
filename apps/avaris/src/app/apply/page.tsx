@@ -191,6 +191,7 @@ export default function ApplyPage() {
   const [idFront, setIdFront] = useState<File | null>(null);
   const [idBack, setIdBack] = useState<File | null>(null);
   const [corporateRegistry, setCorporateRegistry] = useState<File | null>(null);
+  const [idExpiryDate, setIdExpiryDate] = useState("");
 
   // 顧客情報
   const [customerData, setCustomerData] = useState({
@@ -282,6 +283,7 @@ export default function ApplyPage() {
       if (idFront) formData.append("idFront", idFront);
       if (idBack) formData.append("idBack", idBack);
       if (corporateRegistry) formData.append("corporateRegistry", corporateRegistry);
+      if (idExpiryDate) formData.append("idExpiryDate", idExpiryDate);
 
       const res = await fetch("/api/applications", {
         method: "POST",
@@ -330,6 +332,7 @@ export default function ApplyPage() {
 
   const canProceedStep3 = (): boolean => {
     // KYC書類チェック
+    if (!idExpiryDate) return false;
     if (customerType === "INDIVIDUAL") {
       return idFront !== null && idBack !== null;
     } else {
@@ -782,6 +785,21 @@ export default function ApplyPage() {
                   </div>
                 </div>
               )}
+
+              <div className="space-y-4">
+                <h4 className="font-medium">身分証明書の有効期限</h4>
+                <div className="max-w-xs">
+                  <Input
+                    type="date"
+                    value={idExpiryDate}
+                    onChange={(e) => setIdExpiryDate(e.target.value)}
+                    required
+                  />
+                  <p className="text-sm text-muted-foreground mt-1">
+                    運転免許証等の有効期限を入力してください
+                  </p>
+                </div>
+              </div>
 
               <div className="flex justify-between pt-4">
                 <Button variant="outline" onClick={() => setCurrentStep(2)}>

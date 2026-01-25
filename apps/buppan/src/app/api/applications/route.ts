@@ -62,6 +62,8 @@ export async function POST(request: NextRequest) {
     const idFront = formData.get("idFront") as File | null;
     const idBack = formData.get("idBack") as File | null;
     const corporateRegistry = formData.get("corporateRegistry") as File | null;
+    const idExpiryDateStr = formData.get("idExpiryDate") as string | null;
+    const idExpiryDate = idExpiryDateStr ? new Date(idExpiryDateStr) : null;
 
     // バリデーション
     if (!planId || !lineCount || !customerType || !password || !customerJson) {
@@ -292,6 +294,7 @@ export async function POST(request: NextRequest) {
         type: "ID_FRONT",
         storagePath: idFrontPath,
         status: "PENDING",
+        expiryDate: idExpiryDate,
       },
     });
 
@@ -305,6 +308,7 @@ export async function POST(request: NextRequest) {
         type: "ID_BACK",
         storagePath: idBackPath,
         status: "PENDING",
+        expiryDate: idExpiryDate,
       },
     });
 

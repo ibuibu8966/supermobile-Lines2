@@ -14,8 +14,10 @@ const updateStatusSchema = z.object({
     "SHIPPING",
     "COMPLETED",
     "CANCELLED",
-  ]),
+  ]).optional(),
   note: z.string().optional(),
+  comment1: z.string().max(1000).optional().nullable(),
+  comment2: z.string().max(1000).optional().nullable(),
 });
 
 // 申込詳細を取得
@@ -34,8 +36,14 @@ export async function GET(
         service: true,
         lines: {
           include: {
-            sim: true,
+            sim: {
+              include: {
+                simLocationTag: true,
+              },
+            },
             contract: true,
+            lineTag: true,
+            lineReserveTag: true,
           },
         },
         kycImages: true,
@@ -81,12 +89,22 @@ export async function PATCH(
     }
 
     // ステータスに応じた追加処理
-    const updateData: Record<string, unknown> = {
-      status: validated.status,
-    };
+    const updateData: Record<string, unknown> = {};
+
+    if (validated.status !== undefined) {
+      updateData.status = validated.status;
+    }
 
     if (validated.note !== undefined) {
       updateData.note = validated.note;
+    }
+
+    if (validated.comment1 !== undefined) {
+      updateData.comment1 = validated.comment1;
+    }
+
+    if (validated.comment2 !== undefined) {
+      updateData.comment2 = validated.comment2;
     }
 
     // 入金確認時は日時を記録

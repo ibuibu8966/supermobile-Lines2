@@ -50,6 +50,7 @@ export const updateSimSchema = z.object({
   mnpReservationNumber: z.string().max(20).optional().nullable(),
   mnpExpiryDate: z.coerce.date().optional().nullable(),
   status: z.enum(['IN_STOCK', 'ACTIVE', 'RETURNING', 'RETIRED', 'CANCELLED']).optional(),
+  simLocationTagId: z.number().int().positive().optional().nullable(),
 })
 
 // SIMフィルタスキーマ

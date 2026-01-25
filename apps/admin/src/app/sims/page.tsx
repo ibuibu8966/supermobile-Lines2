@@ -11,6 +11,12 @@ interface UsageTag {
   name: string;
 }
 
+interface SimLocationTag {
+  id: number;
+  code: string;
+  name: string;
+}
+
 interface Contract {
   id: string;
   serviceName: string;
@@ -41,6 +47,8 @@ interface Sim {
     code: string;
     name: string;
   };
+  simLocationTag: SimLocationTag | null;
+  simLocationTagId: number | null;
   contracts: Contract[];
   consumedTags: UsageTag[];
 }
@@ -88,12 +96,30 @@ export default function SimsPage() {
   const [pagination, setPagination] = useState<PaginationInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [simLocationTags, setSimLocationTags] = useState<SimLocationTag[]>([]);
+  const [simLocationFilter, setSimLocationFilter] = useState("");
 
   // フィルタ
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [carrierFilter, setCarrierFilter] = useState("");
   const [page, setPage] = useState(1);
+
+  // SIMの場所タグを取得
+  useEffect(() => {
+    const fetchSimLocationTags = async () => {
+      try {
+        const res = await fetch("/api/sim-location-tags");
+        if (res.ok) {
+          const data = await res.json();
+          setSimLocationTags(data);
+        }
+      } catch (error) {
+        console.error("SIMの場所タグ取得エラー:", error);
+      }
+    };
+    fetchSimLocationTags();
+  }, []);
 
   const fetchSims = useCallback(async () => {
     setLoading(true);
@@ -102,6 +128,7 @@ export default function SimsPage() {
       if (search) params.set("search", search);
       if (statusFilter) params.set("status", statusFilter);
       if (carrierFilter) params.set("carrier", carrierFilter);
+      if (simLocationFilter) params.set("simLocationTagId", simLocationFilter);
       params.set("page", page.toString());
 
       const res = await fetch(`/api/sims?${params.toString()}`);
@@ -116,7 +143,7 @@ export default function SimsPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, statusFilter, carrierFilter, page]);
+  }, [search, statusFilter, carrierFilter, simLocationFilter, page]);
 
   useEffect(() => {
     fetchSims();
@@ -150,6 +177,21 @@ export default function SimsPage() {
       return contract.customer.companyName;
     }
     return `${contract.customer.lastName} ${contract.customer.firstName}`;
+  };
+
+  const updateSimLocationTag = async (iccid: string, simLocationTagId: number | null) => {
+    try {
+      const res = await fetch(`/api/sims/${iccid}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ simLocationTagId }),
+      });
+      if (res.ok) {
+        fetchSims();
+      }
+    } catch (error) {
+      console.error("SIMの場所更新エラー:", error);
+    }
   };
 
   return (
@@ -217,6 +259,21 @@ export default function SimsPage() {
               <option value="RETURNING">返却中</option>
               <option value="RETIRED">廃止</option>
             </select>
+            <select
+              className="px-4 py-2 border rounded-md"
+              value={simLocationFilter}
+              onChange={(e) => {
+                setSimLocationFilter(e.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="">SIMの場所</option>
+              {simLocationTags.map((tag) => (
+                <option key={tag.id} value={tag.id.toString()}>
+                  {tag.name}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="flex gap-2">
             <Link href="/sims/import">
@@ -263,6 +320,7 @@ export default function SimsPage() {
                       <th className="text-left py-3 px-4">キャリア</th>
                       <th className="text-left py-3 px-4">MNP</th>
                       <th className="text-left py-3 px-4">消費済みタグ</th>
+                      <th className="text-left py-3 px-4">SIMの場所</th>
                       <th className="text-left py-3 px-4">ステータス</th>
                       <th className="text-left py-3 px-4">仕入れ先</th>
                     </tr>
@@ -321,6 +379,26 @@ export default function SimsPage() {
                             </div>
                           </td>
                           <td className="py-3 px-4">
+                            <select
+                              className="px-2 py-1 border rounded text-sm min-w-[100px]"
+                              value={sim.simLocationTagId?.toString() || ""}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                updateSimLocationTag(
+                                  sim.iccid,
+                                  value ? parseInt(value) : null
+                                );
+                              }}
+                            >
+                              <option value="">未設定</option>
+                              {simLocationTags.map((tag) => (
+                                <option key={tag.id} value={tag.id.toString()}>
+                                  {tag.name}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="py-3 px-4">
                             <Badge variant={STATUS_VARIANTS[sim.status] || "default"}>
                               {STATUS_LABELS[sim.status] || sim.status}
                             </Badge>
@@ -334,7 +412,7 @@ export default function SimsPage() {
                               className="bg-gray-50/50 border-b"
                             >
                               <td className="py-2 px-4"></td>
-                              <td colSpan={7} className="py-2 px-4">
+                              <td colSpan={8} className="py-2 px-4">
                                 <div className="pl-4 border-l-2 border-gray-300 ml-2">
                                   <div className="flex items-center gap-4 text-sm text-gray-600">
                                     <span>

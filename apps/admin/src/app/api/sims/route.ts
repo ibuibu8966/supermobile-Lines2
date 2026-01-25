@@ -10,6 +10,7 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get("status") || "";
     const carrier = searchParams.get("carrier") || "";
     const supplier = searchParams.get("supplier") || "";
+    const simLocationTagId = searchParams.get("simLocationTagId") || "";
     const page = parseInt(searchParams.get("page") || "1");
     const pageSize = parseInt(searchParams.get("pageSize") || "50");
 
@@ -34,11 +35,16 @@ export async function GET(request: NextRequest) {
       where.supplierId = parseInt(supplier);
     }
 
+    if (simLocationTagId) {
+      where.simLocationTagId = parseInt(simLocationTagId);
+    }
+
     const [sims, total] = await Promise.all([
       prisma.sim.findMany({
         where,
         include: {
           supplier: true,
+          simLocationTag: true,
           contracts: {
             include: {
               usageTags: {
