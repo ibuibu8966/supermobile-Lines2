@@ -2,7 +2,7 @@
   "name": "supermobile-lines",
   "private": true,
   "scripts": {
-    "postinstall": "prisma generate --schema=./packages/database/prisma/schema.prisma",
+    "postinstall": "npx prisma generate --schema=./packages/database/prisma/schema.prisma",
     "build": "turbo build",
     "dev": "turbo dev",
     "lint": "turbo lint",
