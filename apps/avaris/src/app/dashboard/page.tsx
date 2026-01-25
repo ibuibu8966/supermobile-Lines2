@@ -78,8 +78,7 @@ export default async function DashboardPage() {
   const pendingLines = allLines.filter(
     (line) =>
       line.status === "UNASSIGNED" ||
-      line.status === "ASSIGNED" ||
-      line.status === "PENDING"
+      line.status === "ASSIGNED"
   );
 
   // 最新の申込（最大3件）
