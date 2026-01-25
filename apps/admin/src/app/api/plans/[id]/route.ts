@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@repo/database";
+import { prisma, Prisma } from "@repo/database";
 import { z } from "zod";
+
+type TransactionClient = Prisma.TransactionClient;
 
 const pricingSchema = z.object({
   id: z.string().cuid().optional(),
@@ -106,7 +108,7 @@ export async function PATCH(
     }
 
     // トランザクションで更新
-    const plan = await prisma.$transaction(async (tx) => {
+    const plan = await prisma.$transaction(async (tx: TransactionClient) => {
       // 基本情報更新
       await tx.plan.update({
         where: { id },
