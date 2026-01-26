@@ -426,7 +426,6 @@ export default function ApplyPage() {
                 <div className="grid gap-4">
                   {plans.map((plan) => {
                     const sortedPricings = [...plan.pricings].sort((a, b) => a.minQuantity - b.minQuantity);
-                    const basePrice = sortedPricings[0];
                     return (
                       <label
                         key={plan.id}
@@ -441,12 +440,23 @@ export default function ApplyPage() {
                           onChange={() => setSelectedPlanId(plan.id)}
                           className="mt-1"
                         />
-                        <div>
+                        <div className="flex-1">
                           <p className="font-medium">{plan.name}</p>
-                          <p className="text-sm text-muted-foreground">
+                          <p className="text-sm text-muted-foreground mb-2">
                             {plan.usageTags.map((pt) => pt.usageTag.name).join(", ") || "汎用プラン"}
-                            {basePrice && " - " + formatPrice(basePrice.unitPrice) + "/月〜"}
                           </p>
+                          <div className="space-y-0.5">
+                            {sortedPricings.map((pricing, i) => {
+                              const rangeText = pricing.maxQuantity
+                                ? `${pricing.minQuantity}〜${pricing.maxQuantity}回線`
+                                : `${pricing.minQuantity}回線以上`;
+                              return (
+                                <div key={i} className="text-xs text-gray-500">
+                                  {rangeText}: <span className="font-medium">{formatPrice(pricing.unitPrice)}</span>/回線
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
                       </label>
                     );
