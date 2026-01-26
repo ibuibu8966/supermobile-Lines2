@@ -164,6 +164,11 @@ export async function PATCH(
           pricings: {
             orderBy: { minQuantity: "asc" },
           },
+          _count: {
+            select: {
+              applications: true,
+            },
+          },
         },
       });
     });
