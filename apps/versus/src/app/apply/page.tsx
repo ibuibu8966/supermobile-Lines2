@@ -821,6 +821,35 @@ export default function ApplyPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* 料金テーブル */}
+              {selectedPlan && selectedPlan.pricings.length > 1 && (
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <h4 className="font-medium text-blue-900 mb-2">回線数別料金（まとめてお得！）</h4>
+                  <div className="space-y-1">
+                    {[...selectedPlan.pricings]
+                      .sort((a, b) => a.minQuantity - b.minQuantity)
+                      .map((pricing, i) => {
+                        const isCurrentTier = lineCount >= pricing.minQuantity &&
+                          (!pricing.maxQuantity || lineCount <= pricing.maxQuantity);
+                        const rangeText = pricing.maxQuantity
+                          ? `${pricing.minQuantity}〜${pricing.maxQuantity}回線`
+                          : `${pricing.minQuantity}回線以上`;
+                        return (
+                          <div
+                            key={i}
+                            className={`flex justify-between text-sm py-1 px-2 rounded ${
+                              isCurrentTier ? "bg-blue-100 font-medium" : ""
+                            }`}
+                          >
+                            <span>{rangeText}</span>
+                            <span>{formatPrice(pricing.unitPrice)}/回線</span>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              )}
+
               <div>
                 <Label htmlFor="lineCount">回線数</Label>
                 <Input
