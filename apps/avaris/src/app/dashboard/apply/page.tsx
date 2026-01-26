@@ -30,7 +30,6 @@ import {
 
 interface PlanPricing {
   id: string;
-  customerType: string;
   minQuantity: number;
   maxQuantity: number | null;
   unitPrice: number;
@@ -87,10 +86,22 @@ export default function AdditionalApplyPage() {
 
   const selectedPlan = plans.find((p) => p.id === selectedPlanId);
 
-  // プランの価格を取得（個人向けの最初の価格を使用）
-  const getPlanPrice = (plan: Plan) => {
-    const pricing = plan.pricings.find((p) => p.customerType === "INDIVIDUAL") || plan.pricings[0];
-    return pricing?.unitPrice || 0;
+  // 回線数に応じた単価を取得（階層料金対応）
+  const getUnitPrice = (plan: Plan, quantity: number): number => {
+    const sortedPricings = [...plan.pricings].sort(
+      (a, b) => a.minQuantity - b.minQuantity
+    );
+    if (sortedPricings.length === 0) return 0;
+
+    let unitPrice = sortedPricings[0].unitPrice;
+    for (const pricing of sortedPricings) {
+      if (quantity >= pricing.minQuantity) {
+        if (!pricing.maxQuantity || quantity <= pricing.maxQuantity) {
+          unitPrice = pricing.unitPrice;
+        }
+      }
+    }
+    return unitPrice;
   };
 
   const canProceedStep1 = () => {
@@ -146,7 +157,7 @@ export default function AdditionalApplyPage() {
     );
   }
 
-  const selectedPlanPrice = selectedPlan ? getPlanPrice(selectedPlan) : 0;
+  const selectedPlanPrice = selectedPlan ? getUnitPrice(selectedPlan, lineCount) : 0;
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -223,7 +234,9 @@ export default function AdditionalApplyPage() {
                 </Label>
                 <div className="mt-3 space-y-3">
                   {plans.map((plan) => {
-                    const price = getPlanPrice(plan);
+                    const sortedPricings = [...plan.pricings].sort(
+                      (a, b) => a.minQuantity - b.minQuantity
+                    );
                     return (
                       <div
                         key={plan.id}
@@ -249,8 +262,17 @@ export default function AdditionalApplyPage() {
                         </div>
                         <div className="ml-3 flex-1">
                           <div className="font-medium">{plan.name}</div>
-                          <div className="mt-1 text-sm text-gray-500">
-                            単価: <strong>{formatCurrency(price)}</strong>
+                          <div className="mt-1 space-y-0.5">
+                            {sortedPricings.map((p, i) => {
+                              const rangeText = p.maxQuantity
+                                ? `${p.minQuantity}〜${p.maxQuantity}回線`
+                                : `${p.minQuantity}回線以上`;
+                              return (
+                                <div key={i} className="text-xs text-gray-500">
+                                  {rangeText}: <strong>{formatCurrency(p.unitPrice)}</strong>/回線
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       </div>

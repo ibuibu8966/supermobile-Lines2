@@ -172,43 +172,41 @@ async function main() {
   ]);
   console.log("Created plan-usage tag relations");
 
-  // 6. プラン料金テーブル
+  // 6. プラン料金テーブル（回線数ベースの階層料金）
   await Promise.all([
-    // ポケカプラン - 個人
+    // ポケカプラン - 通常料金
     prisma.planPricing.upsert({
-      where: { id: "pokeka-individual-1" },
+      where: { id: "pokeka-tier-1" },
       update: {},
       create: {
-        id: "pokeka-individual-1",
+        id: "pokeka-tier-1",
         planId: pokekaplan.id,
-        customerType: "INDIVIDUAL",
         minQuantity: 1,
-        maxQuantity: 10,
+        maxQuantity: 49,
         unitPrice: 3980,
-        description: "1〜10回線",
+        description: "1〜49回線",
       },
     }),
+    // ポケカプラン - 大量割引
     prisma.planPricing.upsert({
-      where: { id: "pokeka-individual-2" },
+      where: { id: "pokeka-tier-2" },
       update: {},
       create: {
-        id: "pokeka-individual-2",
+        id: "pokeka-tier-2",
         planId: pokekaplan.id,
-        customerType: "INDIVIDUAL",
-        minQuantity: 11,
-        maxQuantity: 50,
+        minQuantity: 50,
+        maxQuantity: null,
         unitPrice: 3480,
-        description: "11〜50回線（10%OFF）",
+        description: "50回線以上（割引）",
       },
     }),
-    // アドアフィプラン - 個人
+    // アドアフィプラン - 通常料金
     prisma.planPricing.upsert({
-      where: { id: "adaafi-individual-1" },
+      where: { id: "adaafi-tier-1" },
       update: {},
       create: {
-        id: "adaafi-individual-1",
+        id: "adaafi-tier-1",
         planId: adaafiPlan.id,
-        customerType: "INDIVIDUAL",
         minQuantity: 1,
         maxQuantity: null,
         unitPrice: 4980,

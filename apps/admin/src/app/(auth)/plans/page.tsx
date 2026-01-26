@@ -18,7 +18,6 @@ interface PlanUsageTag {
 
 interface PlanPricing {
   id: string;
-  customerType: "INDIVIDUAL" | "CORPORATE";
   minQuantity: number;
   maxQuantity: number | null;
   unitPrice: number;
@@ -46,7 +45,6 @@ interface Plan {
 }
 
 interface PricingInput {
-  customerType: "INDIVIDUAL" | "CORPORATE";
   minQuantity: number;
   maxQuantity: number | null;
   unitPrice: number;
@@ -137,7 +135,7 @@ function PlansContent() {
       name: "",
       usageTagIds: [],
       pricings: [
-        { customerType: "INDIVIDUAL", minQuantity: 1, maxQuantity: null, unitPrice: 0, description: "" },
+        { minQuantity: 1, maxQuantity: null, unitPrice: 0, description: "" },
       ],
     });
     setError(null);
@@ -152,7 +150,6 @@ function PlansContent() {
       name: plan.name,
       usageTagIds: plan.usageTags.map((pt) => pt.usageTag.id),
       pricings: plan.pricings.map((p) => ({
-        customerType: p.customerType,
         minQuantity: p.minQuantity,
         maxQuantity: p.maxQuantity,
         unitPrice: p.unitPrice,
@@ -253,7 +250,7 @@ function PlansContent() {
       ...formData,
       pricings: [
         ...formData.pricings,
-        { customerType: "INDIVIDUAL", minQuantity: 1, maxQuantity: null, unitPrice: 0, description: "" },
+        { minQuantity: 1, maxQuantity: null, unitPrice: 0, description: "" },
       ],
     });
   };
@@ -275,17 +272,21 @@ function PlansContent() {
     return "¥" + price.toLocaleString();
   };
 
-  const getPriceDisplay = (pricings: PlanPricing[], customerType: "INDIVIDUAL" | "CORPORATE") => {
-    const filtered = pricings.filter((p) => p.customerType === customerType);
-    if (filtered.length === 0) return "-";
+  const getPriceDisplay = (pricings: PlanPricing[]) => {
+    if (pricings.length === 0) return "-";
 
-    const sorted = filtered.sort((a, b) => a.minQuantity - b.minQuantity);
-    const base = sorted[0];
-    const hasDiscount = sorted.length > 1;
+    const sorted = [...pricings].sort((a, b) => a.minQuantity - b.minQuantity);
 
-    return hasDiscount
-      ? formatPrice(base.unitPrice) + "/月〜"
-      : formatPrice(base.unitPrice) + "/月";
+    return sorted.map((p, i) => {
+      const rangeText = p.maxQuantity
+        ? `${p.minQuantity}〜${p.maxQuantity}回線`
+        : `${p.minQuantity}回線以上`;
+      return (
+        <div key={i} className="text-xs">
+          <span className="text-gray-500">{rangeText}:</span> {formatPrice(p.unitPrice)}
+        </div>
+      );
+    });
   };
 
   return (
@@ -354,8 +355,7 @@ function PlansContent() {
                     <th className="text-left py-2 px-4">プラン名</th>
                     <th className="text-left py-2 px-4">コード</th>
                     <th className="text-left py-2 px-4">用途タグ</th>
-                    <th className="text-left py-2 px-4">個人料金</th>
-                    <th className="text-left py-2 px-4">法人料金</th>
+                    <th className="text-left py-2 px-4">料金</th>
                     <th className="text-left py-2 px-4">ステータス</th>
                     <th className="text-right py-2 px-4">操作</th>
                   </tr>
@@ -382,10 +382,7 @@ function PlansContent() {
                         </div>
                       </td>
                       <td className="py-2 px-4">
-                        {getPriceDisplay(plan.pricings, "INDIVIDUAL")}
-                      </td>
-                      <td className="py-2 px-4">
-                        {getPriceDisplay(plan.pricings, "CORPORATE")}
+                        {getPriceDisplay(plan.pricings)}
                       </td>
                       <td className="py-2 px-4">
                         <button onClick={() => toggleActive(plan)}>
@@ -549,28 +546,7 @@ function PlansContent() {
                             </button>
                           )}
                         </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <label className="block text-xs text-gray-500 mb-1">顧客種別</label>
-                            <select
-                              value={pricing.customerType}
-                              onChange={(e) => updatePricing(index, "customerType", e.target.value)}
-                              className="w-full px-2 py-1 border rounded text-sm"
-                            >
-                              <option value="INDIVIDUAL">個人</option>
-                              <option value="CORPORATE">法人</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-xs text-gray-500 mb-1">単価（円/月）</label>
-                            <input
-                              type="number"
-                              value={pricing.unitPrice}
-                              onChange={(e) => updatePricing(index, "unitPrice", parseInt(e.target.value) || 0)}
-                              className="w-full px-2 py-1 border rounded text-sm"
-                              min="0"
-                            />
-                          </div>
+                        <div className="grid grid-cols-3 gap-2">
                           <div>
                             <label className="block text-xs text-gray-500 mb-1">最低回線数</label>
                             <input
@@ -589,6 +565,16 @@ function PlansContent() {
                               onChange={(e) => updatePricing(index, "maxQuantity", e.target.value ? parseInt(e.target.value) : null)}
                               className="w-full px-2 py-1 border rounded text-sm"
                               min="1"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-1">単価（円/月）</label>
+                            <input
+                              type="number"
+                              value={pricing.unitPrice}
+                              onChange={(e) => updatePricing(index, "unitPrice", parseInt(e.target.value) || 0)}
+                              className="w-full px-2 py-1 border rounded text-sm"
+                              min="0"
                             />
                           </div>
                         </div>

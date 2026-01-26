@@ -28,7 +28,6 @@ interface PlanUsageTag {
 
 interface PlanPricing {
   id: string;
-  customerType: "INDIVIDUAL" | "CORPORATE";
   minQuantity: number;
   maxQuantity: number | null;
   unitPrice: number;
@@ -242,7 +241,6 @@ export default function ApplyPage() {
   const getUnitPrice = (): number => {
     if (!selectedPlan) return 0;
     const applicablePricings = selectedPlan.pricings
-      .filter((p) => p.customerType === customerType)
       .sort((a, b) => a.minQuantity - b.minQuantity);
 
     if (applicablePricings.length === 0) return 0;
@@ -427,9 +425,8 @@ export default function ApplyPage() {
               ) : (
                 <div className="grid gap-4">
                   {plans.map((plan) => {
-                    const individualPrice = plan.pricings.find(
-                      (p) => p.customerType === "INDIVIDUAL" && p.minQuantity === 1
-                    );
+                    const sortedPricings = [...plan.pricings].sort((a, b) => a.minQuantity - b.minQuantity);
+                    const basePrice = sortedPricings[0];
                     return (
                       <label
                         key={plan.id}
@@ -448,7 +445,7 @@ export default function ApplyPage() {
                           <p className="font-medium">{plan.name}</p>
                           <p className="text-sm text-muted-foreground">
                             {plan.usageTags.map((pt) => pt.usageTag.name).join(", ") || "汎用プラン"}
-                            {individualPrice && " - " + formatPrice(individualPrice.unitPrice) + "/月"}
+                            {basePrice && " - " + formatPrice(basePrice.unitPrice) + "/月〜"}
                           </p>
                         </div>
                       </label>

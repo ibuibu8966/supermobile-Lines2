@@ -153,9 +153,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 顧客種別に応じた料金を取得
+    // 回線数に応じた料金を取得
     const applicablePricings = plan.pricings
-      .filter((p) => p.customerType === customerType)
       .sort((a, b) => a.minQuantity - b.minQuantity);
 
     if (applicablePricings.length === 0) {

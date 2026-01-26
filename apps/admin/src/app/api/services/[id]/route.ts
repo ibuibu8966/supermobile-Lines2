@@ -34,7 +34,7 @@ export async function GET(
               },
             },
             pricings: {
-              orderBy: [{ customerType: "asc" }, { minQuantity: "asc" }],
+              orderBy: { minQuantity: "asc" },
             },
           },
           orderBy: { name: "asc" },

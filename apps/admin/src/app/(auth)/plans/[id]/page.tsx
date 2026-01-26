@@ -18,7 +18,6 @@ interface PlanUsageTag {
 
 interface PlanPricing {
   id: string;
-  customerType: "INDIVIDUAL" | "CORPORATE";
   minQuantity: number;
   maxQuantity: number | null;
   unitPrice: number;
@@ -46,7 +45,6 @@ interface Plan {
 }
 
 interface PricingInput {
-  customerType: "INDIVIDUAL" | "CORPORATE";
   minQuantity: number;
   maxQuantity: number | null;
   unitPrice: number;
@@ -87,7 +85,6 @@ export default function PlanDetailPage({
           name: data.name,
           usageTagIds: data.usageTags.map((pt: PlanUsageTag) => pt.usageTag.id),
           pricings: data.pricings.map((p: PlanPricing) => ({
-            customerType: p.customerType,
             minQuantity: p.minQuantity,
             maxQuantity: p.maxQuantity,
             unitPrice: p.unitPrice,
@@ -205,7 +202,6 @@ export default function PlanDetailPage({
         name: plan.name,
         usageTagIds: plan.usageTags.map((pt) => pt.usageTag.id),
         pricings: plan.pricings.map((p) => ({
-          customerType: p.customerType,
           minQuantity: p.minQuantity,
           maxQuantity: p.maxQuantity,
           unitPrice: p.unitPrice,
@@ -222,7 +218,7 @@ export default function PlanDetailPage({
       ...formData,
       pricings: [
         ...formData.pricings,
-        { customerType: "INDIVIDUAL", minQuantity: 1, maxQuantity: null, unitPrice: 0, description: "" },
+        { minQuantity: 1, maxQuantity: null, unitPrice: 0, description: "" },
       ],
     });
   };
@@ -397,28 +393,7 @@ export default function PlanDetailPage({
                             </button>
                           )}
                         </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <label className="block text-xs text-gray-500 mb-1">顧客種別</label>
-                            <select
-                              value={pricing.customerType}
-                              onChange={(e) => updatePricing(index, "customerType", e.target.value)}
-                              className="w-full px-2 py-1 border rounded text-sm"
-                            >
-                              <option value="INDIVIDUAL">個人</option>
-                              <option value="CORPORATE">法人</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-xs text-gray-500 mb-1">単価（円/月）</label>
-                            <input
-                              type="number"
-                              value={pricing.unitPrice}
-                              onChange={(e) => updatePricing(index, "unitPrice", parseInt(e.target.value) || 0)}
-                              className="w-full px-2 py-1 border rounded text-sm"
-                              min="0"
-                            />
-                          </div>
+                        <div className="grid grid-cols-3 gap-2">
                           <div>
                             <label className="block text-xs text-gray-500 mb-1">最低回線数</label>
                             <input
@@ -437,6 +412,16 @@ export default function PlanDetailPage({
                               onChange={(e) => updatePricing(index, "maxQuantity", e.target.value ? parseInt(e.target.value) : null)}
                               className="w-full px-2 py-1 border rounded text-sm"
                               min="1"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-1">単価（円/月）</label>
+                            <input
+                              type="number"
+                              value={pricing.unitPrice}
+                              onChange={(e) => updatePricing(index, "unitPrice", parseInt(e.target.value) || 0)}
+                              className="w-full px-2 py-1 border rounded text-sm"
+                              min="0"
                             />
                           </div>
                         </div>
@@ -541,7 +526,6 @@ export default function PlanDetailPage({
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b">
-                          <th className="text-left py-2 px-4">顧客種別</th>
                           <th className="text-left py-2 px-4">回線数</th>
                           <th className="text-right py-2 px-4">単価</th>
                           <th className="text-left py-2 px-4">説明</th>
@@ -550,11 +534,6 @@ export default function PlanDetailPage({
                       <tbody>
                         {plan.pricings.map((pricing) => (
                           <tr key={pricing.id} className="border-b">
-                            <td className="py-2 px-4">
-                              <Badge variant="outline">
-                                {pricing.customerType === "INDIVIDUAL" ? "個人" : "法人"}
-                              </Badge>
-                            </td>
                             <td className="py-2 px-4">
                               {pricing.maxQuantity
                                 ? `${pricing.minQuantity}〜${pricing.maxQuantity}回線`

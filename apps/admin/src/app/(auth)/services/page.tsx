@@ -17,7 +17,6 @@ interface PlanUsageTag {
 
 interface PlanPricing {
   id: string;
-  customerType: "INDIVIDUAL" | "CORPORATE";
   minQuantity: number;
   maxQuantity: number | null;
   unitPrice: number;
@@ -183,11 +182,10 @@ export default function ServicesPage() {
     return "¥" + price.toLocaleString();
   };
 
-  const getPriceDisplay = (pricings: PlanPricing[], customerType: "INDIVIDUAL" | "CORPORATE") => {
-    const filtered = pricings.filter((p) => p.customerType === customerType);
-    if (filtered.length === 0) return "-";
+  const getPriceDisplay = (pricings: PlanPricing[]) => {
+    if (pricings.length === 0) return "-";
 
-    const sorted = filtered.sort((a, b) => a.minQuantity - b.minQuantity);
+    const sorted = [...pricings].sort((a, b) => a.minQuantity - b.minQuantity);
     const base = sorted[0];
     const hasDiscount = sorted.length > 1;
 
@@ -278,8 +276,7 @@ export default function ServicesPage() {
                         <tr className="border-b">
                           <th className="text-left py-2 px-4">プラン名</th>
                           <th className="text-left py-2 px-4">用途タグ</th>
-                          <th className="text-left py-2 px-4">個人料金</th>
-                          <th className="text-left py-2 px-4">法人料金</th>
+                          <th className="text-left py-2 px-4">料金</th>
                           <th className="text-left py-2 px-4">ステータス</th>
                           <th className="text-right py-2 px-4">操作</th>
                         </tr>
@@ -302,10 +299,7 @@ export default function ServicesPage() {
                               </div>
                             </td>
                             <td className="py-2 px-4">
-                              {getPriceDisplay(plan.pricings, "INDIVIDUAL")}
-                            </td>
-                            <td className="py-2 px-4">
-                              {getPriceDisplay(plan.pricings, "CORPORATE")}
+                              {getPriceDisplay(plan.pricings)}
                             </td>
                             <td className="py-2 px-4">
                               <Badge variant={plan.isActive ? "success" : "secondary"}>

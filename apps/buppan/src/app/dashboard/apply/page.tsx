@@ -30,7 +30,6 @@ import {
 
 interface PlanPricing {
   id: string;
-  customerType: string;
   minQuantity: number;
   maxQuantity: number | null;
   unitPrice: number;
@@ -87,10 +86,25 @@ export default function AdditionalApplyPage() {
 
   const selectedPlan = plans.find((p) => p.id === selectedPlanId);
 
-  // プランの価格を取得（個人向けの最初の価格を使用）
+  // 回線数に応じた単価を取得
+  const getUnitPrice = (plan: Plan, quantity: number): number => {
+    const sortedPricings = [...plan.pricings].sort((a, b) => a.minQuantity - b.minQuantity);
+    if (sortedPricings.length === 0) return 0;
+
+    let unitPrice = sortedPricings[0].unitPrice;
+    for (const pricing of sortedPricings) {
+      if (quantity >= pricing.minQuantity) {
+        if (!pricing.maxQuantity || quantity <= pricing.maxQuantity) {
+          unitPrice = pricing.unitPrice;
+        }
+      }
+    }
+    return unitPrice;
+  };
+
+  // プランの基本価格を取得（1回線目の価格）
   const getPlanPrice = (plan: Plan) => {
-    const pricing = plan.pricings.find((p) => p.customerType === "INDIVIDUAL") || plan.pricings[0];
-    return pricing?.unitPrice || 0;
+    return getUnitPrice(plan, 1);
   };
 
   const canProceedStep1 = () => {

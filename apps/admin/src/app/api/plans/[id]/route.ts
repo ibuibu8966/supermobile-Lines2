@@ -6,7 +6,6 @@ type TransactionClient = Prisma.TransactionClient;
 
 const pricingSchema = z.object({
   id: z.string().cuid().optional(),
-  customerType: z.enum(["INDIVIDUAL", "CORPORATE"]),
   minQuantity: z.number().int().min(1).default(1),
   maxQuantity: z.number().int().min(1).nullable().optional(),
   unitPrice: z.number().int().min(0),
@@ -39,7 +38,7 @@ export async function GET(
           },
         },
         pricings: {
-          orderBy: [{ customerType: "asc" }, { minQuantity: "asc" }],
+          orderBy: { minQuantity: "asc" },
         },
         _count: {
           select: {
@@ -143,7 +142,6 @@ export async function PATCH(
           await tx.planPricing.createMany({
             data: pricings.map((p) => ({
               planId: id,
-              customerType: p.customerType,
               minQuantity: p.minQuantity,
               maxQuantity: p.maxQuantity ?? null,
               unitPrice: p.unitPrice,
@@ -164,7 +162,7 @@ export async function PATCH(
             },
           },
           pricings: {
-            orderBy: [{ customerType: "asc" }, { minQuantity: "asc" }],
+            orderBy: { minQuantity: "asc" },
           },
         },
       });

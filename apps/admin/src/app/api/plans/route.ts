@@ -5,7 +5,6 @@ import { z } from "zod";
 export const dynamic = "force-dynamic";
 
 const pricingSchema = z.object({
-  customerType: z.enum(["INDIVIDUAL", "CORPORATE"]),
   minQuantity: z.number().int().min(1).default(1),
   maxQuantity: z.number().int().min(1).nullable().optional(),
   unitPrice: z.number().int().min(0),
@@ -46,7 +45,7 @@ export async function GET(request: NextRequest) {
           },
         },
         pricings: {
-          orderBy: [{ customerType: "asc" }, { minQuantity: "asc" }],
+          orderBy: { minQuantity: "asc" },
         },
         _count: {
           select: {

@@ -56,16 +56,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 価格取得（顧客タイプに応じた価格、なければ最初の価格）
-    const pricing =
-      plan.pricings.find((p) => p.customerType === customer.type) ||
-      plan.pricings[0];
-
-    if (!pricing) {
+    // 回線数に応じた単価を計算
+    if (plan.pricings.length === 0) {
       return NextResponse.json(
         { error: "プランの価格設定が見つかりません" },
         { status: 400 }
       );
+    }
+
+    let unitPrice = plan.pricings[0].unitPrice;
+    for (const pricing of plan.pricings) {
+      if (lineCount >= pricing.minQuantity) {
+        if (!pricing.maxQuantity || lineCount <= pricing.maxQuantity) {
+          unitPrice = pricing.unitPrice;
+        }
+      }
     }
 
     // 申込番号生成
@@ -80,7 +85,6 @@ export async function POST(request: NextRequest) {
     const applicationNumber = `AP${dateStr}${randomNum}`;
 
     // 金額計算
-    const unitPrice = pricing.unitPrice;
     const totalAmount = unitPrice * lineCount;
 
     // 申込作成（トランザクション）
