@@ -4,48 +4,32 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    /* VERSUS Neon Pink/Cyberpunk Theme - Dark by default */
+    --background: 240 20% 2%; /* #050508 */
+    --foreground: 0 0% 100%; /* white */
+    --card: 240 15% 5%; /* slightly elevated */
+    --card-foreground: 0 0% 100%;
+    --popover: 240 15% 5%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 338 100% 50%; /* #ff0066 hot pink */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 330 100% 60%; /* #ff3399 magenta */
+    --secondary-foreground: 0 0% 100%;
+    --muted: 240 10% 12%;
+    --muted-foreground: 0 0% 65%;
+    --accent: 338 100% 50%; /* hot pink */
+    --accent-foreground: 0 0% 100%;
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 10% 15%;
+    --input: 240 10% 15%;
+    --ring: 338 100% 50%; /* hot pink */
     --radius: 0.5rem;
-  }
 
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
+    /* Custom neon colors */
+    --neon-pink: #ff0066;
+    --neon-pink-light: #ff3399;
+    --neon-pink-dark: #cc0052;
   }
 }
 
@@ -56,4 +40,115 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+@layer utilities {
+  .text-neon {
+    color: var(--neon-pink);
+  }
+  .text-neon-light {
+    color: var(--neon-pink-light);
+  }
+  .bg-neon {
+    background-color: var(--neon-pink);
+  }
+  .bg-neon-gradient {
+    background: linear-gradient(135deg, var(--neon-pink) 0%, var(--neon-pink-light) 100%);
+  }
+  .border-neon {
+    border-color: var(--neon-pink);
+  }
+
+  /* Neon glow effects */
+  .neon-text {
+    text-shadow:
+      0 0 5px var(--neon-pink),
+      0 0 10px var(--neon-pink),
+      0 0 20px var(--neon-pink),
+      0 0 40px var(--neon-pink);
+  }
+
+  .neon-box {
+    box-shadow:
+      0 0 5px var(--neon-pink),
+      0 0 10px var(--neon-pink),
+      inset 0 0 5px rgba(255, 0, 102, 0.1);
+  }
+
+  .neon-box-hover:hover {
+    box-shadow:
+      0 0 10px var(--neon-pink),
+      0 0 20px var(--neon-pink),
+      0 0 40px var(--neon-pink),
+      inset 0 0 10px rgba(255, 0, 102, 0.2);
+  }
+
+  .neon-border {
+    border: 1px solid var(--neon-pink);
+    box-shadow:
+      0 0 5px var(--neon-pink),
+      inset 0 0 5px rgba(255, 0, 102, 0.1);
+  }
+
+  .neon-gradient-bg {
+    background: linear-gradient(
+      135deg,
+      rgba(255, 0, 102, 0.1) 0%,
+      rgba(255, 51, 153, 0.05) 100%
+    );
+  }
+
+  .neon-line {
+    height: 2px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      var(--neon-pink),
+      transparent
+    );
+    box-shadow: 0 0 10px var(--neon-pink);
+  }
+
+  /* Grid background */
+  .neon-grid {
+    background-image:
+      linear-gradient(rgba(255, 0, 102, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 0, 102, 0.03) 1px, transparent 1px);
+    background-size: 50px 50px;
+  }
+}
+
+/* Neon animations */
+@keyframes neon-pulse {
+  0%, 100% {
+    opacity: 1;
+    text-shadow:
+      0 0 5px var(--neon-pink),
+      0 0 10px var(--neon-pink),
+      0 0 20px var(--neon-pink);
+  }
+  50% {
+    opacity: 0.8;
+    text-shadow:
+      0 0 2px var(--neon-pink),
+      0 0 5px var(--neon-pink),
+      0 0 10px var(--neon-pink);
+  }
+}
+
+@keyframes neon-flicker {
+  0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% {
+    opacity: 1;
+  }
+  20%, 24%, 55% {
+    opacity: 0.8;
+  }
+}
+
+.animate-neon-pulse {
+  animation: neon-pulse 2s ease-in-out infinite;
+}
+
+.animate-neon-flicker {
+  animation: neon-flicker 3s linear infinite;
 }

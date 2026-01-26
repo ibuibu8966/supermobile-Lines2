@@ -2,6 +2,7 @@
 export { cn } from "./lib/utils";
 
 // Components
+export * from "./components/accordion";
 export * from "./components/button";
 export * from "./components/input";
 export * from "./components/label";

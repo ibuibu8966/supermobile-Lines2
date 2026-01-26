@@ -63,7 +63,7 @@ function LoginForm() {
       </CardHeader>
       <CardContent>
         {(error || formError) && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-600 text-sm">
+          <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg flex items-center gap-2 text-destructive text-sm">
             <AlertCircle className="h-4 w-4 flex-shrink-0" />
             <span>
               {formError || "ログインに失敗しました。再度お試しください。"}
@@ -148,9 +148,9 @@ function LoginFormFallback() {
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          <div className="h-10 bg-gray-100 animate-pulse rounded" />
-          <div className="h-10 bg-gray-100 animate-pulse rounded" />
-          <div className="h-10 bg-gray-100 animate-pulse rounded" />
+          <div className="h-10 bg-muted animate-pulse rounded" />
+          <div className="h-10 bg-muted animate-pulse rounded" />
+          <div className="h-10 bg-muted animate-pulse rounded" />
         </div>
       </CardContent>
     </Card>
@@ -159,7 +159,7 @@ function LoginFormFallback() {
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4">
+    <div className="min-h-screen bg-background flex items-center justify-center py-12 px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <Link

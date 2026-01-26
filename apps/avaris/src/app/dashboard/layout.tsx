@@ -40,7 +40,7 @@ export default function DashboardLayout({
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       {/* モバイルサイドバー */}
       <div
         className={cn(
@@ -52,10 +52,10 @@ export default function DashboardLayout({
           className="fixed inset-0 bg-black/50"
           onClick={() => setSidebarOpen(false)}
         />
-        <div className="fixed inset-y-0 left-0 w-64 bg-white shadow-xl">
-          <div className="flex h-16 items-center justify-between px-4 border-b">
-            <span className="text-lg font-bold">マイページ</span>
-            <button onClick={() => setSidebarOpen(false)}>
+        <div className="fixed inset-y-0 left-0 w-64 bg-card shadow-xl border-r border-border">
+          <div className="flex h-16 items-center justify-between px-4 border-b border-border">
+            <span className="text-lg font-bold text-foreground">マイページ</span>
+            <button onClick={() => setSidebarOpen(false)} className="text-foreground">
               <X className="h-6 w-6" />
             </button>
           </div>
@@ -71,7 +71,7 @@ export default function DashboardLayout({
                     "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
                     isActive
                       ? "bg-primary text-primary-foreground"
-                      : "text-gray-700 hover:bg-gray-100"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   )}
                 >
                   <item.icon className="h-5 w-5" />
@@ -80,10 +80,10 @@ export default function DashboardLayout({
               );
             })}
           </nav>
-          <div className="absolute bottom-0 left-0 right-0 p-4 border-t">
+          <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-border">
             <Button
               variant="ghost"
-              className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
+              className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10"
               onClick={handleSignOut}
             >
               <LogOut className="h-5 w-5 mr-3" />
@@ -95,9 +95,9 @@ export default function DashboardLayout({
 
       {/* デスクトップサイドバー */}
       <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
-        <div className="flex flex-col flex-grow bg-white border-r">
-          <div className="flex h-16 items-center px-6 border-b">
-            <span className="text-lg font-bold">マイページ</span>
+        <div className="flex flex-col flex-grow bg-card border-r border-border">
+          <div className="flex h-16 items-center px-6 border-b border-border">
+            <span className="text-lg font-bold text-foreground">マイページ</span>
           </div>
           <nav className="flex-1 p-4 space-y-1">
             {navigation.map((item) => {
@@ -110,7 +110,7 @@ export default function DashboardLayout({
                     "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
                     isActive
                       ? "bg-primary text-primary-foreground"
-                      : "text-gray-700 hover:bg-gray-100"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   )}
                 >
                   <item.icon className="h-5 w-5" />
@@ -119,14 +119,14 @@ export default function DashboardLayout({
               );
             })}
           </nav>
-          <div className="p-4 border-t">
+          <div className="p-4 border-t border-border">
             {session?.user && (
               <div className="flex items-center gap-3 px-3 py-2 mb-2">
-                <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center">
-                  <User className="h-4 w-4 text-gray-600" />
+                <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
+                  <User className="h-4 w-4 text-muted-foreground" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">
+                  <p className="text-sm font-medium text-foreground truncate">
                     {session.user.name || session.user.email}
                   </p>
                 </div>
@@ -134,7 +134,7 @@ export default function DashboardLayout({
             )}
             <Button
               variant="ghost"
-              className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
+              className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10"
               onClick={handleSignOut}
             >
               <LogOut className="h-5 w-5 mr-3" />
@@ -147,11 +147,11 @@ export default function DashboardLayout({
       {/* メインコンテンツ */}
       <div className="lg:pl-64">
         {/* モバイルヘッダー */}
-        <div className="sticky top-0 z-40 flex h-16 items-center gap-4 bg-white border-b px-4 lg:hidden">
-          <button onClick={() => setSidebarOpen(true)}>
+        <div className="sticky top-0 z-40 flex h-16 items-center gap-4 bg-card border-b border-border px-4 lg:hidden">
+          <button onClick={() => setSidebarOpen(true)} className="text-foreground">
             <Menu className="h-6 w-6" />
           </button>
-          <span className="text-lg font-bold">マイページ</span>
+          <span className="text-lg font-bold text-foreground">マイページ</span>
         </div>
 
         {/* ページコンテンツ */}
