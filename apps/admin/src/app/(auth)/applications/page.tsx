@@ -3,10 +3,11 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@repo/ui";
-import { Search, Loader2, ExternalLink } from "lucide-react";
+import { Search, Loader2, ExternalLink, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryState } from "nuqs";
-import { useApplications, useServices, type Application } from "@/hooks/use-applications";
+import { useApplications, type Application } from "@/hooks/use-applications";
+import { useServices } from "@/hooks/use-users";
 
 const STATUS_LABELS: Record<string, string> = {
   SUBMITTED: "申込済み",
@@ -47,7 +48,7 @@ export default function ApplicationsPage() {
   const [searchInput, setSearchInput] = useState(search);
 
   // SWRでデータ取得
-  const { applications, pagination, isLoading, isValidating, mutate } = useApplications({
+  const { applications, pagination, isLoading, isValidating, error, mutate } = useApplications({
     search,
     status: statusFilter,
     serviceId: serviceFilter,
@@ -150,6 +151,13 @@ export default function ApplicationsPage() {
           全サービスの申し込みを一元管理
         </p>
       </div>
+
+      {error && (
+        <div className="bg-red-50 text-red-600 px-4 py-3 rounded-md text-sm flex items-center gap-2 mb-4">
+          <AlertCircle className="h-4 w-4" />
+          データの取得に失敗しました。再度お試しください。
+        </div>
+      )}
 
       <div className="flex justify-between items-center mb-6">
         <div className="flex gap-4 flex-wrap">

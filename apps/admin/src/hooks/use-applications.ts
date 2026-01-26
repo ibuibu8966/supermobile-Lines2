@@ -108,12 +108,3 @@ export function useApplications(options: UseApplicationsOptions = {}) {
   };
 }
 
-export function useServices() {
-  const { data, error, isLoading } = useSWR<Service[]>("/api/services");
-
-  return {
-    services: data || [],
-    isLoading,
-    error,
-  };
-}

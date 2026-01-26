@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@repo/ui";
-import { Plus, Pencil, Trash2, Loader2, X, Eye, EyeOff } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, X, Eye, EyeOff, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryState } from "nuqs";
 import { useUsers, useServices, type User } from "@/hooks/use-users";
@@ -30,7 +30,7 @@ export default function UsersPage() {
   const [filterServiceId, setFilterServiceId] = useQueryState("service", { defaultValue: "" });
 
   // SWRでデータ取得
-  const { users, isLoading, isValidating, mutate } = useUsers({
+  const { users, isLoading, isValidating, error: fetchError, mutate } = useUsers({
     includeInactive: showInactive === "true",
     role: filterRole,
     serviceId: filterServiceId,
@@ -193,6 +193,13 @@ export default function UsersPage() {
           管理者・顧客ユーザーを管理
         </p>
       </div>
+
+      {fetchError && (
+        <div className="bg-red-50 text-red-600 px-4 py-3 rounded-md text-sm flex items-center gap-2 mb-4">
+          <AlertCircle className="h-4 w-4" />
+          データの取得に失敗しました。再度お試しください。
+        </div>
+      )}
 
       <div className="max-w-6xl">
         <div className="flex justify-between items-center mb-6">

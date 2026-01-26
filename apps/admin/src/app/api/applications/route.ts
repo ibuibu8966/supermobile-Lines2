@@ -45,22 +45,58 @@ export async function GET(request: NextRequest) {
     const [applications, total] = await Promise.all([
       prisma.application.findMany({
         where,
-        include: {
-          customer: true,
-          service: true,
-          plan: true,
-          lines: {
-            include: {
-              sim: {
-                include: {
-                  simLocationTag: true,
-                },
-              },
-              lineTag: true,
-              lineReserveTag: true,
+        select: {
+          id: true,
+          applicationNumber: true,
+          status: true,
+          lineCount: true,
+          unitPrice: true,
+          totalAmount: true,
+          comment1: true,
+          comment2: true,
+          createdAt: true,
+          customer: {
+            select: {
+              id: true,
+              type: true,
+              lastName: true,
+              firstName: true,
+              lastNameKana: true,
+              firstNameKana: true,
+              companyName: true,
+              companyNameKana: true,
+              email: true,
+              phone: true,
             },
           },
-          kycImages: true,
+          service: {
+            select: {
+              id: true,
+              code: true,
+              name: true,
+            },
+          },
+          plan: {
+            select: {
+              id: true,
+              code: true,
+              name: true,
+            },
+          },
+          lines: {
+            select: {
+              status: true,
+            },
+          },
+          kycImages: {
+            select: {
+              id: true,
+              type: true,
+              storagePath: true,
+              status: true,
+              expiryDate: true,
+            },
+          },
         },
         orderBy: {
           createdAt: "desc",
@@ -91,8 +127,11 @@ export async function GET(request: NextRequest) {
         ? expiryDates.reduce((a, b) => (a! > b! ? a : b))
         : null;
 
+      // linesを除外してレスポンスを構築
+      const { lines: _, ...appWithoutLines } = app;
+
       return {
-        ...app,
+        ...appWithoutLines,
         stats: {
           lineCount: app.lineCount,
           shippedCount,
