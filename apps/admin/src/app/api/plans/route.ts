@@ -15,6 +15,7 @@ const planSchema = z.object({
   serviceId: z.string().cuid("サービスを選択してください"),
   code: z.string().min(1, "コードは必須です").max(50),
   name: z.string().min(1, "名前は必須です").max(100),
+  description: z.string().max(500).optional().nullable(),
   usageTagIds: z.array(z.number().int()).optional().default([]),
   pricings: z.array(pricingSchema).optional().default([]),
   isActive: z.boolean().optional().default(true),

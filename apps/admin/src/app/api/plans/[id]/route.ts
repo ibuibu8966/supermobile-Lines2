@@ -15,6 +15,7 @@ const pricingSchema = z.object({
 const updatePlanSchema = z.object({
   code: z.string().min(1).max(50).optional(),
   name: z.string().min(1).max(100).optional(),
+  description: z.string().max(500).optional().nullable(),
   usageTagIds: z.array(z.number().int()).optional(),
   pricings: z.array(pricingSchema).optional(),
   isActive: z.boolean().optional(),

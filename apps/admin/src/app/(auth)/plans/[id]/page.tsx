@@ -34,6 +34,7 @@ interface Plan {
   id: string;
   code: string;
   name: string;
+  description: string | null;
   isActive: boolean;
   serviceId: string;
   service: Service;
@@ -68,6 +69,7 @@ export default function PlanDetailPage({
   const [formData, setFormData] = useState({
     code: "",
     name: "",
+    description: "",
     usageTagIds: [] as number[],
     pricings: [] as PricingInput[],
   });
@@ -83,6 +85,7 @@ export default function PlanDetailPage({
         setFormData({
           code: data.code,
           name: data.name,
+          description: data.description || "",
           usageTagIds: data.usageTags.map((pt: PlanUsageTag) => pt.usageTag.id),
           pricings: data.pricings.map((p: PlanPricing) => ({
             minQuantity: p.minQuantity,
@@ -200,6 +203,7 @@ export default function PlanDetailPage({
       setFormData({
         code: plan.code,
         name: plan.name,
+        description: plan.description || "",
         usageTagIds: plan.usageTags.map((pt) => pt.usageTag.id),
         pricings: plan.pricings.map((p) => ({
           minQuantity: p.minQuantity,
@@ -335,6 +339,23 @@ export default function PlanDetailPage({
                       required
                     />
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    プラン説明（顧客向け）
+                  </label>
+                  <textarea
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-md"
+                    rows={3}
+                    placeholder="例: データ通信専用のお得なプランです。動画視聴やSNS利用に最適。"
+                    maxLength={500}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    申込画面のプラン選択時に表示されます（最大500文字）
+                  </p>
                 </div>
 
                 <div>
@@ -490,6 +511,12 @@ export default function PlanDetailPage({
                   <div>
                     <dt className="text-gray-500">申込数</dt>
                     <dd className="font-medium mt-1">{plan._count.applications}件</dd>
+                  </div>
+                  <div className="col-span-2">
+                    <dt className="text-gray-500">プラン説明</dt>
+                    <dd className="mt-1 whitespace-pre-wrap">
+                      {plan.description || <span className="text-gray-400">未設定</span>}
+                    </dd>
                   </div>
                 </dl>
               </CardContent>

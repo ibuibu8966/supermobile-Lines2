@@ -38,6 +38,7 @@ interface Plan {
   id: string;
   code: string;
   name: string;
+  description: string | null;
   usageTags: PlanUsageTag[];
   pricings: PlanPricing[];
 }
@@ -442,7 +443,12 @@ export default function ApplyPage() {
                         />
                         <div className="flex-1">
                           <p className="font-medium">{plan.name}</p>
-                          <p className="text-sm text-muted-foreground mb-2">
+                          {plan.description && (
+                            <p className="text-sm text-gray-600 mt-1 whitespace-pre-wrap">
+                              {plan.description}
+                            </p>
+                          )}
+                          <p className="text-sm text-muted-foreground mt-1 mb-2">
                             {plan.usageTags.map((pt) => pt.usageTag.name).join(", ") || "汎用プラン"}
                           </p>
                           <div className="space-y-0.5">
