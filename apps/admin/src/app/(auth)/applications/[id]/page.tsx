@@ -325,24 +325,83 @@ export default function ApplicationDetailPage() {
     }
   };
 
-  const updateLineIccid = async (lineId: string, iccid: string) => {
-    // ICCID validation (15 alphanumeric uppercase)
-    const upperIccid = iccid.toUpperCase();
-    if (upperIccid && !/^[A-Z0-9]{15}$/.test(upperIccid)) {
-      return; // Invalid format, don't update
+  // ICCID編集用の状態（クライアント側一時保存）
+  const [editedIccids, setEditedIccids] = useState<Record<string, string>>({});
+  const [iccidErrors, setIccidErrors] = useState<Record<string, string>>({});
+  const [savingIccids, setSavingIccids] = useState(false);
+
+  const validateIccid = (iccid: string): string | null => {
+    if (!iccid) return null; // 空は許可
+    if (!/^[A-Z0-9]{15}$/.test(iccid.toUpperCase())) {
+      return "ICCIDは15桁の英数字です";
     }
+    return null;
+  };
+
+  const handleIccidChange = (lineId: string, value: string) => {
+    const upperValue = value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    setEditedIccids((prev) => ({ ...prev, [lineId]: upperValue }));
+
+    // リアルタイムバリデーション
+    const error = validateIccid(upperValue);
+    setIccidErrors((prev) => {
+      if (error) {
+        return { ...prev, [lineId]: error };
+      } else {
+        const { [lineId]: _, ...rest } = prev;
+        return rest;
+      }
+    });
+  };
+
+  const hasIccidChanges = () => {
+    if (!application) return false;
+    return Object.entries(editedIccids).some(([lineId, iccid]) => {
+      const line = application.lines.find((l) => l.id === lineId);
+      return line && iccid !== (line.simId || "");
+    });
+  };
+
+  const hasIccidErrors = () => {
+    return Object.keys(iccidErrors).length > 0;
+  };
+
+  const saveIccidChanges = async () => {
+    if (!application || hasIccidErrors()) return;
+
+    const changesToSave = Object.entries(editedIccids).filter(([lineId, iccid]) => {
+      const line = application.lines.find((l) => l.id === lineId);
+      return line && iccid !== (line.simId || "");
+    });
+
+    if (changesToSave.length === 0) return;
+
+    setSavingIccids(true);
     try {
-      const res = await fetch(`/api/applications/${id}/lines/${lineId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ simId: upperIccid || null }),
-      });
-      if (res.ok) {
+      const results = await Promise.all(
+        changesToSave.map(([lineId, iccid]) =>
+          fetch(`/api/applications/${id}/lines/${lineId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ simId: iccid || null }),
+          })
+        )
+      );
+
+      if (results.every((res) => res.ok)) {
+        setEditedIccids({});
         fetchApplication();
       }
     } catch (error) {
-      console.error("ICCID更新エラー:", error);
+      console.error("ICCID保存エラー:", error);
+    } finally {
+      setSavingIccids(false);
     }
+  };
+
+  const cancelIccidChanges = () => {
+    setEditedIccids({});
+    setIccidErrors({});
   };
 
   if (loading) {
@@ -604,6 +663,37 @@ export default function ApplicationDetailPage() {
                 </Button>
               </div>
             )}
+            {/* ICCID変更保存バー */}
+            {hasIccidChanges() && (
+              <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg flex flex-wrap items-center gap-3">
+                <span className="text-sm font-medium text-yellow-700">
+                  ICCIDに未保存の変更があります
+                </span>
+                {hasIccidErrors() && (
+                  <span className="text-sm text-red-600">
+                    （入力エラーがあります）
+                  </span>
+                )}
+                <Button
+                  size="sm"
+                  onClick={saveIccidChanges}
+                  disabled={savingIccids || hasIccidErrors()}
+                >
+                  {savingIccids ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    "ICCID保存"
+                  )}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={cancelIccidChanges}
+                >
+                  キャンセル
+                </Button>
+              </div>
+            )}
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -646,33 +736,30 @@ export default function ApplicationDetailPage() {
                       <td className="py-2 px-2">{line.lineNumber}</td>
                       <td className="py-2 px-2">{line.msisdn || "—"}</td>
                       <td className="py-2 px-2">
-                        <div className="flex items-center gap-1">
-                          <input
-                            type="text"
-                            className="px-2 py-1 border rounded text-xs font-mono w-[140px]"
-                            defaultValue={line.simId || ""}
-                            placeholder="ICCID"
-                            maxLength={15}
-                            onBlur={(e) => {
-                              const newValue = e.target.value.toUpperCase();
-                              if (newValue !== (line.simId || "")) {
-                                updateLineIccid(line.id, newValue);
-                              }
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                e.currentTarget.blur();
-                              }
-                            }}
-                          />
-                          {line.simId && (
-                            <Link
-                              href={`/sims/${line.simId}`}
-                              className="text-blue-600 hover:text-blue-800"
-                              title="SIM詳細"
-                            >
-                              <ExternalLink className="h-3 w-3" />
-                            </Link>
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="text"
+                              className={`px-2 py-1 border rounded text-xs font-mono w-[140px] ${
+                                iccidErrors[line.id] ? "border-red-500 bg-red-50" : ""
+                              }`}
+                              value={editedIccids[line.id] ?? line.simId ?? ""}
+                              placeholder="ICCID"
+                              maxLength={15}
+                              onChange={(e) => handleIccidChange(line.id, e.target.value)}
+                            />
+                            {(editedIccids[line.id] ?? line.simId) && (
+                              <Link
+                                href={`/sims/${editedIccids[line.id] ?? line.simId}`}
+                                className="text-blue-600 hover:text-blue-800"
+                                title="SIM詳細"
+                              >
+                                <ExternalLink className="h-3 w-3" />
+                              </Link>
+                            )}
+                          </div>
+                          {iccidErrors[line.id] && (
+                            <span className="text-xs text-red-500">{iccidErrors[line.id]}</span>
                           )}
                         </div>
                       </td>
