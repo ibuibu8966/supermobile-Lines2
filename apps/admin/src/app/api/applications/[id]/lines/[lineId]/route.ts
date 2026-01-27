@@ -5,7 +5,7 @@ import { z } from "zod";
 export const dynamic = "force-dynamic";
 
 const updateLineSchema = z.object({
-  simId: z.string().min(19).max(20).optional().nullable(),
+  simId: z.string().regex(/^[A-Z0-9]{15}$/, "ICCIDは15桁の英数字（大文字）です").optional().nullable(),
   msisdn: z.string().regex(/^0\d{9,10}$/).optional().nullable(),
   status: z.enum([
     "UNASSIGNED",
@@ -88,18 +88,8 @@ export async function PATCH(
       );
     }
 
-    // SIMの存在確認
-    if (validated.simId) {
-      const sim = await prisma.sim.findUnique({
-        where: { iccid: validated.simId },
-      });
-      if (!sim) {
-        return NextResponse.json(
-          { error: "指定されたSIMが見つかりません" },
-          { status: 400 }
-        );
-      }
-    }
+    // SIMの存在確認（存在しなくても登録可能）
+    // SIMが存在しない場合でもICCIDは登録できるようにする
 
     // lineTagIdの存在確認
     if (validated.lineTagId) {

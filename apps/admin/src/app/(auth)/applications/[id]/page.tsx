@@ -264,11 +264,84 @@ export default function ApplicationDetailPage() {
 
   const toggleAllLines = () => {
     if (!application) return;
-    const unassignedLines = application.lines.filter((l) => l.status === "UNASSIGNED");
-    if (selectedLines.size === unassignedLines.length) {
+    if (selectedLines.size === application.lines.length) {
       setSelectedLines(new Set());
     } else {
-      setSelectedLines(new Set(unassignedLines.map((l) => l.id)));
+      setSelectedLines(new Set(application.lines.map((l) => l.id)));
+    }
+  };
+
+  // 一括編集用の状態
+  const [bulkLineTagId, setBulkLineTagId] = useState<string>("");
+  const [bulkLineReserveTagId, setBulkLineReserveTagId] = useState<string>("");
+  const [bulkShippedAt, setBulkShippedAt] = useState<string>("");
+  const [bulkReturnedAt, setBulkReturnedAt] = useState<string>("");
+  const [bulkContractMonth, setBulkContractMonth] = useState<string>("");
+  const [bulkUpdating, setBulkUpdating] = useState(false);
+
+  const applyBulkUpdate = async () => {
+    if (selectedLines.size === 0) return;
+
+    const updateData: Record<string, unknown> = {
+      lineIds: Array.from(selectedLines),
+    };
+
+    if (bulkLineTagId) {
+      updateData.lineTagId = bulkLineTagId === "clear" ? null : parseInt(bulkLineTagId);
+    }
+    if (bulkLineReserveTagId) {
+      updateData.lineReserveTagId = bulkLineReserveTagId === "clear" ? null : parseInt(bulkLineReserveTagId);
+    }
+    if (bulkShippedAt) {
+      updateData.shippedAt = bulkShippedAt === "clear" ? null : new Date(bulkShippedAt);
+    }
+    if (bulkReturnedAt) {
+      updateData.returnedAt = bulkReturnedAt === "clear" ? null : new Date(bulkReturnedAt);
+    }
+    if (bulkContractMonth) {
+      updateData.contractMonth = bulkContractMonth === "clear" ? null : new Date(bulkContractMonth + "-01");
+    }
+
+    setBulkUpdating(true);
+    try {
+      const res = await fetch(`/api/applications/${id}/lines/bulk`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updateData),
+      });
+      if (res.ok) {
+        fetchApplication();
+        setSelectedLines(new Set());
+        setBulkLineTagId("");
+        setBulkLineReserveTagId("");
+        setBulkShippedAt("");
+        setBulkReturnedAt("");
+        setBulkContractMonth("");
+      }
+    } catch (error) {
+      console.error("一括更新エラー:", error);
+    } finally {
+      setBulkUpdating(false);
+    }
+  };
+
+  const updateLineIccid = async (lineId: string, iccid: string) => {
+    // ICCID validation (15 alphanumeric uppercase)
+    const upperIccid = iccid.toUpperCase();
+    if (upperIccid && !/^[A-Z0-9]{15}$/.test(upperIccid)) {
+      return; // Invalid format, don't update
+    }
+    try {
+      const res = await fetch(`/api/applications/${id}/lines/${lineId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ simId: upperIccid || null }),
+      });
+      if (res.ok) {
+        fetchApplication();
+      }
+    } catch (error) {
+      console.error("ICCID更新エラー:", error);
     }
   };
 
@@ -458,6 +531,79 @@ export default function ApplicationDetailPage() {
             </div>
           </CardHeader>
           <CardContent>
+            {/* 一括編集バー */}
+            {selectedLines.size > 0 && (
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex flex-wrap items-center gap-3">
+                <span className="text-sm font-medium text-blue-700">
+                  {selectedLines.size}件選択中
+                </span>
+                <select
+                  className="px-2 py-1 border rounded text-xs"
+                  value={bulkLineTagId}
+                  onChange={(e) => setBulkLineTagId(e.target.value)}
+                >
+                  <option value="">回線タグ</option>
+                  <option value="clear">クリア</option>
+                  {lineTags.map((tag) => (
+                    <option key={tag.id} value={tag.id.toString()}>
+                      {tag.name}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className="px-2 py-1 border rounded text-xs"
+                  value={bulkLineReserveTagId}
+                  onChange={(e) => setBulkLineReserveTagId(e.target.value)}
+                >
+                  <option value="">予備タグ</option>
+                  <option value="clear">クリア</option>
+                  {lineReserveTags.map((tag) => (
+                    <option key={tag.id} value={tag.id.toString()}>
+                      {tag.name}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="date"
+                  className="px-2 py-1 border rounded text-xs"
+                  value={bulkShippedAt}
+                  onChange={(e) => setBulkShippedAt(e.target.value)}
+                  placeholder="発送日"
+                />
+                <input
+                  type="date"
+                  className="px-2 py-1 border rounded text-xs"
+                  value={bulkReturnedAt}
+                  onChange={(e) => setBulkReturnedAt(e.target.value)}
+                  placeholder="返却日"
+                />
+                <input
+                  type="month"
+                  className="px-2 py-1 border rounded text-xs"
+                  value={bulkContractMonth}
+                  onChange={(e) => setBulkContractMonth(e.target.value)}
+                  placeholder="契約月"
+                />
+                <Button
+                  size="sm"
+                  onClick={applyBulkUpdate}
+                  disabled={bulkUpdating || (!bulkLineTagId && !bulkLineReserveTagId && !bulkShippedAt && !bulkReturnedAt && !bulkContractMonth)}
+                >
+                  {bulkUpdating ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    "適用"
+                  )}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setSelectedLines(new Set())}
+                >
+                  解除
+                </Button>
+              </div>
+            )}
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -466,11 +612,11 @@ export default function ApplicationDetailPage() {
                       <input
                         type="checkbox"
                         checked={
-                          unassignedCount > 0 &&
-                          selectedLines.size === application.lines.filter((l) => l.status === "UNASSIGNED").length
+                          application.lines.length > 0 &&
+                          selectedLines.size === application.lines.length
                         }
                         onChange={toggleAllLines}
-                        disabled={unassignedCount === 0}
+                        disabled={application.lines.length === 0}
                         className="rounded"
                       />
                     </th>
@@ -494,23 +640,41 @@ export default function ApplicationDetailPage() {
                           type="checkbox"
                           checked={selectedLines.has(line.id)}
                           onChange={() => toggleLineSelection(line.id)}
-                          disabled={line.status !== "UNASSIGNED"}
                           className="rounded"
                         />
                       </td>
                       <td className="py-2 px-2">{line.lineNumber}</td>
                       <td className="py-2 px-2">{line.msisdn || "—"}</td>
-                      <td className="py-2 px-2 font-mono text-xs">
-                        {line.simId ? (
-                          <Link
-                            href={`/sims/${line.simId}`}
-                            className="text-blue-600 hover:underline"
-                          >
-                            {line.simId}
-                          </Link>
-                        ) : (
-                          "—"
-                        )}
+                      <td className="py-2 px-2">
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="text"
+                            className="px-2 py-1 border rounded text-xs font-mono w-[140px]"
+                            defaultValue={line.simId || ""}
+                            placeholder="ICCID"
+                            maxLength={15}
+                            onBlur={(e) => {
+                              const newValue = e.target.value.toUpperCase();
+                              if (newValue !== (line.simId || "")) {
+                                updateLineIccid(line.id, newValue);
+                              }
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.currentTarget.blur();
+                              }
+                            }}
+                          />
+                          {line.simId && (
+                            <Link
+                              href={`/sims/${line.simId}`}
+                              className="text-blue-600 hover:text-blue-800"
+                              title="SIM詳細"
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                            </Link>
+                          )}
+                        </div>
                       </td>
                       <td className="py-2 px-2">
                         {line.sim ? (

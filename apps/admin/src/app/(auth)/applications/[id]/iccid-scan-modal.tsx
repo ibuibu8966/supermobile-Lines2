@@ -51,16 +51,16 @@ export function IccidScanModal({
   }, []);
 
   const validateIccid = (iccid: string): boolean => {
-    return /^\d{19,20}$/.test(iccid);
+    return /^[A-Z0-9]{15}$/.test(iccid);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/\D/g, "");
+    const value = e.target.value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
     setCurrentInput(value);
     setError(null);
 
-    // 自動送信モードの場合、19-20桁になったら自動追加
-    if (autoEnter && value.length >= 19 && value.length <= 20) {
+    // 自動送信モードの場合、15桁になったら自動追加
+    if (autoEnter && value.length === 15) {
       addIccid(value);
     }
   };
@@ -74,7 +74,7 @@ export function IccidScanModal({
 
   const addIccid = (iccid: string) => {
     if (!validateIccid(iccid)) {
-      setError("ICCIDは19〜20桁の数字です");
+      setError("ICCIDは15桁の英数字です");
       return;
     }
 
@@ -168,7 +168,7 @@ export function IccidScanModal({
               バーコードリーダー自動送信
             </label>
             <span className="text-xs text-gray-500">
-              （19-20桁入力時に自動追加）
+              （15桁入力時に自動追加）
             </span>
           </div>
 
@@ -234,7 +234,7 @@ export function IccidScanModal({
                 value={currentInput}
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
-                maxLength={20}
+                maxLength={15}
               />
             </div>
             <Button

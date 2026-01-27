@@ -5,7 +5,7 @@ import { z } from "zod";
 export const dynamic = "force-dynamic";
 
 const scanSchema = z.object({
-  iccids: z.array(z.string().regex(/^\d{19,20}$/, "ICCIDは19〜20桁の数字です")).min(1),
+  iccids: z.array(z.string().regex(/^[A-Z0-9]{15}$/, "ICCIDは15桁の英数字（大文字）です")).min(1),
   contractMonth: z.coerce.date(),
   lineTagId: z.number().int().positive().optional().nullable(),
   lineReserveTagId: z.number().int().positive().optional().nullable(),
@@ -57,19 +57,22 @@ export async function POST(
       );
     }
 
-    // SIMの存在・ステータス確認
+    // SIMの存在・ステータス確認（存在しないSIMも許可）
     const sims = await prisma.sim.findMany({
       where: { iccid: { in: uniqueIccids } },
     });
 
     const simMap = new Map(sims.map((s) => [s.iccid, s]));
     const errors: string[] = [];
+    const warnings: string[] = [];
 
     for (const iccid of uniqueIccids) {
       const sim = simMap.get(iccid);
       if (!sim) {
-        errors.push(`ICCID ${iccid} が見つかりません`);
+        // SIMが存在しない場合は警告のみ（エラーにしない）
+        warnings.push(`ICCID ${iccid} はSIMマスタに未登録です`);
       } else if (sim.status !== "IN_STOCK") {
+        // SIMが存在するが在庫状態でない場合はエラー
         errors.push(`ICCID ${iccid} は在庫状態ではありません (${sim.status})`);
       }
     }
@@ -122,14 +125,14 @@ export async function POST(
       for (let i = 0; i < uniqueIccids.length; i++) {
         const iccid = uniqueIccids[i];
         const line = unassignedLines[i];
-        const sim = simMap.get(iccid)!;
+        const sim = simMap.get(iccid);
 
-        // 回線にSIMを割当
+        // 回線にSIMを割当（SIMが存在しない場合もICCIDは登録）
         const updatedLine = await tx.applicationLine.update({
           where: { id: line.id },
           data: {
             simId: iccid,
-            msisdn: sim.msisdn,
+            msisdn: sim?.msisdn || null,
             status: "ASSIGNED",
             contractMonth: validated.contractMonth,
             lineTagId: validated.lineTagId,
@@ -146,11 +149,13 @@ export async function POST(
           },
         });
 
-        // SIMのステータスを更新
-        await tx.sim.update({
-          where: { iccid },
-          data: { status: "ACTIVE" },
-        });
+        // SIMが存在する場合のみステータスを更新
+        if (sim) {
+          await tx.sim.update({
+            where: { iccid },
+            data: { status: "ACTIVE" },
+          });
+        }
 
         updatedLines.push(updatedLine);
       }
@@ -162,6 +167,7 @@ export async function POST(
       message: `${results.length}件の回線にICCIDを割り当てました`,
       assignedCount: results.length,
       lines: results,
+      warnings: warnings.length > 0 ? warnings : undefined,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
