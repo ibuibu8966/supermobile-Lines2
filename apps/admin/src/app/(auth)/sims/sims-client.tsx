@@ -3,11 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
-import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@repo/ui";
-import { Plus, Upload, ChevronDown, ChevronRight, Search, Loader2, AlertCircle } from "lucide-react";
+import { Button, Card, CardContent, CardHeader, CardTitle, Badge, Tabs, TabsList, TabsTrigger, TabsContent } from "@repo/ui";
+import { Plus, Upload, ChevronDown, ChevronRight, Search, Loader2, AlertCircle, Smartphone, Building2 } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryState } from "nuqs";
 import { useSimLocationTags, type Sim, type PaginationInfo } from "@/hooks/use-sims";
+import { SupplierManager } from "@/components/suppliers/supplier-manager";
 
 interface Contract {
   id: string;
@@ -178,23 +179,46 @@ export function SimsClient({ initialData, initialSimLocationTags }: SimsClientPr
     }
   };
 
+  // Tab state
+  const [activeTab, setActiveTab] = useQueryState("view", { defaultValue: "sims" });
+
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">SIM一覧</h1>
+        <h1 className="text-2xl font-bold text-gray-900">SIM管理</h1>
         <p className="text-sm text-gray-500 mt-1">
-          SIMカードの管理・検索・詳細確認
+          SIMカードと仕入れ先の管理
         </p>
       </div>
 
-      {error && (
-        <div className="bg-red-50 text-red-600 px-4 py-3 rounded-md text-sm flex items-center gap-2 mb-4">
-          <AlertCircle className="h-4 w-4" />
-          データの取得に失敗しました。再度お試しください。
-        </div>
-      )}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        {/* Pill tabs */}
+        <TabsList className="inline-flex h-10 items-center justify-center rounded-full bg-muted p-1 mb-6">
+          <TabsTrigger
+            value="sims"
+            className="inline-flex items-center justify-center whitespace-nowrap rounded-full px-6 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+          >
+            <Smartphone className="h-4 w-4 mr-2" />
+            SIM一覧
+          </TabsTrigger>
+          <TabsTrigger
+            value="suppliers"
+            className="inline-flex items-center justify-center whitespace-nowrap rounded-full px-6 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+          >
+            <Building2 className="h-4 w-4 mr-2" />
+            仕入れ先
+          </TabsTrigger>
+        </TabsList>
 
-      <div className="flex justify-between items-center mb-6">
+        <TabsContent value="sims" className="mt-0">
+          {error && (
+            <div className="bg-red-50 text-red-600 px-4 py-3 rounded-md text-sm flex items-center gap-2 mb-4">
+              <AlertCircle className="h-4 w-4" />
+              データの取得に失敗しました。再度お試しください。
+            </div>
+          )}
+
+          <div className="flex justify-between items-center mb-6">
         <div className="flex gap-4">
           <div className="relative">
             <input
@@ -460,6 +484,12 @@ export function SimsClient({ initialData, initialSimLocationTags }: SimsClientPr
           )}
         </CardContent>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="suppliers" className="mt-0">
+          <SupplierManager />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

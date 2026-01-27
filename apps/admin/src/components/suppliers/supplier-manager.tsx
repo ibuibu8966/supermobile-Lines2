@@ -14,12 +14,12 @@ interface Supplier {
   };
 }
 
-export default function SuppliersPage() {
+export function SupplierManager() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [showInactive, setShowInactive] = useState(false);
 
-  // モーダル状態
+  // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [formData, setFormData] = useState({ code: "", name: "" });
@@ -141,103 +141,94 @@ export default function SuppliersPage() {
   };
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">仕入れ先管理</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          SIM仕入れ先の登録・編集
-        </p>
+    <div>
+      <div className="flex justify-between items-center mb-6">
+        <label className="flex items-center gap-2 text-sm text-gray-600">
+          <input
+            type="checkbox"
+            checked={showInactive}
+            onChange={(e) => setShowInactive(e.target.checked)}
+            className="rounded"
+          />
+          無効な仕入れ先も表示
+        </label>
+        <Button onClick={openCreateModal}>
+          <Plus className="h-4 w-4 mr-2" />
+          新規仕入れ先登録
+        </Button>
       </div>
 
-      <div className="max-w-4xl">
-        <div className="flex justify-between items-center mb-6">
-          <label className="flex items-center gap-2 text-sm text-gray-600">
-            <input
-              type="checkbox"
-              checked={showInactive}
-              onChange={(e) => setShowInactive(e.target.checked)}
-              className="rounded"
-            />
-            無効な仕入れ先も表示
-          </label>
-          <Button onClick={openCreateModal}>
-            <Plus className="h-4 w-4 mr-2" />
-            新規仕入れ先登録
-          </Button>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">
-              仕入れ先一覧
-              <span className="text-sm font-normal text-gray-500 ml-2">
-                {suppliers.length}件
-              </span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="flex justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-              </div>
-            ) : suppliers.length === 0 ? (
-              <div className="text-center py-12 text-gray-500">
-                仕入れ先が登録されていません
-              </div>
-            ) : (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-3 px-4">ID</th>
-                    <th className="text-left py-3 px-4">コード</th>
-                    <th className="text-left py-3 px-4">仕入れ先名</th>
-                    <th className="text-left py-3 px-4">SIM数</th>
-                    <th className="text-left py-3 px-4">ステータス</th>
-                    <th className="text-right py-3 px-4">操作</th>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">
+            仕入れ先一覧
+            <span className="text-sm font-normal text-gray-500 ml-2">
+              {suppliers.length}件
+            </span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+            </div>
+          ) : suppliers.length === 0 ? (
+            <div className="text-center py-12 text-gray-500">
+              仕入れ先が登録されていません
+            </div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left py-3 px-4">ID</th>
+                  <th className="text-left py-3 px-4">コード</th>
+                  <th className="text-left py-3 px-4">仕入れ先名</th>
+                  <th className="text-left py-3 px-4">SIM数</th>
+                  <th className="text-left py-3 px-4">ステータス</th>
+                  <th className="text-right py-3 px-4">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {suppliers.map((supplier) => (
+                  <tr key={supplier.id} className="border-b hover:bg-gray-50">
+                    <td className="py-3 px-4">{supplier.id}</td>
+                    <td className="py-3 px-4 font-mono">{supplier.code}</td>
+                    <td className="py-3 px-4">{supplier.name}</td>
+                    <td className="py-3 px-4">{supplier._count.sims.toLocaleString()}</td>
+                    <td className="py-3 px-4">
+                      <button onClick={() => toggleActive(supplier)}>
+                        <Badge variant={supplier.isActive ? "success" : "secondary"}>
+                          {supplier.isActive ? "有効" : "無効"}
+                        </Badge>
+                      </button>
+                    </td>
+                    <td className="py-3 px-4 text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openEditModal(supplier)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(supplier)}
+                        >
+                          <Trash2 className="h-4 w-4 text-red-500" />
+                        </Button>
+                      </div>
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {suppliers.map((supplier) => (
-                    <tr key={supplier.id} className="border-b hover:bg-gray-50">
-                      <td className="py-3 px-4">{supplier.id}</td>
-                      <td className="py-3 px-4 font-mono">{supplier.code}</td>
-                      <td className="py-3 px-4">{supplier.name}</td>
-                      <td className="py-3 px-4">{supplier._count.sims.toLocaleString()}</td>
-                      <td className="py-3 px-4">
-                        <button onClick={() => toggleActive(supplier)}>
-                          <Badge variant={supplier.isActive ? "success" : "secondary"}>
-                            {supplier.isActive ? "有効" : "無効"}
-                          </Badge>
-                        </button>
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openEditModal(supplier)}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(supplier)}
-                          >
-                            <Trash2 className="h-4 w-4 text-red-500" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </CardContent>
+      </Card>
 
-      {/* モーダル */}
+      {/* Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
