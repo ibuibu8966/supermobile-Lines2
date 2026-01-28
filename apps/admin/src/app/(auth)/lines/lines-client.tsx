@@ -135,6 +135,16 @@ export function LinesClient({ initialData }: LinesClientProps) {
   const [bulkStatus, setBulkStatus] = useState("");
   const [bulkUpdating, setBulkUpdating] = useState(false);
 
+  // Inline edit states (保存ボタン方式)
+  const [editedLines, setEditedLines] = useState<Record<string, Partial<{
+    simLocationTagId: number | null;
+    lineReserveTagId: number | null;
+    shippedAt: string | null;
+    returnedAt: string | null;
+    status: string;
+  }>>>({});
+  const [isSaving, setIsSaving] = useState(false);
+
   // Build SWR key
   const buildSwrKey = () => {
     const params = new URLSearchParams();
@@ -262,6 +272,60 @@ export function LinesClient({ initialData }: LinesClientProps) {
       return customer.companyName;
     }
     return `${customer.lastName} ${customer.firstName}`;
+  };
+
+  // 編集用ヘルパー関数
+  const handleFieldChange = (lineId: string, field: string, value: any) => {
+    setEditedLines((prev) => ({
+      ...prev,
+      [lineId]: { ...prev[lineId], [field]: value },
+    }));
+  };
+
+  const getEditedValue = <T,>(line: ApplicationLine, field: string, originalValue: T): T => {
+    const edited = editedLines[line.id];
+    if (edited && field in edited) {
+      return edited[field as keyof typeof edited] as T;
+    }
+    return originalValue;
+  };
+
+  const hasChanges = () => Object.keys(editedLines).length > 0;
+
+  const hasLineChanges = (lineId: string) => lineId in editedLines;
+
+  const getChangedLinesCount = () => Object.keys(editedLines).length;
+
+  const cancelChanges = () => setEditedLines({});
+
+  const saveChanges = async () => {
+    if (!hasChanges()) return;
+
+    setIsSaving(true);
+    try {
+      const promises = Object.entries(editedLines).map(([lineId, changes]) =>
+        fetch(`/api/lines/${lineId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(changes),
+        })
+      );
+
+      const results = await Promise.all(promises);
+      const allSucceeded = results.every((res) => res.ok);
+
+      if (allSucceeded) {
+        toast.success(`${getChangedLinesCount()}件の変更を保存しました`);
+        setEditedLines({});
+        mutate();
+      } else {
+        throw new Error("一部の更新に失敗しました");
+      }
+    } catch (err) {
+      toast.error("保存に失敗しました");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -570,6 +634,43 @@ export function LinesClient({ initialData }: LinesClientProps) {
         </Card>
       )}
 
+      {/* Unsaved Changes Bar */}
+      {hasChanges() && (
+        <Card className="mb-6 bg-yellow-50 border-yellow-200">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-yellow-800">
+                未保存の変更があります（{getChangedLinesCount()}件）
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={cancelChanges}
+                  disabled={isSaving}
+                >
+                  キャンセル
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={saveChanges}
+                  disabled={isSaving}
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      保存中...
+                    </>
+                  ) : (
+                    "保存"
+                  )}
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Table */}
       <Card>
         <CardHeader>
@@ -622,7 +723,7 @@ export function LinesClient({ initialData }: LinesClientProps) {
                 </thead>
                 <tbody>
                   {lines.map((line) => (
-                    <tr key={line.id} className="border-b hover:bg-gray-50">
+                    <tr key={line.id} className={`border-b hover:bg-gray-50 ${hasLineChanges(line.id) ? "bg-yellow-50" : ""}`}>
                       <td className="py-3 px-4">
                         <input
                           type="checkbox"
@@ -660,10 +761,10 @@ export function LinesClient({ initialData }: LinesClientProps) {
                       <td className="py-3 px-4">
                         <select
                           className="px-2 py-1 border rounded text-sm min-w-[120px]"
-                          value={line.sim?.simLocationTagId?.toString() || ""}
+                          value={getEditedValue(line, "simLocationTagId", line.sim?.simLocationTagId)?.toString() || ""}
                           onChange={(e) => {
                             const value = e.target.value ? Number(e.target.value) : null;
-                            updateLine(line.id, { simLocationTagId: value });
+                            handleFieldChange(line.id, "simLocationTagId", value);
                           }}
                           disabled={!line.simId}
                         >
@@ -678,10 +779,10 @@ export function LinesClient({ initialData }: LinesClientProps) {
                       <td className="py-3 px-4">
                         <select
                           className="px-2 py-1 border rounded text-sm min-w-[120px]"
-                          value={line.lineReserveTagId?.toString() || ""}
+                          value={getEditedValue(line, "lineReserveTagId", line.lineReserveTagId)?.toString() || ""}
                           onChange={(e) => {
                             const value = e.target.value ? Number(e.target.value) : null;
-                            updateLine(line.id, { lineReserveTagId: value });
+                            handleFieldChange(line.id, "lineReserveTagId", value);
                           }}
                         >
                           <option value="">選択してください</option>
@@ -696,11 +797,9 @@ export function LinesClient({ initialData }: LinesClientProps) {
                         <input
                           type="date"
                           className="px-2 py-1 border rounded text-sm"
-                          value={formatDate(line.shippedAt)}
+                          value={getEditedValue(line, "shippedAt", formatDate(line.shippedAt))}
                           onChange={(e) => {
-                            updateLine(line.id, {
-                              shippedAt: e.target.value || null,
-                            });
+                            handleFieldChange(line.id, "shippedAt", e.target.value || null);
                           }}
                         />
                       </td>
@@ -708,20 +807,18 @@ export function LinesClient({ initialData }: LinesClientProps) {
                         <input
                           type="date"
                           className="px-2 py-1 border rounded text-sm"
-                          value={formatDate(line.returnedAt)}
+                          value={getEditedValue(line, "returnedAt", formatDate(line.returnedAt))}
                           onChange={(e) => {
-                            updateLine(line.id, {
-                              returnedAt: e.target.value || null,
-                            });
+                            handleFieldChange(line.id, "returnedAt", e.target.value || null);
                           }}
                         />
                       </td>
                       <td className="py-3 px-4">
                         <select
                           className="px-2 py-1 border rounded text-sm"
-                          value={line.status}
+                          value={getEditedValue(line, "status", line.status)}
                           onChange={(e) => {
-                            updateLine(line.id, { status: e.target.value });
+                            handleFieldChange(line.id, "status", e.target.value);
                           }}
                         >
                           {Object.entries(STATUS_LABELS).map(([value, label]) => (
