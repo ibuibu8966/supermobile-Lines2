@@ -6,6 +6,7 @@ import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@repo/u
 import { Filter, ChevronDown, ChevronUp, Loader2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryState } from "nuqs";
+import { CustomerDetailModal } from "@/components/customer-detail-modal";
 
 interface ApplicationLine {
   id: string;
@@ -23,7 +24,27 @@ interface ApplicationLine {
       firstName: string;
       companyName: string | null;
       type: string;
+      lastNameKana: string | null;
+      firstNameKana: string | null;
+      companyNameKana: string | null;
+      postalCode: string | null;
+      prefecture: string | null;
+      city: string | null;
+      address: string | null;
+      building: string | null;
+      email: string | null;
+      phone: string | null;
     };
+    service: {
+      id: string;
+      name: string;
+      code: string;
+    } | null;
+    plan: {
+      id: string;
+      name: string;
+      code: string;
+    } | null;
   };
   sim: {
     iccid: string;
@@ -97,6 +118,8 @@ export function LinesClient({ initialData }: LinesClientProps) {
   const [searchInput, setSearchInput] = useState(search);
   const [showFilters, setShowFilters] = useState(false);
   const [selectedLines, setSelectedLines] = useState<Set<string>>(new Set());
+  const [selectedCustomer, setSelectedCustomer] = useState<ApplicationLine["application"]["customer"] | null>(null);
+  const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
 
   // Bulk edit states
   const [bulkSimLocationTagId, setBulkSimLocationTagId] = useState<number | null>(null);
@@ -580,6 +603,8 @@ export function LinesClient({ initialData }: LinesClientProps) {
                     </th>
                     <th className="text-left py-3 px-4">申込者名</th>
                     <th className="text-left py-3 px-4">会社名</th>
+                    <th className="text-left py-3 px-4">サービス</th>
+                    <th className="text-left py-3 px-4">プラン</th>
                     <th className="text-left py-3 px-4">電話番号</th>
                     <th className="text-left py-3 px-4">ICCID</th>
                     <th className="text-left py-3 px-4">SIMの場所</th>
@@ -600,9 +625,25 @@ export function LinesClient({ initialData }: LinesClientProps) {
                           onChange={() => toggleSelectLine(line.id)}
                         />
                       </td>
-                      <td className="py-3 px-4">{getCustomerName(line)}</td>
+                      <td className="py-3 px-4">
+                        <button
+                          onClick={() => {
+                            setSelectedCustomer(line.application.customer);
+                            setIsCustomerModalOpen(true);
+                          }}
+                          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer text-left"
+                        >
+                          {getCustomerName(line)}
+                        </button>
+                      </td>
                       <td className="py-3 px-4">
                         {line.application.customer.companyName || "—"}
+                      </td>
+                      <td className="py-3 px-4">
+                        {line.application.service?.name || "—"}
+                      </td>
+                      <td className="py-3 px-4">
+                        {line.application.plan?.name || "—"}
                       </td>
                       <td className="py-3 px-4 font-mono text-xs">
                         {line.msisdn || line.sim?.msisdn || "—"}
@@ -722,6 +763,14 @@ export function LinesClient({ initialData }: LinesClientProps) {
           )}
         </CardContent>
       </Card>
+
+      {selectedCustomer && (
+        <CustomerDetailModal
+          open={isCustomerModalOpen}
+          onOpenChange={setIsCustomerModalOpen}
+          customer={selectedCustomer}
+        />
+      )}
     </div>
   );
 }
