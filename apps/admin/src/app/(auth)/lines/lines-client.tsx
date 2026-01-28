@@ -301,9 +301,39 @@ export function LinesClient({ initialData }: LinesClientProps) {
   const saveChanges = async () => {
     if (!hasChanges()) return;
 
+    const changesCount = getChangedLinesCount();
+    const currentEditedLines = { ...editedLines };
+
+    // 楽観的更新: まずUIを即座に更新
+    if (data) {
+      const optimisticData = {
+        ...data,
+        data: data.data.map((line) => {
+          const changes = currentEditedLines[line.id];
+          if (!changes) return line;
+          return {
+            ...line,
+            ...(changes.lineReserveTagId !== undefined && { lineReserveTagId: changes.lineReserveTagId }),
+            ...(changes.status !== undefined && { status: changes.status }),
+            ...(changes.shippedAt !== undefined && { shippedAt: changes.shippedAt ? new Date(changes.shippedAt) : null }),
+            ...(changes.returnedAt !== undefined && { returnedAt: changes.returnedAt ? new Date(changes.returnedAt) : null }),
+            sim: line.sim && changes.simLocationTagId !== undefined
+              ? { ...line.sim, simLocationTagId: changes.simLocationTagId }
+              : line.sim,
+          };
+        }),
+      };
+      mutate(optimisticData, { revalidate: false });
+    }
+
+    // 編集状態をクリア（UIは既に更新済み）
+    setEditedLines({});
+    toast.success(`${changesCount}件の変更を保存しました`);
+
+    // バックグラウンドでAPIを呼び出し
     setIsSaving(true);
     try {
-      const promises = Object.entries(editedLines).map(([lineId, changes]) =>
+      const promises = Object.entries(currentEditedLines).map(([lineId, changes]) =>
         fetch(`/api/lines/${lineId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -314,15 +344,14 @@ export function LinesClient({ initialData }: LinesClientProps) {
       const results = await Promise.all(promises);
       const allSucceeded = results.every((res) => res.ok);
 
-      if (allSucceeded) {
-        toast.success(`${getChangedLinesCount()}件の変更を保存しました`);
-        setEditedLines({});
+      if (!allSucceeded) {
+        // 失敗した場合は再取得して正しい状態に戻す
+        toast.error("一部の保存に失敗しました。データを再取得します。");
         mutate();
-      } else {
-        throw new Error("一部の更新に失敗しました");
       }
     } catch (err) {
-      toast.error("保存に失敗しました");
+      toast.error("保存に失敗しました。データを再取得します。");
+      mutate();
     } finally {
       setIsSaving(false);
     }
