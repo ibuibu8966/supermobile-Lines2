@@ -16,6 +16,7 @@ import {
   LogOut,
   Menu,
   X,
+  ListChecks,
 } from "lucide-react";
 import { useSidebar } from "@/contexts/sidebar-context";
 import { SidebarItem } from "./sidebar-item";
@@ -36,6 +37,7 @@ const ROLE_LABELS: Record<string, string> = {
 const menuItems = [
   { title: "ダッシュボード", href: "/", icon: LayoutDashboard },
   { title: "申し込み一覧", href: "/applications", icon: FileText },
+  { title: "総合回線管理", href: "/lines", icon: ListChecks },
   { title: "SIM管理", href: "/sims", icon: Smartphone },
   { title: "タグ管理", href: "/tags", icon: Tags },
   { title: "販売ルール管理", href: "/rules", icon: Settings },
