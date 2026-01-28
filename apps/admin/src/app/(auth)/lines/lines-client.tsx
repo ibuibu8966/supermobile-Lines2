@@ -27,11 +27,17 @@ interface ApplicationLine {
       lastNameKana: string | null;
       firstNameKana: string | null;
       companyNameKana: string | null;
+      birthDate: Date | null;
       postalCode: string | null;
       prefecture: string | null;
       city: string | null;
       address: string | null;
       building: string | null;
+      companyPostalCode: string | null;
+      companyPrefecture: string | null;
+      companyCity: string | null;
+      companyAddress: string | null;
+      companyBuilding: string | null;
       email: string | null;
       phone: string | null;
     };
