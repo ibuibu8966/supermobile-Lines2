@@ -5,6 +5,7 @@ import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button, Card, CardContent, CardHeader, CardTitle } from "@repo/ui";
 import { Loader2, Eye, EyeOff, AlertCircle } from "lucide-react";
+import { prefetchAdminData } from "@/lib/prefetch-admin-data";
 
 function LoginForm() {
   const router = useRouter();
@@ -16,6 +17,7 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isPrefetching, setIsPrefetching] = useState(false);
   const [error, setError] = useState<string | null>(
     errorParam === "CredentialsSignin" ? "メールアドレスまたはパスワードが正しくありません" : null
   );
@@ -35,6 +37,12 @@ function LoginForm() {
       if (result?.error) {
         setError("メールアドレスまたはパスワードが正しくありません");
       } else {
+        // プリフェッチ開始（5秒タイムアウト）
+        setIsPrefetching(true);
+        await Promise.race([
+          prefetchAdminData(),
+          new Promise((resolve) => setTimeout(resolve, 5000)),
+        ]);
         router.push(callbackUrl);
         router.refresh();
       }
@@ -110,9 +118,14 @@ function LoginForm() {
             <Button
               type="submit"
               className="w-full"
-              disabled={loading}
+              disabled={loading || isPrefetching}
             >
-              {loading ? (
+              {isPrefetching ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  データ読み込み中...
+                </>
+              ) : loading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   ログイン中...

@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import {
   Card,
   CardContent,
@@ -8,55 +7,12 @@ import {
   CardTitle,
 } from "@repo/ui";
 import { Loader2, Package, Smartphone, RotateCcw } from "lucide-react";
-
-interface DashboardStats {
-  overview: {
-    totalInStockSims: number;
-    totalActiveLines: number;
-    totalReturningLines: number;
-  };
-  simInventoryByUsageTag: Array<{
-    usageTagId: number;
-    usageTagCode: string;
-    usageTagName: string;
-    availableCount: number;
-  }>;
-  activeLinesByPlan: Array<{
-    planId: string;
-    planCode: string;
-    planName: string;
-    serviceName: string;
-    activeCount: number;
-  }>;
-}
+import { useDashboardStats } from "@/hooks/use-dashboard-stats";
 
 export function DashboardStats() {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { stats, error, isLoading } = useDashboardStats();
 
-  useEffect(() => {
-    fetchStats();
-  }, []);
-
-  const fetchStats = async () => {
-    try {
-      setLoading(true);
-      const res = await fetch("/api/dashboard/stats");
-      if (!res.ok) {
-        throw new Error("Failed to fetch stats");
-      }
-      const data = await res.json();
-      setStats(data);
-    } catch (err) {
-      console.error("Stats fetch error:", err);
-      setError("統計データの取得に失敗しました");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
@@ -67,7 +23,7 @@ export function DashboardStats() {
   if (error) {
     return (
       <div className="text-center py-12 text-red-500">
-        {error}
+        統計データの取得に失敗しました
       </div>
     );
   }

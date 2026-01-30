@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
+import useSWR from "swr";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@repo/ui";
 import { Plus, Pencil, Trash2, Loader2, X, Settings } from "lucide-react";
 
@@ -45,9 +46,15 @@ interface Service {
 }
 
 export default function ServicesPage() {
-  const [services, setServices] = useState<Service[]>([]);
-  const [loading, setLoading] = useState(true);
   const [showInactive, setShowInactive] = useState(false);
+
+  // SWR hook
+  const params = new URLSearchParams();
+  if (showInactive) params.set("includeInactive", "true");
+  const queryString = params.toString();
+  const swrKey = queryString ? `/api/services?${queryString}` : "/api/services";
+
+  const { data: services = [], isLoading: loading, mutate: mutateServices } = useSWR<Service[]>(swrKey);
 
   // モーダル状態
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -58,28 +65,6 @@ export default function ServicesPage() {
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const fetchServices = async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (showInactive) params.set("includeInactive", "true");
-
-      const res = await fetch("/api/services?" + params.toString());
-      const data = await res.json();
-      if (res.ok) {
-        setServices(data);
-      }
-    } catch (err) {
-      console.error("サービス取得エラー:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchServices();
-  }, [showInactive]);
 
   const openCreateModal = () => {
     setEditingService(null);
@@ -128,7 +113,7 @@ export default function ServicesPage() {
 
       if (res.ok) {
         closeModal();
-        fetchServices();
+        mutateServices();
       } else {
         setError(data.error || "保存に失敗しました");
       }
@@ -151,7 +136,7 @@ export default function ServicesPage() {
       });
 
       if (res.ok) {
-        fetchServices();
+        mutateServices();
       } else {
         const data = await res.json();
         alert(data.error || "削除に失敗しました");
@@ -171,7 +156,7 @@ export default function ServicesPage() {
       });
 
       if (res.ok) {
-        fetchServices();
+        mutateServices();
       }
     } catch (err) {
       console.error("ステータス変更エラー:", err);

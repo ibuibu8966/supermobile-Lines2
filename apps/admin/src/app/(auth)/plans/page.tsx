@@ -1,48 +1,12 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import Link from "next/link";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@repo/ui";
 import { Plus, Pencil, Trash2, Loader2, X } from "lucide-react";
-
-interface UsageTag {
-  id: number;
-  code: string;
-  name: string;
-}
-
-interface PlanUsageTag {
-  usageTag: UsageTag;
-}
-
-interface PlanPricing {
-  id: string;
-  minQuantity: number;
-  maxQuantity: number | null;
-  unitPrice: number;
-  description: string | null;
-}
-
-interface Service {
-  id: string;
-  code: string;
-  name: string;
-}
-
-interface Plan {
-  id: string;
-  code: string;
-  name: string;
-  isActive: boolean;
-  serviceId: string;
-  service: Service;
-  usageTags: PlanUsageTag[];
-  pricings: PlanPricing[];
-  _count: {
-    applications: number;
-  };
-}
+import { usePlans, type Plan, type PlanPricing } from "@/hooks/use-plans";
+import { useServices } from "@/hooks/use-services";
+import { useUsageTags } from "@/hooks/use-usage-tags";
 
 interface PricingInput {
   minQuantity: number;
@@ -55,12 +19,16 @@ function PlansContent() {
   const searchParams = useSearchParams();
   const serviceIdParam = searchParams.get("serviceId");
 
-  const [plans, setPlans] = useState<Plan[]>([]);
-  const [services, setServices] = useState<Service[]>([]);
-  const [usageTags, setUsageTags] = useState<UsageTag[]>([]);
-  const [loading, setLoading] = useState(true);
   const [showInactive, setShowInactive] = useState(false);
   const [filterServiceId, setFilterServiceId] = useState<string>(serviceIdParam || "");
+
+  // SWR hooks
+  const { plans, isLoading: loading, mutate: mutatePlans } = usePlans({
+    includeInactive: showInactive,
+    serviceId: filterServiceId || undefined,
+  });
+  const { services } = useServices();
+  const { usageTags } = useUsageTags();
 
   // モーダル状態
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -74,58 +42,6 @@ function PlansContent() {
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const fetchPlans = async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (showInactive) params.set("includeInactive", "true");
-      if (filterServiceId) params.set("serviceId", filterServiceId);
-
-      const res = await fetch("/api/plans?" + params.toString());
-      const data = await res.json();
-      if (res.ok) {
-        setPlans(data);
-      }
-    } catch (err) {
-      console.error("プラン取得エラー:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchServices = async () => {
-    try {
-      const res = await fetch("/api/services");
-      const data = await res.json();
-      if (res.ok) {
-        setServices(data);
-      }
-    } catch (err) {
-      console.error("サービス取得エラー:", err);
-    }
-  };
-
-  const fetchUsageTags = async () => {
-    try {
-      const res = await fetch("/api/usage-tags");
-      const data = await res.json();
-      if (res.ok) {
-        setUsageTags(data);
-      }
-    } catch (err) {
-      console.error("用途タグ取得エラー:", err);
-    }
-  };
-
-  useEffect(() => {
-    fetchServices();
-    fetchUsageTags();
-  }, []);
-
-  useEffect(() => {
-    fetchPlans();
-  }, [showInactive, filterServiceId]);
 
   const openCreateModal = () => {
     setEditingPlan(null);
@@ -195,7 +111,7 @@ function PlansContent() {
 
       if (res.ok) {
         closeModal();
-        fetchPlans();
+        mutatePlans();
       } else {
         setError(data.error || "保存に失敗しました");
       }
@@ -218,7 +134,7 @@ function PlansContent() {
       });
 
       if (res.ok) {
-        fetchPlans();
+        mutatePlans();
       } else {
         const data = await res.json();
         alert(data.error || "削除に失敗しました");
@@ -238,7 +154,7 @@ function PlansContent() {
       });
 
       if (res.ok) {
-        fetchPlans();
+        mutatePlans();
       }
     } catch (err) {
       console.error("ステータス変更エラー:", err);
