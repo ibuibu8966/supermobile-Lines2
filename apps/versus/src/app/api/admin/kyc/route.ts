@@ -11,9 +11,9 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get("page") || "1");
     const pageSize = parseInt(searchParams.get("pageSize") || "20");
 
-    // 物販サービスを取得
+    // versusサービスを取得
     const service = await prisma.service.findUnique({
-      where: { code: "buppan" },
+      where: { code: "versus" },
     });
 
     if (!service) {

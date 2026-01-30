@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@repo/database";
+import { prisma, getSignedUrl } from "@repo/database";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
@@ -79,8 +79,20 @@ export async function GET(
       ? expiryDates.reduce((a, b) => (a! > b! ? a : b))
       : null;
 
+    // KYC画像に署名付きURLを追加
+    const kycImagesWithUrls = await Promise.all(
+      application.kycImages.map(async (img) => {
+        const signedUrl = await getSignedUrl("kyc", img.storagePath);
+        return {
+          ...img,
+          signedUrl,
+        };
+      })
+    );
+
     return NextResponse.json({
       ...application,
+      kycImages: kycImagesWithUrls,
       stats: {
         lineCount: application.lineCount,
         shippedCount,

@@ -6,9 +6,9 @@ export const dynamic = "force-dynamic";
 // 管理画面ダッシュボード情報を取得
 export async function GET() {
   try {
-    // 物販サービスを取得
+    // versusサービスを取得
     const service = await prisma.service.findUnique({
-      where: { code: "buppan" },
+      where: { code: "versus" },
     });
 
     if (!service) {

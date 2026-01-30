@@ -263,7 +263,7 @@ export default function ShippingManagementPage() {
       <header className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold text-primary">物販管理画面</h1>
+            <h1 className="text-xl font-bold text-primary">versus管理画面</h1>
             <Badge variant="secondary">ADMIN</Badge>
           </div>
           <div className="flex items-center gap-4">
@@ -291,10 +291,10 @@ export default function ShippingManagementPage() {
               申込管理
             </Link>
             <Link
-              href="/admin/customers"
+              href="/admin/lines"
               className="py-3 border-b-2 border-transparent text-sm text-muted-foreground hover:text-foreground"
             >
-              顧客管理
+              回線管理
             </Link>
             <Link
               href="/admin/kyc"

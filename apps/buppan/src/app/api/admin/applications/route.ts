@@ -24,12 +24,26 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const excludeArchived = searchParams.get("excludeArchived") === "true";
+    const archived = searchParams.get("archived") === "true";
+    const customerType = searchParams.get("customerType");
+
     const where: Record<string, unknown> = {
       serviceId: service.id,
     };
 
     if (status) {
       where.status = status;
+    } else if (excludeArchived) {
+      // アーカイブ済み（完了・キャンセル）を除外
+      where.status = { notIn: ["COMPLETED", "CANCELLED"] };
+    } else if (archived) {
+      // アーカイブ済みのみ表示
+      where.status = { in: ["COMPLETED", "CANCELLED"] };
+    }
+
+    if (customerType) {
+      where.customer = { type: customerType };
     }
 
     if (search) {
@@ -84,6 +98,7 @@ export async function GET(request: NextRequest) {
             ? app.customer.companyName
             : app.customer.lastName + " " + app.customer.firstName,
           email: app.customer.email,
+          phone: app.customer.phone,
         },
         plan: {
           id: app.plan.id,

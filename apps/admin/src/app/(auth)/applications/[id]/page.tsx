@@ -3,8 +3,30 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@repo/ui";
-import { Loader2, ScanLine, ExternalLink } from "lucide-react";
+import {
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Badge,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  Textarea,
+} from "@repo/ui";
+import {
+  Loader2,
+  ScanLine,
+  ExternalLink,
+  ZoomIn,
+  ChevronLeft,
+  ChevronRight,
+  Check,
+  X,
+} from "lucide-react";
 import { IccidScanModal } from "./iccid-scan-modal";
 
 interface Customer {
@@ -48,6 +70,9 @@ interface KycImage {
   storagePath: string;
   status: string;
   expiryDate: string | null;
+  signedUrl: string | null;
+  reviewedAt: string | null;
+  reviewNote: string | null;
 }
 
 interface SimLocationTag {
@@ -163,6 +188,13 @@ export default function ApplicationDetailPage() {
   const [showScanModal, setShowScanModal] = useState(false);
   const [selectedLines, setSelectedLines] = useState<Set<string>>(new Set());
 
+  // KYC画像関連の状態
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+  const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
+  const [rejectNote, setRejectNote] = useState("");
+  const [kycProcessing, setKycProcessing] = useState(false);
+
   const fetchApplication = useCallback(async () => {
     setLoading(true);
     try {
@@ -241,6 +273,62 @@ export default function ApplicationDetailPage() {
     if (!dateStr) return "";
     const date = new Date(dateStr);
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+  };
+
+  // KYC画像のステータスBadge
+  const getKycStatusBadge = (status: string) => {
+    switch (status) {
+      case "PENDING":
+        return <Badge variant="secondary">未確認</Badge>;
+      case "APPROVED":
+        return <Badge variant="success">OK</Badge>;
+      case "REJECTED":
+        return <Badge variant="destructive">NG</Badge>;
+      default:
+        return <Badge variant="secondary">{status}</Badge>;
+    }
+  };
+
+  // KYC画像を承認
+  const handleApproveKyc = async (imageId: string) => {
+    setKycProcessing(true);
+    try {
+      const response = await fetch(`/api/kyc-images/${imageId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "APPROVED" }),
+      });
+
+      if (response.ok) {
+        await fetchApplication();
+      }
+    } catch (error) {
+      console.error("KYC承認エラー:", error);
+    } finally {
+      setKycProcessing(false);
+    }
+  };
+
+  // KYC画像を不備として処理
+  const handleRejectKyc = async (imageId: string) => {
+    setKycProcessing(true);
+    try {
+      const response = await fetch(`/api/kyc-images/${imageId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "REJECTED", reviewNote: rejectNote }),
+      });
+
+      if (response.ok) {
+        setIsRejectModalOpen(false);
+        setRejectNote("");
+        await fetchApplication();
+      }
+    } catch (error) {
+      console.error("KYC不備処理エラー:", error);
+    } finally {
+      setKycProcessing(false);
+    }
   };
 
   const getCustomerName = (customer: Customer) => {
@@ -544,28 +632,159 @@ export default function ApplicationDetailPage() {
             {application.kycImages.length === 0 ? (
               <p className="text-gray-500">書類がありません</p>
             ) : (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {application.kycImages.map((img) => (
-                  <div key={img.id} className="border rounded-lg p-3">
-                    <div className="text-sm font-medium mb-2">
-                      {KYC_TYPE_LABELS[img.type] || img.type}
-                    </div>
-                    <a
-                      href={img.storagePath}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline text-sm flex items-center gap-1"
-                    >
-                      <ExternalLink className="h-3 w-3" />
-                      画像を表示
-                    </a>
-                    {img.expiryDate && (
-                      <div className="text-xs text-gray-500 mt-1">
-                        有効期限: {formatDate(img.expiryDate)}
+              <div className="grid lg:grid-cols-2 gap-6">
+                {/* 左側: 画像プレビュー */}
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <p className="text-sm font-medium">
+                      {KYC_TYPE_LABELS[application.kycImages[selectedImageIndex]?.type] || application.kycImages[selectedImageIndex]?.type}
+                    </p>
+                    {getKycStatusBadge(application.kycImages[selectedImageIndex]?.status)}
+                  </div>
+                  <div
+                    className="relative aspect-[4/3] bg-gray-100 rounded-lg overflow-hidden cursor-pointer"
+                    onClick={() => setIsImageModalOpen(true)}
+                  >
+                    {application.kycImages[selectedImageIndex]?.signedUrl ? (
+                      <img
+                        src={application.kycImages[selectedImageIndex].signedUrl}
+                        alt="KYC画像"
+                        className="w-full h-full object-contain"
+                      />
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-gray-400">
+                        画像を読み込めません
                       </div>
                     )}
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="absolute bottom-2 right-2"
+                    >
+                      <ZoomIn className="h-4 w-4 mr-1" />
+                      拡大
+                    </Button>
                   </div>
-                ))}
+                  {application.kycImages[selectedImageIndex]?.expiryDate && (
+                    <div className="text-xs text-gray-500 mt-2">
+                      有効期限: {formatDate(application.kycImages[selectedImageIndex].expiryDate)}
+                    </div>
+                  )}
+                  {application.kycImages.length > 1 && (
+                    <div className="flex justify-center gap-2 mt-3">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={selectedImageIndex === 0}
+                        onClick={() => setSelectedImageIndex((i) => i - 1)}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <span className="text-sm py-2">
+                        {selectedImageIndex + 1} / {application.kycImages.length}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={selectedImageIndex === application.kycImages.length - 1}
+                        onClick={() => setSelectedImageIndex((i) => i + 1)}
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+                  {/* 承認/不備ボタン */}
+                  {application.kycImages[selectedImageIndex]?.status === "PENDING" && (
+                    <div className="flex gap-2 mt-4">
+                      <Button
+                        className="flex-1"
+                        onClick={() => handleApproveKyc(application.kycImages[selectedImageIndex].id)}
+                        disabled={kycProcessing}
+                      >
+                        <Check className="h-4 w-4 mr-1" />
+                        承認
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        className="flex-1"
+                        onClick={() => setIsRejectModalOpen(true)}
+                        disabled={kycProcessing}
+                      >
+                        <X className="h-4 w-4 mr-1" />
+                        不備
+                      </Button>
+                    </div>
+                  )}
+                  {application.kycImages[selectedImageIndex]?.reviewNote && (
+                    <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <p className="text-sm font-medium text-red-700">不備理由:</p>
+                      <p className="text-sm text-red-600">{application.kycImages[selectedImageIndex].reviewNote}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* 右側: 顧客情報パネル */}
+                <div>
+                  <h4 className="font-medium text-sm mb-3">顧客情報</h4>
+                  <dl className="space-y-2 text-sm">
+                    <div className="flex">
+                      <dt className="text-gray-500 w-24 shrink-0">氏名</dt>
+                      <dd>{getCustomerName(application.customer)}</dd>
+                    </div>
+                    <div className="flex">
+                      <dt className="text-gray-500 w-24 shrink-0">種別</dt>
+                      <dd>
+                        <Badge variant={application.customer.type === "CORPORATE" ? "default" : "secondary"}>
+                          {application.customer.type === "CORPORATE" ? "法人" : "個人"}
+                        </Badge>
+                      </dd>
+                    </div>
+                    <div className="flex">
+                      <dt className="text-gray-500 w-24 shrink-0">メール</dt>
+                      <dd className="truncate">
+                        <a href={`mailto:${application.customer.email}`} className="text-blue-600 hover:underline">
+                          {application.customer.email}
+                        </a>
+                      </dd>
+                    </div>
+                    <div className="flex">
+                      <dt className="text-gray-500 w-24 shrink-0">電話番号</dt>
+                      <dd>{application.customer.phone}</dd>
+                    </div>
+                    <div className="flex">
+                      <dt className="text-gray-500 w-24 shrink-0">住所</dt>
+                      <dd>
+                        〒{application.customer.postalCode}<br />
+                        {application.customer.prefecture}
+                        {application.customer.city}
+                        {application.customer.address}
+                        {application.customer.building && (
+                          <>
+                            <br />
+                            {application.customer.building}
+                          </>
+                        )}
+                      </dd>
+                    </div>
+                    {application.customer.type === "CORPORATE" && application.customer.companyPostalCode && (
+                      <div className="flex">
+                        <dt className="text-gray-500 w-24 shrink-0">法人住所</dt>
+                        <dd>
+                          〒{application.customer.companyPostalCode}<br />
+                          {application.customer.companyPrefecture}
+                          {application.customer.companyCity}
+                          {application.customer.companyAddress}
+                          {application.customer.companyBuilding && (
+                            <>
+                              <br />
+                              {application.customer.companyBuilding}
+                            </>
+                          )}
+                        </dd>
+                      </div>
+                    )}
+                  </dl>
+                </div>
               </div>
             )}
           </CardContent>
@@ -949,6 +1168,62 @@ export default function ApplicationDetailPage() {
           }}
         />
       )}
+
+      {/* KYC画像拡大モーダル */}
+      <Dialog open={isImageModalOpen} onOpenChange={setIsImageModalOpen}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>
+              {application?.kycImages[selectedImageIndex]?.type &&
+                KYC_TYPE_LABELS[application.kycImages[selectedImageIndex].type]}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="relative aspect-[4/3] bg-gray-100 rounded-lg overflow-hidden">
+            {application?.kycImages[selectedImageIndex]?.signedUrl && (
+              <img
+                src={application.kycImages[selectedImageIndex].signedUrl}
+                alt="KYC画像"
+                className="w-full h-full object-contain"
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 不備理由入力モーダル */}
+      <Dialog open={isRejectModalOpen} onOpenChange={setIsRejectModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>不備の理由を入力</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Textarea
+              placeholder="不備の理由を入力してください..."
+              value={rejectNote}
+              onChange={(e) => setRejectNote(e.target.value)}
+              rows={4}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsRejectModalOpen(false)}
+            >
+              キャンセル
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() =>
+                application &&
+                handleRejectKyc(application.kycImages[selectedImageIndex].id)
+              }
+              disabled={kycProcessing}
+            >
+              不備として登録
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
