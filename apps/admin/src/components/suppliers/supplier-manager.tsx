@@ -1,8 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@repo/ui";
 import { Plus, Pencil, Trash2, Loader2, X } from "lucide-react";
+import { toast } from "sonner";
+import { queryKeys } from "@/lib/query-keys";
+import { api } from "@/lib/api";
 
 interface Supplier {
   id: number;
@@ -15,9 +19,20 @@ interface Supplier {
 }
 
 export function SupplierManager() {
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [showInactive, setShowInactive] = useState(false);
+
+  // TanStack Query - suppliers (prefetched at login)
+  const { data: suppliersData = [], isLoading } = useQuery<Supplier[]>({
+    queryKey: queryKeys.suppliers,
+    queryFn: api.getSuppliers,
+  });
+
+  // フィルター適用
+  const suppliers = useMemo(() => {
+    if (showInactive) return suppliersData;
+    return suppliersData.filter((s) => s.isActive);
+  }, [suppliersData, showInactive]);
 
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -25,28 +40,6 @@ export function SupplierManager() {
   const [formData, setFormData] = useState({ code: "", name: "" });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const fetchSuppliers = async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (showInactive) params.set("includeInactive", "true");
-
-      const res = await fetch(`/api/suppliers?${params.toString()}`);
-      const data = await res.json();
-      if (res.ok) {
-        setSuppliers(data);
-      }
-    } catch (err) {
-      console.error("仕入れ先取得エラー:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchSuppliers();
-  }, [showInactive]);
 
   const openCreateModal = () => {
     setEditingSupplier(null);
@@ -90,7 +83,8 @@ export function SupplierManager() {
 
       if (res.ok) {
         closeModal();
-        fetchSuppliers();
+        toast.success(editingSupplier ? "仕入れ先を更新しました" : "仕入れ先を作成しました");
+        queryClient.invalidateQueries({ queryKey: queryKeys.suppliers });
       } else {
         setError(data.error || "保存に失敗しました");
       }
@@ -113,18 +107,27 @@ export function SupplierManager() {
       });
 
       if (res.ok) {
-        fetchSuppliers();
+        toast.success("仕入れ先を削除しました");
+        queryClient.invalidateQueries({ queryKey: queryKeys.suppliers });
       } else {
         const data = await res.json();
-        alert(data.error || "削除に失敗しました");
+        toast.error(data.error || "削除に失敗しました");
       }
     } catch (err) {
       console.error("削除エラー:", err);
-      alert("削除に失敗しました");
+      toast.error("削除に失敗しました");
     }
   };
 
   const toggleActive = async (supplier: Supplier) => {
+    // 楽観的更新
+    queryClient.setQueryData<Supplier[]>(queryKeys.suppliers, (old) => {
+      if (!old) return old;
+      return old.map((s) =>
+        s.id === supplier.id ? { ...s, isActive: !s.isActive } : s
+      );
+    });
+
     try {
       const res = await fetch(`/api/suppliers/${supplier.id}`, {
         method: "PATCH",
@@ -133,10 +136,14 @@ export function SupplierManager() {
       });
 
       if (res.ok) {
-        fetchSuppliers();
+        toast.success(supplier.isActive ? "仕入れ先を無効化しました" : "仕入れ先を有効化しました");
+      } else {
+        throw new Error("更新に失敗しました");
       }
     } catch (err) {
       console.error("ステータス変更エラー:", err);
+      toast.error("ステータスの変更に失敗しました");
+      queryClient.invalidateQueries({ queryKey: queryKeys.suppliers });
     }
   };
 
@@ -168,7 +175,7 @@ export function SupplierManager() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {loading ? (
+          {isLoading ? (
             <div className="flex justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
             </div>

@@ -1,8 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@repo/ui";
 import { Plus, Pencil, Trash2, Loader2, X } from "lucide-react";
+import { toast } from "sonner";
+import { queryKeys } from "@/lib/query-keys";
+import { api } from "@/lib/api";
 
 interface UsageTag {
   id: number;
@@ -33,10 +37,26 @@ const CARRIER_LABELS: Record<string, string> = {
 };
 
 export default function RulesPage() {
-  const [rules, setRules] = useState<UsageRule[]>([]);
-  const [usageTags, setUsageTags] = useState<UsageTag[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [showInactive, setShowInactive] = useState(false);
+
+  // TanStack Query - rules (prefetched at login)
+  const { data: rulesData = [], isLoading: loadingRules } = useQuery<UsageRule[]>({
+    queryKey: queryKeys.rules,
+    queryFn: api.getRules,
+  });
+
+  // TanStack Query - usageTags (prefetched at login)
+  const { data: usageTags = [] } = useQuery<UsageTag[]>({
+    queryKey: queryKeys.usageTags,
+    queryFn: api.getUsageTags,
+  });
+
+  // フィルター適用
+  const rules = useMemo(() => {
+    if (showInactive) return rulesData;
+    return rulesData.filter((r) => r.isActive);
+  }, [rulesData, showInactive]);
 
   // モーダル状態
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -52,41 +72,6 @@ export default function RulesPage() {
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const fetchRules = async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (showInactive) params.set("includeInactive", "true");
-
-      const res = await fetch(`/api/usage-rules?${params.toString()}`);
-      const data = await res.json();
-      if (res.ok) {
-        setRules(data);
-      }
-    } catch (err) {
-      console.error("販売ルール取得エラー:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchUsageTags = async () => {
-    try {
-      const res = await fetch("/api/usage-tags");
-      const data = await res.json();
-      if (res.ok) {
-        setUsageTags(data);
-      }
-    } catch (err) {
-      console.error("用途タグ取得エラー:", err);
-    }
-  };
-
-  useEffect(() => {
-    fetchRules();
-    fetchUsageTags();
-  }, [showInactive]);
 
   const openCreateModal = () => {
     if (usageTags.length === 0) {
@@ -153,7 +138,8 @@ export default function RulesPage() {
 
       if (res.ok) {
         closeModal();
-        fetchRules();
+        toast.success(editingRule ? "ルールを更新しました" : "ルールを作成しました");
+        queryClient.invalidateQueries({ queryKey: queryKeys.rules });
       } else {
         setError(data.error || "保存に失敗しました");
       }
@@ -176,18 +162,27 @@ export default function RulesPage() {
       });
 
       if (res.ok) {
-        fetchRules();
+        toast.success("ルールを削除しました");
+        queryClient.invalidateQueries({ queryKey: queryKeys.rules });
       } else {
         const data = await res.json();
-        alert(data.error || "削除に失敗しました");
+        toast.error(data.error || "削除に失敗しました");
       }
     } catch (err) {
       console.error("削除エラー:", err);
-      alert("削除に失敗しました");
+      toast.error("削除に失敗しました");
     }
   };
 
   const toggleActive = async (rule: UsageRule) => {
+    // 楽観的更新
+    queryClient.setQueryData<UsageRule[]>(queryKeys.rules, (old) => {
+      if (!old) return old;
+      return old.map((r) =>
+        r.id === rule.id ? { ...r, isActive: !r.isActive } : r
+      );
+    });
+
     try {
       const res = await fetch(`/api/usage-rules/${rule.id}`, {
         method: "PATCH",
@@ -196,10 +191,14 @@ export default function RulesPage() {
       });
 
       if (res.ok) {
-        fetchRules();
+        toast.success(rule.isActive ? "ルールを無効化しました" : "ルールを有効化しました");
+      } else {
+        throw new Error("更新に失敗しました");
       }
     } catch (err) {
       console.error("ステータス変更エラー:", err);
+      toast.error("ステータスの変更に失敗しました");
+      queryClient.invalidateQueries({ queryKey: queryKeys.rules });
     }
   };
 
@@ -248,7 +247,7 @@ export default function RulesPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {loading ? (
+            {loadingRules ? (
               <div className="flex justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
               </div>

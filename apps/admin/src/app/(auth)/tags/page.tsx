@@ -5,11 +5,15 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@repo/ui";
 import { Tags, MapPin, Tag, Bookmark } from "lucide-react";
 import { TagManager, TagManagerConfig } from "@/components/tags/tag-manager";
+import { queryKeys } from "@/lib/query-keys";
+import { api } from "@/lib/api";
 
 // Configuration for each tag type
 const TAG_CONFIGS: Record<string, TagManagerConfig> = {
   usage: {
     apiEndpoint: "/api/usage-tags",
+    queryKey: queryKeys.usageTags,
+    queryFn: api.getUsageTags,
     title: "用途タグ一覧",
     emptyMessage: "用途タグが登録されていません",
     hasCategoryGrouping: true,
@@ -29,6 +33,8 @@ const TAG_CONFIGS: Record<string, TagManagerConfig> = {
   },
   "sim-location": {
     apiEndpoint: "/api/sim-location-tags",
+    queryKey: queryKeys.simLocationTags,
+    queryFn: api.getSimLocationTags,
     title: "SIMの場所一覧",
     emptyMessage: "SIMの場所タグが登録されていません",
     formFields: [
@@ -45,6 +51,8 @@ const TAG_CONFIGS: Record<string, TagManagerConfig> = {
   },
   line: {
     apiEndpoint: "/api/line-tags",
+    queryKey: queryKeys.lineTags,
+    queryFn: api.getLineTags,
     title: "回線タグ一覧",
     emptyMessage: "回線タグが登録されていません",
     formFields: [
@@ -61,6 +69,8 @@ const TAG_CONFIGS: Record<string, TagManagerConfig> = {
   },
   "line-reserve": {
     apiEndpoint: "/api/line-reserve-tags",
+    queryKey: queryKeys.lineReserveTags,
+    queryFn: api.getLineReserveTags,
     title: "回線予備タグ一覧",
     emptyMessage: "回線予備タグが登録されていません",
     formFields: [

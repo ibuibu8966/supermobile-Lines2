@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@repo/ui";
 import { Plus, Pencil, Trash2, Loader2, X, GripVertical } from "lucide-react";
+import { toast } from "sonner";
 
 // Base tag interface
 interface BaseTag {
@@ -28,6 +30,8 @@ interface FormField {
 // Component configuration
 export interface TagManagerConfig {
   apiEndpoint: string;
+  queryKey: readonly string[];
+  queryFn: () => Promise<BaseTag[]>;
   title: string;
   emptyMessage: string;
   formFields: FormField[];
@@ -45,9 +49,20 @@ interface TagManagerProps {
 }
 
 export function TagManager({ config }: TagManagerProps) {
-  const [tags, setTags] = useState<BaseTag[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [showInactive, setShowInactive] = useState(false);
+
+  // TanStack Query - tags (prefetched at login)
+  const { data: tagsData = [], isLoading } = useQuery<BaseTag[]>({
+    queryKey: config.queryKey,
+    queryFn: config.queryFn,
+  });
+
+  // フィルター適用
+  const tags = useMemo(() => {
+    if (showInactive) return tagsData;
+    return tagsData.filter((t) => t.isActive);
+  }, [tagsData, showInactive]);
 
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -68,28 +83,6 @@ export function TagManager({ config }: TagManagerProps) {
     });
     return data;
   };
-
-  const fetchTags = async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (showInactive) params.set("includeInactive", "true");
-
-      const res = await fetch(`${config.apiEndpoint}?${params.toString()}`);
-      const data = await res.json();
-      if (res.ok) {
-        setTags(data);
-      }
-    } catch (err) {
-      console.error("タグ取得エラー:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchTags();
-  }, [showInactive]);
 
   const openCreateModal = () => {
     setEditingTag(null);
@@ -145,7 +138,8 @@ export function TagManager({ config }: TagManagerProps) {
 
       if (res.ok) {
         closeModal();
-        fetchTags();
+        toast.success(editingTag ? "タグを更新しました" : "タグを作成しました");
+        queryClient.invalidateQueries({ queryKey: config.queryKey });
       } else {
         setError(data.error || "保存に失敗しました");
       }
@@ -168,18 +162,27 @@ export function TagManager({ config }: TagManagerProps) {
       });
 
       if (res.ok) {
-        fetchTags();
+        toast.success("タグを削除しました");
+        queryClient.invalidateQueries({ queryKey: config.queryKey });
       } else {
         const data = await res.json();
-        alert(data.error || "削除に失敗しました");
+        toast.error(data.error || "削除に失敗しました");
       }
     } catch (err) {
       console.error("削除エラー:", err);
-      alert("削除に失敗しました");
+      toast.error("削除に失敗しました");
     }
   };
 
   const toggleActive = async (tag: BaseTag) => {
+    // 楽観的更新
+    queryClient.setQueryData<BaseTag[]>(config.queryKey, (old) => {
+      if (!old) return old;
+      return old.map((t) =>
+        t.id === tag.id ? { ...t, isActive: !t.isActive } : t
+      );
+    });
+
     try {
       const res = await fetch(`${config.apiEndpoint}/${tag.id}`, {
         method: "PATCH",
@@ -188,10 +191,14 @@ export function TagManager({ config }: TagManagerProps) {
       });
 
       if (res.ok) {
-        fetchTags();
+        toast.success(tag.isActive ? "タグを無効化しました" : "タグを有効化しました");
+      } else {
+        throw new Error("更新に失敗しました");
       }
     } catch (err) {
       console.error("ステータス変更エラー:", err);
+      toast.error("ステータスの変更に失敗しました");
+      queryClient.invalidateQueries({ queryKey: config.queryKey });
     }
   };
 
@@ -293,7 +300,7 @@ export function TagManager({ config }: TagManagerProps) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {loading ? (
+          {isLoading ? (
             <div className="flex justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
             </div>

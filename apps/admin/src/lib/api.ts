@@ -5,7 +5,10 @@ export const api = {
   getUsageTags: () => fetch("/api/usage-tags").then((r) => r.json()),
   getSimLocationTags: () => fetch("/api/sim-location-tags").then((r) => r.json()),
   getLineReserveTags: () => fetch("/api/line-reserve-tags").then((r) => r.json()),
+  getLineTags: () => fetch("/api/line-tags").then((r) => r.json()),
   getUsers: () => fetch("/api/users").then((r) => r.json()),
+  getRules: () => fetch("/api/usage-rules").then((r) => r.json()),
+  getSuppliers: () => fetch("/api/suppliers").then((r) => r.json()),
   getSims: (params?: URLSearchParams) =>
     fetch(`/api/sims?${params?.toString() || "page=1"}`).then((r) => r.json()),
   getApplications: (params?: URLSearchParams) =>

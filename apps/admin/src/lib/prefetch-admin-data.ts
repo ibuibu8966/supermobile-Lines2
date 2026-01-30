@@ -29,8 +29,20 @@ export async function prefetchAdminData(queryClient: QueryClient) {
       queryFn: api.getLineReserveTags,
     }),
     queryClient.prefetchQuery({
+      queryKey: queryKeys.lineTags,
+      queryFn: api.getLineTags,
+    }),
+    queryClient.prefetchQuery({
       queryKey: queryKeys.users,
       queryFn: api.getUsers,
+    }),
+    queryClient.prefetchQuery({
+      queryKey: queryKeys.rules,
+      queryFn: api.getRules,
+    }),
+    queryClient.prefetchQuery({
+      queryKey: queryKeys.suppliers,
+      queryFn: api.getSuppliers,
     }),
     queryClient.prefetchQuery({
       queryKey: queryKeys.sims(),
