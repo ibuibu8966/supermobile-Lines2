@@ -113,7 +113,7 @@ export default function ApplicationsPage() {
   }, [hasFilters, search, statusFilter, serviceFilter, customerTypeFilter, page]);
 
   // Applications data from cache (prefetched at login for default view)
-  const { data: applicationsData, isFetching: isLoadingApplications, error } = useQuery<ApplicationsResponse>({
+  const { data: applicationsData, isLoading: isLoadingApplications, error } = useQuery<ApplicationsResponse>({
     queryKey: queryKeys.applications(queryParams),
     queryFn: () => {
       const params = new URLSearchParams();

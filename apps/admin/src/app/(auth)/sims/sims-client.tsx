@@ -140,7 +140,7 @@ export function SimsClient() {
   }, [hasFilters, search, statusFilter, carrierFilter, simLocationFilter, page]);
 
   // SIMs data from cache (prefetched at login for default view)
-  const { data: simsData, isFetching: isLoadingSims, error } = useQuery<SimsResponse>({
+  const { data: simsData, isLoading: isLoadingSims, error } = useQuery<SimsResponse>({
     queryKey: queryKeys.sims(queryParams),
     queryFn: () => {
       const params = new URLSearchParams();

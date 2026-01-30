@@ -166,7 +166,7 @@ export function LinesClient() {
   }, [hasFilters, search, simLocationTagIds, lineReserveTagIds, statuses, shippedFrom, shippedTo, returnedFrom, returnedTo, page]);
 
   // Lines data from cache (prefetched at login for default view)
-  const { data: linesData, isFetching: isLoadingLines, error } = useQuery<LinesResponse>({
+  const { data: linesData, isLoading: isLoadingLines, error } = useQuery<LinesResponse>({
     queryKey: queryKeys.lines(queryParams),
     queryFn: () => {
       const params = new URLSearchParams();

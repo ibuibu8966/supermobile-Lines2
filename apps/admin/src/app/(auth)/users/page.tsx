@@ -66,7 +66,7 @@ export default function UsersPage() {
   }, [hasFilters, showInactive, filterRole, filterServiceId]);
 
   // Users data from cache (prefetched at login for default view)
-  const { data: usersData = [], isFetching: isLoadingUsers, error: fetchError } = useQuery<User[]>({
+  const { data: usersData = [], isLoading: isLoadingUsers, error: fetchError } = useQuery<User[]>({
     queryKey: queryKeys.users,
     queryFn: () => {
       const params = new URLSearchParams();
