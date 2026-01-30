@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
-import useSWR from "swr";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@repo/ui";
 import { Plus, Pencil, Trash2, Loader2, X, Settings } from "lucide-react";
+import { useAdminData } from "@/contexts/admin-data-context";
 
 interface UsageTag {
   id: number;
@@ -48,13 +48,19 @@ interface Service {
 export default function ServicesPage() {
   const [showInactive, setShowInactive] = useState(false);
 
-  // SWR hook
-  const params = new URLSearchParams();
-  if (showInactive) params.set("includeInactive", "true");
-  const queryString = params.toString();
-  const swrKey = queryString ? `/api/services?${queryString}` : "/api/services";
+  // Context
+  const { data, isLoaded, refetch } = useAdminData();
 
-  const { data: services = [], isLoading: loading, mutate: mutateServices } = useSWR<Service[]>(swrKey);
+  // フィルター適用
+  const services = useMemo(() => {
+    let filtered = data.services as Service[];
+    if (!showInactive) {
+      filtered = filtered.filter((s) => s.isActive);
+    }
+    return filtered;
+  }, [data.services, showInactive]);
+
+  const loading = !isLoaded;
 
   // モーダル状態
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -113,7 +119,7 @@ export default function ServicesPage() {
 
       if (res.ok) {
         closeModal();
-        mutateServices();
+        refetch("services");
       } else {
         setError(data.error || "保存に失敗しました");
       }
@@ -136,7 +142,7 @@ export default function ServicesPage() {
       });
 
       if (res.ok) {
-        mutateServices();
+        refetch("services");
       } else {
         const data = await res.json();
         alert(data.error || "削除に失敗しました");
@@ -156,7 +162,7 @@ export default function ServicesPage() {
       });
 
       if (res.ok) {
-        mutateServices();
+        refetch("services");
       }
     } catch (err) {
       console.error("ステータス変更エラー:", err);

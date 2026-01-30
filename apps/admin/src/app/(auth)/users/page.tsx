@@ -1,11 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@repo/ui";
 import { Plus, Pencil, Trash2, Loader2, X, Eye, EyeOff, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryState } from "nuqs";
-import { useUsers, useServices, type User } from "@/hooks/use-users";
+import { useAdminData } from "@/contexts/admin-data-context";
+
+interface User {
+  id: string;
+  email: string;
+  role: "CUSTOMER" | "ADMIN" | "SUPER_ADMIN";
+  serviceId: string | null;
+  service: { id: string; code: string; name: string } | null;
+  isActive: boolean;
+  createdAt: string;
+  _count: {
+    customers: number;
+  };
+}
 
 const ROLE_LABELS: Record<string, string> = {
   CUSTOMER: "顧客",
@@ -20,6 +33,9 @@ const ROLE_VARIANTS: Record<string, "default" | "secondary" | "success" | "warni
 };
 
 export default function UsersPage() {
+  const { data: adminData, isLoaded } = useAdminData();
+  const services = adminData.services as { id: string; code: string; name: string }[];
+
   // URL状態管理
   const [showInactive, setShowInactive] = useQueryState("inactive", {
     defaultValue: "false",
@@ -29,14 +45,37 @@ export default function UsersPage() {
   const [filterRole, setFilterRole] = useQueryState("role", { defaultValue: "" });
   const [filterServiceId, setFilterServiceId] = useQueryState("service", { defaultValue: "" });
 
-  // SWRでデータ取得
-  const { users, isLoading, isValidating, error: fetchError, mutate } = useUsers({
-    includeInactive: showInactive === "true",
-    role: filterRole,
-    serviceId: filterServiceId,
-  });
+  // Users data state
+  const [usersData, setUsersData] = useState<User[]>([]);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+  const [fetchError, setFetchError] = useState<Error | null>(null);
 
-  const { services } = useServices();
+  // Fetch users data
+  const fetchUsers = useCallback(async () => {
+    setIsLoadingUsers(true);
+    setFetchError(null);
+    try {
+      const params = new URLSearchParams();
+      if (showInactive === "true") params.set("includeInactive", "true");
+      if (filterRole) params.set("role", filterRole);
+      if (filterServiceId) params.set("serviceId", filterServiceId);
+
+      const res = await fetch(`/api/users?${params.toString()}`);
+      if (!res.ok) throw new Error("Failed to fetch users");
+      const data = await res.json();
+      setUsersData(data);
+    } catch (err) {
+      setFetchError(err as Error);
+    } finally {
+      setIsLoadingUsers(false);
+    }
+  }, [showInactive, filterRole, filterServiceId]);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
+
+  const users = usersData;
 
   // モーダル状態
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -123,7 +162,7 @@ export default function UsersPage() {
       if (res.ok) {
         closeModal();
         toast.success(editingUser ? "ユーザーを更新しました" : "ユーザーを作成しました");
-        mutate();
+        fetchUsers();
       } else {
         setError(data.error || "保存に失敗しました");
       }
@@ -146,7 +185,7 @@ export default function UsersPage() {
 
       if (res.ok) {
         toast.success("ユーザーを削除しました");
-        mutate();
+        fetchUsers();
       } else {
         const data = await res.json();
         toast.error(data.error || "削除に失敗しました");
@@ -158,12 +197,11 @@ export default function UsersPage() {
 
   const toggleActive = async (user: User) => {
     // 楽観的更新
-    const previousUsers = users;
-    mutate(
-      users.map((u) =>
+    const previousUsers = [...usersData];
+    setUsersData(
+      usersData.map((u) =>
         u.id === user.id ? { ...u, isActive: !u.isActive } : u
-      ),
-      false
+      )
     );
 
     try {
@@ -175,13 +213,12 @@ export default function UsersPage() {
 
       if (res.ok) {
         toast.success(user.isActive ? "ユーザーを無効化しました" : "ユーザーを有効化しました");
-        mutate();
       } else {
         throw new Error("更新に失敗しました");
       }
     } catch {
       toast.error("ステータスの変更に失敗しました");
-      mutate(previousUsers, false);
+      setUsersData(previousUsers);
     }
   };
 
@@ -249,13 +286,13 @@ export default function UsersPage() {
               <span className="text-sm font-normal text-gray-500">
                 {users.length}件
               </span>
-              {isValidating && !isLoading && (
+              {isLoadingUsers && (
                 <Loader2 className="h-4 w-4 animate-spin text-blue-400" />
               )}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {isLoading ? (
+            {!isLoaded || (isLoadingUsers && usersData.length === 0) ? (
               <div className="flex justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
               </div>

@@ -5,13 +5,14 @@ import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button, Card, CardContent, CardHeader, CardTitle } from "@repo/ui";
 import { Loader2, Eye, EyeOff, AlertCircle } from "lucide-react";
-import { prefetchAdminData } from "@/lib/prefetch-admin-data";
+import { useAdminData } from "@/contexts/admin-data-context";
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") || "/";
   const errorParam = searchParams.get("error");
+  const { loadAllData } = useAdminData();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -37,10 +38,10 @@ function LoginForm() {
       if (result?.error) {
         setError("メールアドレスまたはパスワードが正しくありません");
       } else {
-        // プリフェッチ開始（5秒タイムアウト）
+        // 全データ読み込み（5秒タイムアウト）
         setIsPrefetching(true);
         await Promise.race([
-          prefetchAdminData(),
+          loadAllData(),
           new Promise((resolve) => setTimeout(resolve, 5000)),
         ]);
         router.push(callbackUrl);

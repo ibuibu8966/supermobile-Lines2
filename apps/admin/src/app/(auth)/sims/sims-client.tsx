@@ -1,13 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import useSWR from "swr";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge, Tabs, TabsList, TabsTrigger, TabsContent } from "@repo/ui";
 import { Plus, Upload, ChevronDown, ChevronRight, Search, Loader2, AlertCircle, Smartphone, Building2 } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryState } from "nuqs";
-import { useSimLocationTags, type Sim, type PaginationInfo } from "@/hooks/use-sims";
+import { useAdminData } from "@/contexts/admin-data-context";
 import { SupplierManager } from "@/components/suppliers/supplier-manager";
 
 interface Contract {
@@ -32,14 +31,40 @@ interface Contract {
   }>;
 }
 
-interface SimsResponse {
-  data: Sim[];
-  pagination: PaginationInfo;
+interface Sim {
+  iccid: string;
+  msisdn: string | null;
+  simType: string;
+  carrierType: string | null;
+  status: string;
+  isMnpEligible: boolean;
+  supplier: {
+    id: string;
+    code: string;
+    name: string;
+  };
+  simLocationTag: {
+    id: number;
+    code: string;
+    name: string;
+  } | null;
+  simLocationTagId: number | null;
+  contracts: Contract[];
+  consumedTags: Array<{
+    id: number;
+    code: string;
+    name: string;
+  }>;
 }
 
-interface SimsClientProps {
-  initialData: SimsResponse | null;
-  initialSimLocationTags: Array<{ id: number; code: string; name: string }>;
+interface SimsResponse {
+  data: Sim[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -73,7 +98,10 @@ const CARRIER_LABELS: Record<string, string> = {
   RAKUTEN: "楽天",
 };
 
-export function SimsClient({ initialData, initialSimLocationTags }: SimsClientProps) {
+export function SimsClient() {
+  const { data: adminData, isLoaded } = useAdminData();
+  const simLocationTags = adminData.simLocationTags as { id: number; code?: string; name: string }[];
+
   // URL状態管理
   const [search, setSearch] = useQueryState("search", { defaultValue: "" });
   const [statusFilter, setStatusFilter] = useQueryState("status", { defaultValue: "" });
@@ -89,31 +117,40 @@ export function SimsClient({ initialData, initialSimLocationTags }: SimsClientPr
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [searchInput, setSearchInput] = useState(search);
 
-  // SWRキーを構築
-  const buildSwrKey = () => {
-    const params = new URLSearchParams();
-    if (search) params.set("search", search);
-    if (statusFilter) params.set("status", statusFilter);
-    if (carrierFilter) params.set("carrier", carrierFilter);
-    if (simLocationFilter) params.set("simLocationTagId", simLocationFilter);
-    params.set("page", page);
-    return `/api/sims?${params.toString()}`;
-  };
+  // SIMs data state
+  const [simsData, setSimsData] = useState<SimsResponse | null>(null);
+  const [isLoadingSims, setIsLoadingSims] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
 
-  // SWRでデータ取得（初期データがある場合はfallbackDataとして使用）
-  const { data, error, isLoading, isValidating, mutate } = useSWR<SimsResponse>(
-    buildSwrKey(),
-    {
-      fallbackData: initialData || undefined,
+  // Fetch SIMs data
+  const fetchSims = useCallback(async () => {
+    setIsLoadingSims(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams();
+      if (search) params.set("search", search);
+      if (statusFilter) params.set("status", statusFilter);
+      if (carrierFilter) params.set("carrier", carrierFilter);
+      if (simLocationFilter) params.set("simLocationTagId", simLocationFilter);
+      params.set("page", page);
+
+      const res = await fetch(`/api/sims?${params.toString()}`);
+      if (!res.ok) throw new Error("Failed to fetch SIMs");
+      const data = await res.json();
+      setSimsData(data);
+    } catch (err) {
+      setError(err as Error);
+    } finally {
+      setIsLoadingSims(false);
     }
-  );
+  }, [search, statusFilter, carrierFilter, simLocationFilter, page]);
 
-  const sims = data?.data || [];
-  const pagination = data?.pagination || null;
+  useEffect(() => {
+    fetchSims();
+  }, [fetchSims]);
 
-  // SIMの場所タグ（初期データがある場合はそれを使用）
-  const { simLocationTags: fetchedTags } = useSimLocationTags();
-  const simLocationTags = initialSimLocationTags.length > 0 ? initialSimLocationTags : fetchedTags;
+  const sims = simsData?.data || [];
+  const pagination = simsData?.pagination || null;
 
   const toggleExpand = (iccid: string) => {
     setExpandedRows((prev) => {
@@ -146,20 +183,22 @@ export function SimsClient({ initialData, initialSimLocationTags }: SimsClientPr
   };
 
   const updateSimLocationTag = async (iccid: string, simLocationTagId: number | null) => {
-    if (!pagination) return;
+    if (!pagination || !simsData) return;
 
     // 楽観的更新
-    mutate(
-      {
-        data: sims.map((sim) =>
-          sim.iccid === iccid
-            ? { ...sim, simLocationTagId, simLocationTag: simLocationTagId ? simLocationTags.find(t => t.id === simLocationTagId) || null : null }
-            : sim
-        ),
-        pagination,
-      },
-      false
-    );
+    const foundTag = simLocationTagId ? simLocationTags.find(t => t.id === simLocationTagId) : null;
+    setSimsData({
+      ...simsData,
+      data: sims.map((sim) =>
+        sim.iccid === iccid
+          ? {
+              ...sim,
+              simLocationTagId,
+              simLocationTag: foundTag ? { id: foundTag.id, code: foundTag.code || "", name: foundTag.name } : null
+            }
+          : sim
+      ),
+    });
 
     try {
       const res = await fetch(`/api/sims/${iccid}`, {
@@ -169,13 +208,12 @@ export function SimsClient({ initialData, initialSimLocationTags }: SimsClientPr
       });
       if (res.ok) {
         toast.success("SIMの場所を更新しました");
-        mutate();
       } else {
         throw new Error("更新に失敗しました");
       }
     } catch {
       toast.error("SIMの場所の更新に失敗しました");
-      mutate();
+      fetchSims();
     }
   };
 
@@ -303,13 +341,13 @@ export function SimsClient({ initialData, initialSimLocationTags }: SimsClientPr
                 {pagination.total}件
               </span>
             )}
-            {isValidating && !isLoading && (
+            {isLoadingSims && (
               <Loader2 className="h-4 w-4 animate-spin text-blue-400" />
             )}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoading && !initialData ? (
+          {!isLoaded || (isLoadingSims && !simsData) ? (
             <div className="flex justify-center items-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
             </div>

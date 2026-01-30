@@ -7,29 +7,18 @@ import {
   CardTitle,
 } from "@repo/ui";
 import { Loader2, Package, Smartphone, RotateCcw } from "lucide-react";
-import { useDashboardStats } from "@/hooks/use-dashboard-stats";
+import { useAdminData } from "@/contexts/admin-data-context";
 
 export function DashboardStats() {
-  const { stats, error, isLoading } = useDashboardStats();
+  const { data, isLoaded } = useAdminData();
+  const stats = data.dashboardStats;
 
-  if (isLoading) {
+  if (!isLoaded || !stats) {
     return (
       <div className="flex items-center justify-center py-12">
         <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
       </div>
     );
-  }
-
-  if (error) {
-    return (
-      <div className="text-center py-12 text-red-500">
-        統計データの取得に失敗しました
-      </div>
-    );
-  }
-
-  if (!stats) {
-    return null;
   }
 
   return (

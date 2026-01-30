@@ -1,13 +1,53 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@repo/ui";
 import { Search, Loader2, ExternalLink, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryState } from "nuqs";
-import { useApplications, type Application } from "@/hooks/use-applications";
-import { useServices } from "@/hooks/use-users";
+import { useAdminData } from "@/contexts/admin-data-context";
+
+interface Application {
+  id: string;
+  applicationNumber: string;
+  status: string;
+  comment1: string | null;
+  comment2: string | null;
+  latestExpiryDate: string | null;
+  customer: {
+    type: string;
+    lastName: string;
+    firstName: string;
+    lastNameKana: string | null;
+    firstNameKana: string | null;
+    companyName: string | null;
+    companyNameKana: string | null;
+    email: string | null;
+    phone: string | null;
+  };
+  service: {
+    id: string;
+    name: string;
+  };
+  stats: {
+    lineCount: number;
+    shippedCount: number;
+    unassignedCount: number;
+    returnedCount: number;
+  };
+  kycImages: { id: string }[];
+}
+
+interface ApplicationsResponse {
+  data: Application[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
+}
 
 const STATUS_LABELS: Record<string, string> = {
   SUBMITTED: "申込済み",
@@ -33,6 +73,9 @@ const PAYMENT_VERIFY_OPTIONS = [
 ];
 
 export default function ApplicationsPage() {
+  const { data: adminData, isLoaded } = useAdminData();
+  const services = adminData.services as { id: string; name: string }[];
+
   // URL状態管理
   const [search, setSearch] = useQueryState("search", { defaultValue: "" });
   const [statusFilter, setStatusFilter] = useQueryState("status", { defaultValue: "" });
@@ -47,16 +90,40 @@ export default function ApplicationsPage() {
   // ローカル状態
   const [searchInput, setSearchInput] = useState(search);
 
-  // SWRでデータ取得
-  const { applications, pagination, isLoading, isValidating, error, mutate } = useApplications({
-    search,
-    status: statusFilter,
-    serviceId: serviceFilter,
-    customerType: customerTypeFilter,
-    page: parseInt(page),
-  });
+  // Applications data state
+  const [applicationsData, setApplicationsData] = useState<ApplicationsResponse | null>(null);
+  const [isLoadingApplications, setIsLoadingApplications] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
 
-  const { services } = useServices();
+  // Fetch applications data
+  const fetchApplications = useCallback(async () => {
+    setIsLoadingApplications(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams();
+      if (search) params.set("search", search);
+      if (statusFilter) params.set("status", statusFilter);
+      if (serviceFilter) params.set("serviceId", serviceFilter);
+      if (customerTypeFilter) params.set("customerType", customerTypeFilter);
+      params.set("page", page);
+
+      const res = await fetch(`/api/applications?${params.toString()}`);
+      if (!res.ok) throw new Error("Failed to fetch applications");
+      const data = await res.json();
+      setApplicationsData(data);
+    } catch (err) {
+      setError(err as Error);
+    } finally {
+      setIsLoadingApplications(false);
+    }
+  }, [search, statusFilter, serviceFilter, customerTypeFilter, page]);
+
+  useEffect(() => {
+    fetchApplications();
+  }, [fetchApplications]);
+
+  const applications = applicationsData?.data || [];
+  const pagination = applicationsData?.pagination || null;
 
   const handleSearch = () => {
     setSearch(searchInput);
@@ -67,15 +134,14 @@ export default function ApplicationsPage() {
     if (!pagination) return;
 
     // 楽観的更新
-    mutate(
-      {
+    if (applicationsData) {
+      setApplicationsData({
+        ...applicationsData,
         data: applications.map((app) =>
           app.id === id ? { ...app, status } : app
         ),
-        pagination,
-      },
-      false
-    );
+      });
+    }
 
     try {
       const res = await fetch(`/api/applications/${id}`, {
@@ -85,17 +151,26 @@ export default function ApplicationsPage() {
       });
       if (res.ok) {
         toast.success("ステータスを更新しました");
-        mutate();
       } else {
         throw new Error("更新に失敗しました");
       }
     } catch {
       toast.error("ステータスの更新に失敗しました");
-      mutate(); // サーバーから最新データを取得してロールバック
+      fetchApplications(); // サーバーから最新データを取得してロールバック
     }
   };
 
   const updateApplicationComment = async (id: string, field: "comment1" | "comment2", value: string) => {
+    // 楽観的更新
+    if (applicationsData) {
+      setApplicationsData({
+        ...applicationsData,
+        data: applications.map((app) =>
+          app.id === id ? { ...app, [field]: value } : app
+        ),
+      });
+    }
+
     try {
       const res = await fetch(`/api/applications/${id}`, {
         method: "PATCH",
@@ -104,12 +179,12 @@ export default function ApplicationsPage() {
       });
       if (res.ok) {
         toast.success("コメントを保存しました");
-        mutate();
       } else {
         throw new Error("更新に失敗しました");
       }
     } catch {
       toast.error("コメントの保存に失敗しました");
+      fetchApplications();
     }
   };
 
@@ -231,13 +306,13 @@ export default function ApplicationsPage() {
                 {pagination.total}件
               </span>
             )}
-            {isValidating && !isLoading && (
+            {isLoadingApplications && (
               <Loader2 className="h-4 w-4 animate-spin text-blue-400" />
             )}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
+          {!isLoaded || (isLoadingApplications && !applicationsData) ? (
             <div className="flex justify-center items-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
             </div>

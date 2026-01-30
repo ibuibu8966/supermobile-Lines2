@@ -1,12 +1,30 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, Suspense, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@repo/ui";
 import { Plus, Pencil, Trash2, Loader2, X } from "lucide-react";
-import { usePlans, type Plan, type PlanPricing } from "@/hooks/use-plans";
-import { useServices } from "@/hooks/use-services";
-import { useUsageTags } from "@/hooks/use-usage-tags";
+import { useAdminData } from "@/contexts/admin-data-context";
+
+interface PlanPricing {
+  id: string;
+  minQuantity: number;
+  maxQuantity: number | null;
+  unitPrice: number;
+  description: string | null;
+}
+
+interface Plan {
+  id: string;
+  code: string;
+  name: string;
+  isActive: boolean;
+  serviceId: string;
+  service: { id: string; code: string; name: string };
+  usageTags: Array<{ usageTag: { id: number; code: string; name: string } }>;
+  pricings: PlanPricing[];
+  _count: { applications: number };
+}
 
 interface PricingInput {
   minQuantity: number;
@@ -22,13 +40,24 @@ function PlansContent() {
   const [showInactive, setShowInactive] = useState(false);
   const [filterServiceId, setFilterServiceId] = useState<string>(serviceIdParam || "");
 
-  // SWR hooks
-  const { plans, isLoading: loading, mutate: mutatePlans } = usePlans({
-    includeInactive: showInactive,
-    serviceId: filterServiceId || undefined,
-  });
-  const { services } = useServices();
-  const { usageTags } = useUsageTags();
+  // Context
+  const { data, isLoaded, refetch } = useAdminData();
+  const services = data.services;
+  const usageTags = data.usageTags;
+
+  // フィルター適用
+  const plans = useMemo(() => {
+    let filtered = data.plans as Plan[];
+    if (!showInactive) {
+      filtered = filtered.filter((p) => p.isActive);
+    }
+    if (filterServiceId) {
+      filtered = filtered.filter((p) => p.serviceId === filterServiceId);
+    }
+    return filtered;
+  }, [data.plans, showInactive, filterServiceId]);
+
+  const loading = !isLoaded;
 
   // モーダル状態
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -111,7 +140,7 @@ function PlansContent() {
 
       if (res.ok) {
         closeModal();
-        mutatePlans();
+        refetch("plans");
       } else {
         setError(data.error || "保存に失敗しました");
       }
@@ -134,7 +163,7 @@ function PlansContent() {
       });
 
       if (res.ok) {
-        mutatePlans();
+        refetch("plans");
       } else {
         const data = await res.json();
         alert(data.error || "削除に失敗しました");
@@ -154,7 +183,7 @@ function PlansContent() {
       });
 
       if (res.ok) {
-        mutatePlans();
+        refetch("plans");
       }
     } catch (err) {
       console.error("ステータス変更エラー:", err);

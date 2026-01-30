@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import useSWR from "swr";
+import { useState, useEffect, useCallback } from "react";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@repo/ui";
 import { Filter, ChevronDown, ChevronUp, Loader2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryState } from "nuqs";
 import { CustomerDetailModal } from "@/components/customer-detail-modal";
+import { useAdminData } from "@/contexts/admin-data-context";
 
 interface ApplicationLine {
   id: string;
@@ -77,20 +77,6 @@ interface LinesResponse {
   };
 }
 
-interface LinesClientProps {
-  initialData: {
-    data: ApplicationLine[];
-    pagination: {
-      page: number;
-      pageSize: number;
-      total: number;
-      totalPages: number;
-    };
-    simLocationTags: Array<{ id: number; code: string; name: string }>;
-    lineReserveTags: Array<{ id: number; code: string; name: string }>;
-  };
-}
-
 const STATUS_LABELS: Record<string, string> = {
   UNASSIGNED: "未開通",
   ASSIGNED: "開通済み",
@@ -109,7 +95,11 @@ const STATUS_VARIANTS: Record<string, "default" | "success" | "destructive" | "s
   RETURNED: "secondary",
 };
 
-export function LinesClient({ initialData }: LinesClientProps) {
+export function LinesClient() {
+  const { data: adminData, isLoaded } = useAdminData();
+  const simLocationTags = adminData.simLocationTags as { id: number; name: string }[];
+  const lineReserveTags = adminData.lineReserveTags as { id: number; name: string }[];
+
   // Filter states
   const [search, setSearch] = useQueryState("search", { defaultValue: "" });
   const [simLocationTagIds, setSimLocationTagIds] = useQueryState("simLocationTagIds", { defaultValue: "" });
@@ -145,30 +135,44 @@ export function LinesClient({ initialData }: LinesClientProps) {
   }>>>({});
   const [isSaving, setIsSaving] = useState(false);
 
-  // Build SWR key
-  const buildSwrKey = () => {
-    const params = new URLSearchParams();
-    if (search) params.set("search", search);
-    if (simLocationTagIds) params.set("simLocationTagIds", simLocationTagIds);
-    if (lineReserveTagIds) params.set("lineReserveTagIds", lineReserveTagIds);
-    if (statuses) params.set("statuses", statuses);
-    if (shippedFrom) params.set("shippedFrom", shippedFrom);
-    if (shippedTo) params.set("shippedTo", shippedTo);
-    if (returnedFrom) params.set("returnedFrom", returnedFrom);
-    if (returnedTo) params.set("returnedTo", returnedTo);
-    params.set("page", page);
-    return `/api/lines?${params.toString()}`;
-  };
+  // Lines data state (fetched separately with filters/pagination)
+  const [linesData, setLinesData] = useState<LinesResponse | null>(null);
+  const [isLoadingLines, setIsLoadingLines] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
 
-  const { data, error, isLoading, isValidating, mutate } = useSWR<LinesResponse>(
-    buildSwrKey(),
-    {
-      fallbackData: initialData,
+  // Fetch lines data when filters/pagination change
+  const fetchLines = useCallback(async () => {
+    setIsLoadingLines(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams();
+      if (search) params.set("search", search);
+      if (simLocationTagIds) params.set("simLocationTagIds", simLocationTagIds);
+      if (lineReserveTagIds) params.set("lineReserveTagIds", lineReserveTagIds);
+      if (statuses) params.set("statuses", statuses);
+      if (shippedFrom) params.set("shippedFrom", shippedFrom);
+      if (shippedTo) params.set("shippedTo", shippedTo);
+      if (returnedFrom) params.set("returnedFrom", returnedFrom);
+      if (returnedTo) params.set("returnedTo", returnedTo);
+      params.set("page", page);
+
+      const res = await fetch(`/api/lines?${params.toString()}`);
+      if (!res.ok) throw new Error("Failed to fetch lines");
+      const data = await res.json();
+      setLinesData(data);
+    } catch (err) {
+      setError(err as Error);
+    } finally {
+      setIsLoadingLines(false);
     }
-  );
+  }, [search, simLocationTagIds, lineReserveTagIds, statuses, shippedFrom, shippedTo, returnedFrom, returnedTo, page]);
 
-  const lines = data?.data || [];
-  const pagination = data?.pagination || null;
+  useEffect(() => {
+    fetchLines();
+  }, [fetchLines]);
+
+  const lines = linesData?.data || [];
+  const pagination = linesData?.pagination || null;
 
   const handleSearch = () => {
     setSearch(searchInput);
@@ -203,13 +207,13 @@ export function LinesClient({ initialData }: LinesClientProps) {
 
       if (res.ok) {
         toast.success("更新しました");
-        mutate();
+        fetchLines();
       } else {
         throw new Error("更新に失敗しました");
       }
     } catch (err) {
       toast.error("更新に失敗しました");
-      mutate();
+      fetchLines();
     }
   };
 
@@ -250,7 +254,7 @@ export function LinesClient({ initialData }: LinesClientProps) {
         setBulkShippedAt("");
         setBulkReturnedAt("");
         setBulkStatus("");
-        mutate();
+        fetchLines();
       } else {
         throw new Error("一括更新に失敗しました");
       }
@@ -305,10 +309,10 @@ export function LinesClient({ initialData }: LinesClientProps) {
     const currentEditedLines = { ...editedLines };
 
     // 楽観的更新: まずUIを即座に更新
-    if (data) {
+    if (linesData) {
       const optimisticData = {
-        ...data,
-        data: data.data.map((line) => {
+        ...linesData,
+        data: linesData.data.map((line) => {
           const changes = currentEditedLines[line.id];
           if (!changes) return line;
           return {
@@ -323,7 +327,7 @@ export function LinesClient({ initialData }: LinesClientProps) {
           };
         }),
       };
-      mutate(optimisticData, { revalidate: false });
+      setLinesData(optimisticData);
     }
 
     // 編集状態をクリア（UIは既に更新済み）
@@ -347,11 +351,11 @@ export function LinesClient({ initialData }: LinesClientProps) {
       if (!allSucceeded) {
         // 失敗した場合は再取得して正しい状態に戻す
         toast.error("一部の保存に失敗しました。データを再取得します。");
-        mutate();
+        fetchLines();
       }
     } catch (err) {
       toast.error("保存に失敗しました。データを再取得します。");
-      mutate();
+      fetchLines();
     } finally {
       setIsSaving(false);
     }
@@ -441,7 +445,7 @@ export function LinesClient({ initialData }: LinesClientProps) {
                   SIMの場所
                 </label>
                 <div className="space-y-1 max-h-32 overflow-y-auto border rounded-md p-2">
-                  {initialData.simLocationTags.map((tag) => (
+                  {simLocationTags.map((tag) => (
                     <label key={tag.id} className="flex items-center gap-2 cursor-pointer">
                       <input
                         type="checkbox"
@@ -471,7 +475,7 @@ export function LinesClient({ initialData }: LinesClientProps) {
                   予備タグ
                 </label>
                 <div className="space-y-1 max-h-32 overflow-y-auto border rounded-md p-2">
-                  {initialData.lineReserveTags.map((tag) => (
+                  {lineReserveTags.map((tag) => (
                     <label key={tag.id} className="flex items-center gap-2 cursor-pointer">
                       <input
                         type="checkbox"
@@ -600,7 +604,7 @@ export function LinesClient({ initialData }: LinesClientProps) {
                 onChange={(e) => setBulkSimLocationTagId(e.target.value ? Number(e.target.value) : null)}
               >
                 <option value="">SIMの場所</option>
-                {initialData.simLocationTags.map((tag) => (
+                {simLocationTags.map((tag) => (
                   <option key={tag.id} value={tag.id}>
                     {tag.name}
                   </option>
@@ -612,7 +616,7 @@ export function LinesClient({ initialData }: LinesClientProps) {
                 onChange={(e) => setBulkLineReserveTagId(e.target.value ? Number(e.target.value) : null)}
               >
                 <option value="">予備タグ</option>
-                {initialData.lineReserveTags.map((tag) => (
+                {lineReserveTags.map((tag) => (
                   <option key={tag.id} value={tag.id}>
                     {tag.name}
                   </option>
@@ -710,13 +714,13 @@ export function LinesClient({ initialData }: LinesClientProps) {
                 {pagination.total.toLocaleString()}件
               </span>
             )}
-            {isValidating && !isLoading && (
+            {isLoadingLines && (
               <Loader2 className="h-4 w-4 animate-spin text-blue-400" />
             )}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoading && !initialData ? (
+          {!isLoaded || (isLoadingLines && !linesData) ? (
             <div className="flex justify-center items-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
             </div>
@@ -798,7 +802,7 @@ export function LinesClient({ initialData }: LinesClientProps) {
                           disabled={!line.simId}
                         >
                           <option value="">選択してください</option>
-                          {initialData.simLocationTags.map((tag) => (
+                          {simLocationTags.map((tag) => (
                             <option key={tag.id} value={tag.id}>
                               {tag.name}
                             </option>
@@ -815,7 +819,7 @@ export function LinesClient({ initialData }: LinesClientProps) {
                           }}
                         >
                           <option value="">選択してください</option>
-                          {initialData.lineReserveTags.map((tag) => (
+                          {lineReserveTags.map((tag) => (
                             <option key={tag.id} value={tag.id}>
                               {tag.name}
                             </option>
