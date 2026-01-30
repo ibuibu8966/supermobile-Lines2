@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@repo/ui";
 import { Filter, ChevronDown, ChevronUp, Loader2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryState } from "nuqs";
 import { CustomerDetailModal } from "@/components/customer-detail-modal";
-import { useAdminData } from "@/contexts/admin-data-context";
+import { queryKeys } from "@/lib/query-keys";
+import { api } from "@/lib/api";
 
 interface ApplicationLine {
   id: string;
@@ -96,9 +98,18 @@ const STATUS_VARIANTS: Record<string, "default" | "success" | "destructive" | "s
 };
 
 export function LinesClient() {
-  const { data: adminData, isLoaded } = useAdminData();
-  const simLocationTags = adminData.simLocationTags as { id: number; name: string }[];
-  const lineReserveTags = adminData.lineReserveTags as { id: number; name: string }[];
+  const queryClient = useQueryClient();
+
+  // Tags from cache (prefetched at login)
+  const { data: simLocationTags = [] } = useQuery<{ id: number; name: string }[]>({
+    queryKey: queryKeys.simLocationTags,
+    queryFn: api.getSimLocationTags,
+  });
+
+  const { data: lineReserveTags = [] } = useQuery<{ id: number; name: string }[]>({
+    queryKey: queryKeys.lineReserveTags,
+    queryFn: api.getLineReserveTags,
+  });
 
   // Filter states
   const [search, setSearch] = useQueryState("search", { defaultValue: "" });
@@ -135,16 +146,29 @@ export function LinesClient() {
   }>>>({});
   const [isSaving, setIsSaving] = useState(false);
 
-  // Lines data state (fetched separately with filters/pagination)
-  const [linesData, setLinesData] = useState<LinesResponse | null>(null);
-  const [isLoadingLines, setIsLoadingLines] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
+  // フィルターが設定されているかチェック
+  const hasFilters = !!(search || simLocationTagIds || lineReserveTagIds || statuses || shippedFrom || shippedTo || returnedFrom || returnedTo || page !== "1");
 
-  // Fetch lines data when filters/pagination change
-  const fetchLines = useCallback(async () => {
-    setIsLoadingLines(true);
-    setError(null);
-    try {
+  // クエリパラメータ生成
+  const queryParams = useMemo(() => {
+    if (!hasFilters) return undefined;
+    const params: Record<string, string> = {};
+    if (search) params.search = search;
+    if (simLocationTagIds) params.simLocationTagIds = simLocationTagIds;
+    if (lineReserveTagIds) params.lineReserveTagIds = lineReserveTagIds;
+    if (statuses) params.statuses = statuses;
+    if (shippedFrom) params.shippedFrom = shippedFrom;
+    if (shippedTo) params.shippedTo = shippedTo;
+    if (returnedFrom) params.returnedFrom = returnedFrom;
+    if (returnedTo) params.returnedTo = returnedTo;
+    params.page = page;
+    return params;
+  }, [hasFilters, search, simLocationTagIds, lineReserveTagIds, statuses, shippedFrom, shippedTo, returnedFrom, returnedTo, page]);
+
+  // Lines data from cache (prefetched at login for default view)
+  const { data: linesData, isFetching: isLoadingLines, error } = useQuery<LinesResponse>({
+    queryKey: queryKeys.lines(queryParams),
+    queryFn: () => {
       const params = new URLSearchParams();
       if (search) params.set("search", search);
       if (simLocationTagIds) params.set("simLocationTagIds", simLocationTagIds);
@@ -155,24 +179,13 @@ export function LinesClient() {
       if (returnedFrom) params.set("returnedFrom", returnedFrom);
       if (returnedTo) params.set("returnedTo", returnedTo);
       params.set("page", page);
-
-      const res = await fetch(`/api/lines?${params.toString()}`);
-      if (!res.ok) throw new Error("Failed to fetch lines");
-      const data = await res.json();
-      setLinesData(data);
-    } catch (err) {
-      setError(err as Error);
-    } finally {
-      setIsLoadingLines(false);
-    }
-  }, [search, simLocationTagIds, lineReserveTagIds, statuses, shippedFrom, shippedTo, returnedFrom, returnedTo, page]);
-
-  useEffect(() => {
-    fetchLines();
-  }, [fetchLines]);
+      return api.getLines(params);
+    },
+  });
 
   const lines = linesData?.data || [];
   const pagination = linesData?.pagination || null;
+  const currentQueryKey = queryKeys.lines(queryParams);
 
   const handleSearch = () => {
     setSearch(searchInput);
@@ -195,26 +208,6 @@ export function LinesClient() {
       newSelected.add(lineId);
     }
     setSelectedLines(newSelected);
-  };
-
-  const updateLine = async (lineId: string, updates: any) => {
-    try {
-      const res = await fetch(`/api/lines/${lineId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updates),
-      });
-
-      if (res.ok) {
-        toast.success("更新しました");
-        fetchLines();
-      } else {
-        throw new Error("更新に失敗しました");
-      }
-    } catch (err) {
-      toast.error("更新に失敗しました");
-      fetchLines();
-    }
   };
 
   const handleBulkUpdate = async () => {
@@ -254,7 +247,7 @@ export function LinesClient() {
         setBulkShippedAt("");
         setBulkReturnedAt("");
         setBulkStatus("");
-        fetchLines();
+        queryClient.invalidateQueries({ queryKey: currentQueryKey });
       } else {
         throw new Error("一括更新に失敗しました");
       }
@@ -309,10 +302,11 @@ export function LinesClient() {
     const currentEditedLines = { ...editedLines };
 
     // 楽観的更新: まずUIを即座に更新
-    if (linesData) {
-      const optimisticData = {
-        ...linesData,
-        data: linesData.data.map((line) => {
+    queryClient.setQueryData<LinesResponse>(currentQueryKey, (old) => {
+      if (!old) return old;
+      return {
+        ...old,
+        data: old.data.map((line) => {
           const changes = currentEditedLines[line.id];
           if (!changes) return line;
           return {
@@ -327,8 +321,7 @@ export function LinesClient() {
           };
         }),
       };
-      setLinesData(optimisticData);
-    }
+    });
 
     // 編集状態をクリア（UIは既に更新済み）
     setEditedLines({});
@@ -351,11 +344,11 @@ export function LinesClient() {
       if (!allSucceeded) {
         // 失敗した場合は再取得して正しい状態に戻す
         toast.error("一部の保存に失敗しました。データを再取得します。");
-        fetchLines();
+        queryClient.invalidateQueries({ queryKey: currentQueryKey });
       }
     } catch (err) {
       toast.error("保存に失敗しました。データを再取得します。");
-      fetchLines();
+      queryClient.invalidateQueries({ queryKey: currentQueryKey });
     } finally {
       setIsSaving(false);
     }
@@ -720,13 +713,13 @@ export function LinesClient() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {!isLoaded || (isLoadingLines && !linesData) ? (
-            <div className="flex justify-center items-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-            </div>
-          ) : lines.length === 0 ? (
+          {lines.length === 0 && !isLoadingLines ? (
             <div className="text-center py-12 text-gray-500">
               回線が見つかりません
+            </div>
+          ) : lines.length === 0 && isLoadingLines ? (
+            <div className="flex justify-center items-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
             </div>
           ) : (
             <div className="overflow-x-auto">

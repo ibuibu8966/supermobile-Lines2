@@ -1,5 +1,6 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import {
   Card,
   CardContent,
@@ -7,13 +8,37 @@ import {
   CardTitle,
 } from "@repo/ui";
 import { Loader2, Package, Smartphone, RotateCcw } from "lucide-react";
-import { useAdminData } from "@/contexts/admin-data-context";
+import { queryKeys } from "@/lib/query-keys";
+import { api } from "@/lib/api";
+
+interface DashboardStats {
+  overview: {
+    totalInStockSims: number;
+    totalActiveLines: number;
+    totalReturningLines: number;
+  };
+  simInventoryByUsageTag: Array<{
+    usageTagId: number;
+    usageTagCode: string;
+    usageTagName: string;
+    availableCount: number;
+  }>;
+  activeLinesByPlan: Array<{
+    planId: string;
+    planCode: string;
+    planName: string;
+    serviceName: string;
+    activeCount: number;
+  }>;
+}
 
 export function DashboardStats() {
-  const { data, isLoaded } = useAdminData();
-  const stats = data.dashboardStats;
+  const { data: stats, isLoading } = useQuery<DashboardStats>({
+    queryKey: queryKeys.dashboardStats,
+    queryFn: api.getDashboardStats,
+  });
 
-  if (!isLoaded || !stats) {
+  if (isLoading || !stats) {
     return (
       <div className="flex items-center justify-center py-12">
         <Loader2 className="h-8 w-8 animate-spin text-gray-400" />

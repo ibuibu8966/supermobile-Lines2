@@ -3,16 +3,17 @@
 import { useState, Suspense } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button, Card, CardContent, CardHeader, CardTitle } from "@repo/ui";
 import { Loader2, Eye, EyeOff, AlertCircle } from "lucide-react";
-import { useAdminData } from "@/contexts/admin-data-context";
+import { prefetchAdminData } from "@/lib/prefetch-admin-data";
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") || "/";
   const errorParam = searchParams.get("error");
-  const { loadAllData } = useAdminData();
+  const queryClient = useQueryClient();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -41,7 +42,7 @@ function LoginForm() {
         // 全データ読み込み（5秒タイムアウト）
         setIsPrefetching(true);
         await Promise.race([
-          loadAllData(),
+          prefetchAdminData(queryClient),
           new Promise((resolve) => setTimeout(resolve, 5000)),
         ]);
         router.push(callbackUrl);

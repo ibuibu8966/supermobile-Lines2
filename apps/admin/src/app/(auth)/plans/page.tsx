@@ -2,9 +2,12 @@
 
 import { useState, Suspense, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@repo/ui";
 import { Plus, Pencil, Trash2, Loader2, X } from "lucide-react";
-import { useAdminData } from "@/contexts/admin-data-context";
+import { toast } from "sonner";
+import { queryKeys } from "@/lib/query-keys";
+import { api } from "@/lib/api";
 
 interface PlanPricing {
   id: string;
@@ -36,18 +39,30 @@ interface PricingInput {
 function PlansContent() {
   const searchParams = useSearchParams();
   const serviceIdParam = searchParams.get("serviceId");
+  const queryClient = useQueryClient();
 
   const [showInactive, setShowInactive] = useState(false);
   const [filterServiceId, setFilterServiceId] = useState<string>(serviceIdParam || "");
 
-  // Context
-  const { data, isLoaded, refetch } = useAdminData();
-  const services = data.services;
-  const usageTags = data.usageTags;
+  // TanStack Query
+  const { data: services = [] } = useQuery<{ id: string; code: string; name: string }[]>({
+    queryKey: queryKeys.services,
+    queryFn: api.getServices,
+  });
+
+  const { data: usageTags = [] } = useQuery<{ id: number; code: string; name: string }[]>({
+    queryKey: queryKeys.usageTags,
+    queryFn: api.getUsageTags,
+  });
+
+  const { data: plansData = [], isLoading: loading } = useQuery<Plan[]>({
+    queryKey: queryKeys.plans,
+    queryFn: api.getPlans,
+  });
 
   // フィルター適用
   const plans = useMemo(() => {
-    let filtered = data.plans as Plan[];
+    let filtered = plansData;
     if (!showInactive) {
       filtered = filtered.filter((p) => p.isActive);
     }
@@ -55,9 +70,7 @@ function PlansContent() {
       filtered = filtered.filter((p) => p.serviceId === filterServiceId);
     }
     return filtered;
-  }, [data.plans, showInactive, filterServiceId]);
-
-  const loading = !isLoaded;
+  }, [plansData, showInactive, filterServiceId]);
 
   // モーダル状態
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -140,7 +153,8 @@ function PlansContent() {
 
       if (res.ok) {
         closeModal();
-        refetch("plans");
+        toast.success(editingPlan ? "プランを更新しました" : "プランを作成しました");
+        queryClient.invalidateQueries({ queryKey: queryKeys.plans });
       } else {
         setError(data.error || "保存に失敗しました");
       }
@@ -163,18 +177,27 @@ function PlansContent() {
       });
 
       if (res.ok) {
-        refetch("plans");
+        toast.success("プランを削除しました");
+        queryClient.invalidateQueries({ queryKey: queryKeys.plans });
       } else {
         const data = await res.json();
-        alert(data.error || "削除に失敗しました");
+        toast.error(data.error || "削除に失敗しました");
       }
     } catch (err) {
       console.error("削除エラー:", err);
-      alert("削除に失敗しました");
+      toast.error("削除に失敗しました");
     }
   };
 
   const toggleActive = async (plan: Plan) => {
+    // 楽観的更新
+    queryClient.setQueryData<Plan[]>(queryKeys.plans, (old) => {
+      if (!old) return old;
+      return old.map((p) =>
+        p.id === plan.id ? { ...p, isActive: !p.isActive } : p
+      );
+    });
+
     try {
       const res = await fetch("/api/plans/" + plan.id, {
         method: "PATCH",
@@ -183,10 +206,14 @@ function PlansContent() {
       });
 
       if (res.ok) {
-        refetch("plans");
+        toast.success(plan.isActive ? "プランを無効化しました" : "プランを有効化しました");
+      } else {
+        throw new Error("更新に失敗しました");
       }
     } catch (err) {
       console.error("ステータス変更エラー:", err);
+      toast.error("ステータスの変更に失敗しました");
+      queryClient.invalidateQueries({ queryKey: queryKeys.plans });
     }
   };
 
@@ -284,13 +311,13 @@ function PlansContent() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {loading ? (
-              <div className="flex justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-              </div>
-            ) : plans.length === 0 ? (
+            {plans.length === 0 && !loading ? (
               <div className="text-center py-12 text-gray-500">
                 プランが登録されていません
+              </div>
+            ) : plans.length === 0 && loading ? (
+              <div className="flex justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
               </div>
             ) : (
               <table className="w-full text-sm">

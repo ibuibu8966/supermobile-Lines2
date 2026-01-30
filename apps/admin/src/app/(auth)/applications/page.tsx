@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@repo/ui";
 import { Search, Loader2, ExternalLink, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryState } from "nuqs";
-import { useAdminData } from "@/contexts/admin-data-context";
+import { queryKeys } from "@/lib/query-keys";
+import { api } from "@/lib/api";
 
 interface Application {
   id: string;
@@ -73,8 +75,13 @@ const PAYMENT_VERIFY_OPTIONS = [
 ];
 
 export default function ApplicationsPage() {
-  const { data: adminData, isLoaded } = useAdminData();
-  const services = adminData.services as { id: string; name: string }[];
+  const queryClient = useQueryClient();
+
+  // Services from cache (prefetched at login)
+  const { data: services = [] } = useQuery<{ id: string; name: string }[]>({
+    queryKey: queryKeys.services,
+    queryFn: api.getServices,
+  });
 
   // URL状態管理
   const [search, setSearch] = useQueryState("search", { defaultValue: "" });
@@ -90,37 +97,34 @@ export default function ApplicationsPage() {
   // ローカル状態
   const [searchInput, setSearchInput] = useState(search);
 
-  // Applications data state
-  const [applicationsData, setApplicationsData] = useState<ApplicationsResponse | null>(null);
-  const [isLoadingApplications, setIsLoadingApplications] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
+  // フィルターが設定されているかチェック
+  const hasFilters = !!(search || statusFilter || serviceFilter || customerTypeFilter || page !== "1");
 
-  // Fetch applications data
-  const fetchApplications = useCallback(async () => {
-    setIsLoadingApplications(true);
-    setError(null);
-    try {
+  // クエリパラメータ生成
+  const queryParams = useMemo(() => {
+    if (!hasFilters) return undefined;
+    const params: Record<string, string> = {};
+    if (search) params.search = search;
+    if (statusFilter) params.status = statusFilter;
+    if (serviceFilter) params.serviceId = serviceFilter;
+    if (customerTypeFilter) params.customerType = customerTypeFilter;
+    params.page = page;
+    return params;
+  }, [hasFilters, search, statusFilter, serviceFilter, customerTypeFilter, page]);
+
+  // Applications data from cache (prefetched at login for default view)
+  const { data: applicationsData, isFetching: isLoadingApplications, error } = useQuery<ApplicationsResponse>({
+    queryKey: queryKeys.applications(queryParams),
+    queryFn: () => {
       const params = new URLSearchParams();
       if (search) params.set("search", search);
       if (statusFilter) params.set("status", statusFilter);
       if (serviceFilter) params.set("serviceId", serviceFilter);
       if (customerTypeFilter) params.set("customerType", customerTypeFilter);
       params.set("page", page);
-
-      const res = await fetch(`/api/applications?${params.toString()}`);
-      if (!res.ok) throw new Error("Failed to fetch applications");
-      const data = await res.json();
-      setApplicationsData(data);
-    } catch (err) {
-      setError(err as Error);
-    } finally {
-      setIsLoadingApplications(false);
-    }
-  }, [search, statusFilter, serviceFilter, customerTypeFilter, page]);
-
-  useEffect(() => {
-    fetchApplications();
-  }, [fetchApplications]);
+      return api.getApplications(params);
+    },
+  });
 
   const applications = applicationsData?.data || [];
   const pagination = applicationsData?.pagination || null;
@@ -131,17 +135,18 @@ export default function ApplicationsPage() {
   };
 
   const updateApplicationStatus = async (id: string, status: string) => {
-    if (!pagination) return;
+    const currentQueryKey = queryKeys.applications(queryParams);
 
     // 楽観的更新
-    if (applicationsData) {
-      setApplicationsData({
-        ...applicationsData,
-        data: applications.map((app) =>
+    queryClient.setQueryData<ApplicationsResponse>(currentQueryKey, (old) => {
+      if (!old) return old;
+      return {
+        ...old,
+        data: old.data.map((app) =>
           app.id === id ? { ...app, status } : app
         ),
-      });
-    }
+      };
+    });
 
     try {
       const res = await fetch(`/api/applications/${id}`, {
@@ -156,20 +161,23 @@ export default function ApplicationsPage() {
       }
     } catch {
       toast.error("ステータスの更新に失敗しました");
-      fetchApplications(); // サーバーから最新データを取得してロールバック
+      queryClient.invalidateQueries({ queryKey: currentQueryKey });
     }
   };
 
   const updateApplicationComment = async (id: string, field: "comment1" | "comment2", value: string) => {
+    const currentQueryKey = queryKeys.applications(queryParams);
+
     // 楽観的更新
-    if (applicationsData) {
-      setApplicationsData({
-        ...applicationsData,
-        data: applications.map((app) =>
+    queryClient.setQueryData<ApplicationsResponse>(currentQueryKey, (old) => {
+      if (!old) return old;
+      return {
+        ...old,
+        data: old.data.map((app) =>
           app.id === id ? { ...app, [field]: value } : app
         ),
-      });
-    }
+      };
+    });
 
     try {
       const res = await fetch(`/api/applications/${id}`, {
@@ -184,7 +192,7 @@ export default function ApplicationsPage() {
       }
     } catch {
       toast.error("コメントの保存に失敗しました");
-      fetchApplications();
+      queryClient.invalidateQueries({ queryKey: currentQueryKey });
     }
   };
 
@@ -312,13 +320,13 @@ export default function ApplicationsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {!isLoaded || (isLoadingApplications && !applicationsData) ? (
-            <div className="flex justify-center items-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-            </div>
-          ) : applications.length === 0 ? (
+          {applications.length === 0 && !isLoadingApplications ? (
             <div className="text-center py-12 text-gray-500">
               申し込みが見つかりません
+            </div>
+          ) : applications.length === 0 && isLoadingApplications ? (
+            <div className="flex justify-center items-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
             </div>
           ) : (
             <div className="overflow-x-auto">

@@ -2,9 +2,12 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@repo/ui";
 import { Plus, Pencil, Trash2, Loader2, X, Settings } from "lucide-react";
-import { useAdminData } from "@/contexts/admin-data-context";
+import { toast } from "sonner";
+import { queryKeys } from "@/lib/query-keys";
+import { api } from "@/lib/api";
 
 interface UsageTag {
   id: number;
@@ -46,21 +49,23 @@ interface Service {
 }
 
 export default function ServicesPage() {
+  const queryClient = useQueryClient();
   const [showInactive, setShowInactive] = useState(false);
 
-  // Context
-  const { data, isLoaded, refetch } = useAdminData();
+  // TanStack Query
+  const { data: servicesData = [], isLoading: loading } = useQuery<Service[]>({
+    queryKey: queryKeys.services,
+    queryFn: api.getServices,
+  });
 
   // フィルター適用
   const services = useMemo(() => {
-    let filtered = data.services as Service[];
+    let filtered = servicesData;
     if (!showInactive) {
       filtered = filtered.filter((s) => s.isActive);
     }
     return filtered;
-  }, [data.services, showInactive]);
-
-  const loading = !isLoaded;
+  }, [servicesData, showInactive]);
 
   // モーダル状態
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -119,7 +124,8 @@ export default function ServicesPage() {
 
       if (res.ok) {
         closeModal();
-        refetch("services");
+        toast.success(editingService ? "サービスを更新しました" : "サービスを作成しました");
+        queryClient.invalidateQueries({ queryKey: queryKeys.services });
       } else {
         setError(data.error || "保存に失敗しました");
       }
@@ -142,18 +148,27 @@ export default function ServicesPage() {
       });
 
       if (res.ok) {
-        refetch("services");
+        toast.success("サービスを削除しました");
+        queryClient.invalidateQueries({ queryKey: queryKeys.services });
       } else {
         const data = await res.json();
-        alert(data.error || "削除に失敗しました");
+        toast.error(data.error || "削除に失敗しました");
       }
     } catch (err) {
       console.error("削除エラー:", err);
-      alert("削除に失敗しました");
+      toast.error("削除に失敗しました");
     }
   };
 
   const toggleActive = async (service: Service) => {
+    // 楽観的更新
+    queryClient.setQueryData<Service[]>(queryKeys.services, (old) => {
+      if (!old) return old;
+      return old.map((s) =>
+        s.id === service.id ? { ...s, isActive: !s.isActive } : s
+      );
+    });
+
     try {
       const res = await fetch("/api/services/" + service.id, {
         method: "PATCH",
@@ -162,10 +177,14 @@ export default function ServicesPage() {
       });
 
       if (res.ok) {
-        refetch("services");
+        toast.success(service.isActive ? "サービスを無効化しました" : "サービスを有効化しました");
+      } else {
+        throw new Error("更新に失敗しました");
       }
     } catch (err) {
       console.error("ステータス変更エラー:", err);
+      toast.error("ステータスの変更に失敗しました");
+      queryClient.invalidateQueries({ queryKey: queryKeys.services });
     }
   };
 
@@ -211,16 +230,16 @@ export default function ServicesPage() {
           </Button>
         </div>
 
-        {loading ? (
-          <div className="flex justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-          </div>
-        ) : services.length === 0 ? (
+        {services.length === 0 && !loading ? (
           <Card>
             <CardContent className="text-center py-12 text-gray-500">
               サービスが登録されていません
             </CardContent>
           </Card>
+        ) : services.length === 0 && loading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+          </div>
         ) : (
           <div className="space-y-6">
             {services.map((service) => (

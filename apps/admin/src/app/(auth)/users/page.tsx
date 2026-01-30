@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@repo/ui";
 import { Plus, Pencil, Trash2, Loader2, X, Eye, EyeOff, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryState } from "nuqs";
-import { useAdminData } from "@/contexts/admin-data-context";
+import { queryKeys } from "@/lib/query-keys";
+import { api } from "@/lib/api";
 
 interface User {
   id: string;
@@ -33,8 +35,13 @@ const ROLE_VARIANTS: Record<string, "default" | "secondary" | "success" | "warni
 };
 
 export default function UsersPage() {
-  const { data: adminData, isLoaded } = useAdminData();
-  const services = adminData.services as { id: string; code: string; name: string }[];
+  const queryClient = useQueryClient();
+
+  // Services from cache (prefetched at login)
+  const { data: services = [] } = useQuery<{ id: string; code: string; name: string }[]>({
+    queryKey: queryKeys.services,
+    queryFn: api.getServices,
+  });
 
   // URL状態管理
   const [showInactive, setShowInactive] = useQueryState("inactive", {
@@ -45,37 +52,45 @@ export default function UsersPage() {
   const [filterRole, setFilterRole] = useQueryState("role", { defaultValue: "" });
   const [filterServiceId, setFilterServiceId] = useQueryState("service", { defaultValue: "" });
 
-  // Users data state
-  const [usersData, setUsersData] = useState<User[]>([]);
-  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
-  const [fetchError, setFetchError] = useState<Error | null>(null);
+  // フィルターが設定されているかチェック
+  const hasFilters = !!(showInactive === "true" || filterRole || filterServiceId);
 
-  // Fetch users data
-  const fetchUsers = useCallback(async () => {
-    setIsLoadingUsers(true);
-    setFetchError(null);
-    try {
+  // クエリパラメータ生成
+  const queryParams = useMemo(() => {
+    if (!hasFilters) return undefined;
+    const params: Record<string, string> = {};
+    if (showInactive === "true") params.includeInactive = "true";
+    if (filterRole) params.role = filterRole;
+    if (filterServiceId) params.serviceId = filterServiceId;
+    return params;
+  }, [hasFilters, showInactive, filterRole, filterServiceId]);
+
+  // Users data from cache (prefetched at login for default view)
+  const { data: usersData = [], isFetching: isLoadingUsers, error: fetchError } = useQuery<User[]>({
+    queryKey: queryKeys.users,
+    queryFn: () => {
       const params = new URLSearchParams();
       if (showInactive === "true") params.set("includeInactive", "true");
       if (filterRole) params.set("role", filterRole);
       if (filterServiceId) params.set("serviceId", filterServiceId);
+      return api.getUsers();
+    },
+  });
 
-      const res = await fetch(`/api/users?${params.toString()}`);
-      if (!res.ok) throw new Error("Failed to fetch users");
-      const data = await res.json();
-      setUsersData(data);
-    } catch (err) {
-      setFetchError(err as Error);
-    } finally {
-      setIsLoadingUsers(false);
+  // クライアントサイドでフィルター適用
+  const users = useMemo(() => {
+    let filtered = usersData;
+    if (showInactive !== "true") {
+      filtered = filtered.filter((u) => u.isActive);
     }
-  }, [showInactive, filterRole, filterServiceId]);
-
-  useEffect(() => {
-    fetchUsers();
-  }, [fetchUsers]);
-
-  const users = usersData;
+    if (filterRole) {
+      filtered = filtered.filter((u) => u.role === filterRole);
+    }
+    if (filterServiceId) {
+      filtered = filtered.filter((u) => u.serviceId === filterServiceId);
+    }
+    return filtered;
+  }, [usersData, showInactive, filterRole, filterServiceId]);
 
   // モーダル状態
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -162,7 +177,7 @@ export default function UsersPage() {
       if (res.ok) {
         closeModal();
         toast.success(editingUser ? "ユーザーを更新しました" : "ユーザーを作成しました");
-        fetchUsers();
+        queryClient.invalidateQueries({ queryKey: queryKeys.users });
       } else {
         setError(data.error || "保存に失敗しました");
       }
@@ -185,7 +200,7 @@ export default function UsersPage() {
 
       if (res.ok) {
         toast.success("ユーザーを削除しました");
-        fetchUsers();
+        queryClient.invalidateQueries({ queryKey: queryKeys.users });
       } else {
         const data = await res.json();
         toast.error(data.error || "削除に失敗しました");
@@ -197,12 +212,12 @@ export default function UsersPage() {
 
   const toggleActive = async (user: User) => {
     // 楽観的更新
-    const previousUsers = [...usersData];
-    setUsersData(
-      usersData.map((u) =>
+    queryClient.setQueryData<User[]>(queryKeys.users, (old) => {
+      if (!old) return old;
+      return old.map((u) =>
         u.id === user.id ? { ...u, isActive: !u.isActive } : u
-      )
-    );
+      );
+    });
 
     try {
       const res = await fetch(`/api/users/${user.id}`, {
@@ -218,7 +233,7 @@ export default function UsersPage() {
       }
     } catch {
       toast.error("ステータスの変更に失敗しました");
-      setUsersData(previousUsers);
+      queryClient.invalidateQueries({ queryKey: queryKeys.users });
     }
   };
 
@@ -292,13 +307,13 @@ export default function UsersPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {!isLoaded || (isLoadingUsers && usersData.length === 0) ? (
-              <div className="flex justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-              </div>
-            ) : users.length === 0 ? (
+            {users.length === 0 && !isLoadingUsers ? (
               <div className="text-center py-12 text-gray-500">
                 ユーザーが登録されていません
+              </div>
+            ) : users.length === 0 && isLoadingUsers ? (
+              <div className="flex justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
               </div>
             ) : (
               <div className="overflow-x-auto">

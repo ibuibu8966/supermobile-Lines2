@@ -1,0 +1,12 @@
+export const queryKeys = {
+  dashboardStats: ["dashboardStats"] as const,
+  services: ["services"] as const,
+  plans: ["plans"] as const,
+  usageTags: ["usageTags"] as const,
+  simLocationTags: ["simLocationTags"] as const,
+  lineReserveTags: ["lineReserveTags"] as const,
+  users: ["users"] as const,
+  sims: (filters?: Record<string, string>) => ["sims", filters] as const,
+  applications: (filters?: Record<string, string>) => ["applications", filters] as const,
+  lines: (filters?: Record<string, string>) => ["lines", filters] as const,
+};
