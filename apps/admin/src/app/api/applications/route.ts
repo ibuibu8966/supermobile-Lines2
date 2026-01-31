@@ -12,13 +12,18 @@ export async function GET(request: NextRequest) {
     const serviceId = searchParams.get("serviceId") || "";
     const customerType = searchParams.get("customerType") || "";
     const includeArchived = searchParams.get("includeArchived") === "true";
+    const archivedOnly = searchParams.get("archivedOnly") === "true";
     const page = parseInt(searchParams.get("page") || "1");
     const pageSize = parseInt(searchParams.get("pageSize") || "50");
 
     const where: Record<string, unknown> = {};
 
-    // デフォルトでアーカイブ済みを除外
-    if (!includeArchived) {
+    // アーカイブフィルタリング
+    if (archivedOnly) {
+      // アーカイブのみ表示
+      where.isArchived = true;
+    } else if (!includeArchived) {
+      // デフォルトでアーカイブ済みを除外
       where.isArchived = false;
     }
 
