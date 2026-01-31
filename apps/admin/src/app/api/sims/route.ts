@@ -66,6 +66,19 @@ export async function GET(request: NextRequest) {
               createdAt: "desc",
             },
           },
+          applicationLines: {
+            select: {
+              id: true,
+              application: {
+                select: {
+                  id: true,
+                  applicationNumber: true,
+                  isArchived: true,
+                  archivedAt: true,
+                },
+              },
+            },
+          },
         },
         orderBy: {
           updatedAt: "desc",

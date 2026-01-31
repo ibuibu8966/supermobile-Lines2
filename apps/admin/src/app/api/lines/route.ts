@@ -21,9 +21,17 @@ export async function GET(request: NextRequest) {
     const shippedTo = searchParams.get("shippedTo");
     const returnedFrom = searchParams.get("returnedFrom");
     const returnedTo = searchParams.get("returnedTo");
+    const includeArchived = searchParams.get("includeArchived") === "true";
 
     // Build where clause
     const where: any = {};
+
+    // デフォルトでアーカイブ済み申し込みの回線を除外
+    if (!includeArchived) {
+      where.application = {
+        isArchived: false,
+      };
+    }
 
     // Search filter (customer name, company name, phone number, ICCID)
     if (search) {
@@ -84,7 +92,11 @@ export async function GET(request: NextRequest) {
         where,
         include: {
           application: {
-            include: {
+            select: {
+              id: true,
+              applicationNumber: true,
+              isArchived: true,
+              archivedAt: true,
               customer: {
                 select: {
                   lastName: true,

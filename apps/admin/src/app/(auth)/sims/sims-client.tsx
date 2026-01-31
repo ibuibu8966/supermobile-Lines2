@@ -57,6 +57,15 @@ interface Sim {
     code: string;
     name: string;
   }>;
+  applicationLines?: Array<{
+    id: string;
+    application: {
+      id: string;
+      applicationNumber: string;
+      isArchived: boolean;
+      archivedAt: Date | null;
+    };
+  }>;
 }
 
 interface SimsResponse {
@@ -184,6 +193,11 @@ export function SimsClient() {
       return contract.customer.companyName;
     }
     return `${contract.customer.lastName} ${contract.customer.firstName}`;
+  };
+
+  // SIMに紐づく申し込みがアーカイブされているかチェック
+  const hasArchivedApplication = (sim: Sim) => {
+    return sim.applicationLines?.some((line) => line.application?.isArchived) || false;
   };
 
   const updateSimLocationTag = async (iccid: string, simLocationTagId: number | null) => {
@@ -383,7 +397,12 @@ export function SimsClient() {
                     <tbody>
                       {sims.map((sim) => (
                         <>
-                          <tr key={sim.iccid} className="border-b hover:bg-gray-50">
+                          <tr
+                            key={sim.iccid}
+                            className={`border-b hover:bg-gray-50 ${
+                              hasArchivedApplication(sim) ? "bg-gray-100 opacity-75" : ""
+                            }`}
+                          >
                             <td className="py-3 px-4">
                               {sim.contracts.length > 0 && (
                                 <button
@@ -399,9 +418,16 @@ export function SimsClient() {
                               )}
                             </td>
                             <td className="py-3 px-4 font-mono text-xs">
-                              <Link href={`/sims/${sim.iccid}`} className="hover:underline text-blue-600">
-                                {sim.iccid}
-                              </Link>
+                              <div className="flex items-center gap-2">
+                                <Link href={`/sims/${sim.iccid}`} className="hover:underline text-blue-600">
+                                  {sim.iccid}
+                                </Link>
+                                {hasArchivedApplication(sim) && (
+                                  <Badge variant="secondary" className="text-xs">
+                                    アーカイブ
+                                  </Badge>
+                                )}
+                              </div>
                             </td>
                             <td className="py-3 px-4">
                               {sim.msisdn || "—"}

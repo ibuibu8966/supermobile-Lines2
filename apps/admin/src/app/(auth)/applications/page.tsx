@@ -14,8 +14,12 @@ interface Application {
   id: string;
   applicationNumber: string;
   status: string;
+  kycStatus: "PENDING" | "APPROVED" | "REJECTED";
+  paymentConfirmed: boolean;
   comment1: string | null;
   comment2: string | null;
+  isArchived: boolean;
+  archivedAt: string | null;
   latestExpiryDate: string | null;
   customer: {
     type: string;
@@ -63,15 +67,15 @@ const STATUS_LABELS: Record<string, string> = {
   CANCELLED: "キャンセル",
 };
 
-const KYC_VERIFY_OPTIONS = [
-  { value: "", label: "未確認" },
-  { value: "KYC_APPROVED", label: "OK" },
-  { value: "KYC_REJECTED", label: "NG" },
+const KYC_STATUS_OPTIONS = [
+  { value: "PENDING", label: "未確認" },
+  { value: "APPROVED", label: "OK" },
+  { value: "REJECTED", label: "NG" },
 ];
 
-const PAYMENT_VERIFY_OPTIONS = [
-  { value: "", label: "未確認" },
-  { value: "PAID", label: "入金済み" },
+const PAYMENT_OPTIONS = [
+  { value: "false", label: "未確認" },
+  { value: "true", label: "入金済み" },
 ];
 
 export default function ApplicationsPage() {
@@ -88,6 +92,7 @@ export default function ApplicationsPage() {
   const [statusFilter, setStatusFilter] = useQueryState("status", { defaultValue: "" });
   const [serviceFilter, setServiceFilter] = useQueryState("service", { defaultValue: "" });
   const [customerTypeFilter, setCustomerTypeFilter] = useQueryState("customerType", { defaultValue: "" });
+  const [showArchived, setShowArchived] = useQueryState("archived", { defaultValue: "false" });
   const [page, setPage] = useQueryState("page", {
     defaultValue: "1",
     parse: (v) => v,
@@ -98,7 +103,7 @@ export default function ApplicationsPage() {
   const [searchInput, setSearchInput] = useState(search);
 
   // フィルターが設定されているかチェック
-  const hasFilters = !!(search || statusFilter || serviceFilter || customerTypeFilter || page !== "1");
+  const hasFilters = !!(search || statusFilter || serviceFilter || customerTypeFilter || showArchived === "true" || page !== "1");
 
   // クエリパラメータ生成
   const queryParams = useMemo(() => {
@@ -108,9 +113,10 @@ export default function ApplicationsPage() {
     if (statusFilter) params.status = statusFilter;
     if (serviceFilter) params.serviceId = serviceFilter;
     if (customerTypeFilter) params.customerType = customerTypeFilter;
+    if (showArchived === "true") params.includeArchived = "true";
     params.page = page;
     return params;
-  }, [hasFilters, search, statusFilter, serviceFilter, customerTypeFilter, page]);
+  }, [hasFilters, search, statusFilter, serviceFilter, customerTypeFilter, showArchived, page]);
 
   // Applications data from cache (prefetched at login for default view)
   const { data: applicationsData, isLoading: isLoadingApplications, error } = useQuery<ApplicationsResponse>({
@@ -121,6 +127,7 @@ export default function ApplicationsPage() {
       if (statusFilter) params.set("status", statusFilter);
       if (serviceFilter) params.set("serviceId", serviceFilter);
       if (customerTypeFilter) params.set("customerType", customerTypeFilter);
+      if (showArchived === "true") params.set("includeArchived", "true");
       params.set("page", page);
       return api.getApplications(params);
     },
@@ -215,15 +222,35 @@ export default function ApplicationsPage() {
     return `${customer.lastNameKana} ${customer.firstNameKana}`;
   };
 
-  const getKycVerifyStatus = (status: string) => {
-    if (status === "KYC_APPROVED") return "KYC_APPROVED";
-    if (status === "KYC_REJECTED") return "KYC_REJECTED";
-    return "";
-  };
+  const updateApplicationField = async (id: string, field: string, value: unknown) => {
+    const currentQueryKey = queryKeys.applications(queryParams);
 
-  const getPaymentVerifyStatus = (status: string) => {
-    if (["PAID", "SHIPPING", "COMPLETED"].includes(status)) return "PAID";
-    return "";
+    // 楽観的更新
+    queryClient.setQueryData<ApplicationsResponse>(currentQueryKey, (old) => {
+      if (!old) return old;
+      return {
+        ...old,
+        data: old.data.map((app) =>
+          app.id === id ? { ...app, [field]: value } : app
+        ),
+      };
+    });
+
+    try {
+      const res = await fetch(`/api/applications/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [field]: value }),
+      });
+      if (res.ok) {
+        toast.success("更新しました");
+      } else {
+        throw new Error("更新に失敗しました");
+      }
+    } catch {
+      toast.error("更新に失敗しました");
+      queryClient.invalidateQueries({ queryKey: currentQueryKey });
+    }
   };
 
   return (
@@ -302,6 +329,18 @@ export default function ApplicationsPage() {
               </option>
             ))}
           </select>
+          <label className="flex items-center gap-2 text-sm text-gray-600">
+            <input
+              type="checkbox"
+              checked={showArchived === "true"}
+              onChange={(e) => {
+                setShowArchived(e.target.checked ? "true" : "false");
+                setPage("1");
+              }}
+              className="rounded"
+            />
+            アーカイブ済みを表示
+          </label>
         </div>
       </div>
 
@@ -354,15 +393,27 @@ export default function ApplicationsPage() {
                 </thead>
                 <tbody>
                   {applications.map((app) => (
-                    <tr key={app.id} className="border-b hover:bg-gray-50">
+                    <tr
+                      key={app.id}
+                      className={`border-b hover:bg-gray-50 ${
+                        app.isArchived ? "bg-gray-100 opacity-75" : ""
+                      }`}
+                    >
                       <td className="py-2 px-2">
-                        <Link
-                          href={`/applications/${app.id}`}
-                          className="text-blue-600 hover:underline flex items-center gap-1"
-                        >
-                          <ExternalLink className="h-3 w-3" />
-                          詳細
-                        </Link>
+                        <div className="flex items-center gap-2">
+                          <Link
+                            href={`/applications/${app.id}`}
+                            className="text-blue-600 hover:underline flex items-center gap-1"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                            詳細
+                          </Link>
+                          {app.isArchived && (
+                            <Badge variant="secondary" className="text-xs">
+                              アーカイブ
+                            </Badge>
+                          )}
+                        </div>
                       </td>
                       <td className="py-2 px-2">
                         <Badge variant={app.customer.type === "CORPORATE" ? "default" : "secondary"}>
@@ -408,14 +459,12 @@ export default function ApplicationsPage() {
                       <td className="py-2 px-2">
                         <select
                           className="px-2 py-1 border rounded text-xs"
-                          value={getKycVerifyStatus(app.status)}
+                          value={app.kycStatus}
                           onChange={(e) => {
-                            if (e.target.value) {
-                              updateApplicationStatus(app.id, e.target.value);
-                            }
+                            updateApplicationField(app.id, "kycStatus", e.target.value);
                           }}
                         >
-                          {KYC_VERIFY_OPTIONS.map((opt) => (
+                          {KYC_STATUS_OPTIONS.map((opt) => (
                             <option key={opt.value} value={opt.value}>
                               {opt.label}
                             </option>
@@ -425,14 +474,12 @@ export default function ApplicationsPage() {
                       <td className="py-2 px-2">
                         <select
                           className="px-2 py-1 border rounded text-xs"
-                          value={getPaymentVerifyStatus(app.status)}
+                          value={app.paymentConfirmed.toString()}
                           onChange={(e) => {
-                            if (e.target.value) {
-                              updateApplicationStatus(app.id, e.target.value);
-                            }
+                            updateApplicationField(app.id, "paymentConfirmed", e.target.value === "true");
                           }}
                         >
-                          {PAYMENT_VERIFY_OPTIONS.map((opt) => (
+                          {PAYMENT_OPTIONS.map((opt) => (
                             <option key={opt.value} value={opt.value}>
                               {opt.label}
                             </option>

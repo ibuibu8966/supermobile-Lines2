@@ -11,10 +11,16 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get("status") || "";
     const serviceId = searchParams.get("serviceId") || "";
     const customerType = searchParams.get("customerType") || "";
+    const includeArchived = searchParams.get("includeArchived") === "true";
     const page = parseInt(searchParams.get("page") || "1");
     const pageSize = parseInt(searchParams.get("pageSize") || "50");
 
     const where: Record<string, unknown> = {};
+
+    // デフォルトでアーカイブ済みを除外
+    if (!includeArchived) {
+      where.isArchived = false;
+    }
 
     if (search) {
       where.OR = [
@@ -49,11 +55,15 @@ export async function GET(request: NextRequest) {
           id: true,
           applicationNumber: true,
           status: true,
+          kycStatus: true,
+          paymentConfirmed: true,
           lineCount: true,
           unitPrice: true,
           totalAmount: true,
           comment1: true,
           comment2: true,
+          isArchived: true,
+          archivedAt: true,
           createdAt: true,
           customer: {
             select: {

@@ -94,6 +94,12 @@ enum KycImageStatus {
   REJECTED
 }
 
+enum KycVerificationStatus {
+  PENDING  // 未確認
+  APPROVED // OK
+  REJECTED // NG
+}
+
 // ==================== SIM管理 ====================
 
 model Supplier {
@@ -430,6 +436,14 @@ model Application {
   paidAt            DateTime?
   note              String?           @db.Text
 
+  // 独立した確認ステータス
+  kycStatus        KycVerificationStatus @default(PENDING)
+  paymentConfirmed Boolean               @default(false)
+
+  // アーカイブ
+  isArchived Boolean   @default(false)
+  archivedAt DateTime?
+
   // 管理用コメント
   comment1 String? @db.Text
   comment2 String? @db.Text
@@ -448,6 +462,7 @@ model Application {
   @@index([planId])
   @@index([status])
   @@index([createdAt])
+  @@index([isArchived])
 }
 
 model ApplicationLine {

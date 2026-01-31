@@ -21,6 +21,10 @@ interface ApplicationLine {
   returnedAt: Date | null;
   lineReserveTagId: number | null;
   application: {
+    id: string;
+    applicationNumber: string;
+    isArchived: boolean;
+    archivedAt: Date | null;
     customer: {
       lastName: string;
       firstName: string;
@@ -120,6 +124,7 @@ export function LinesClient() {
   const [shippedTo, setShippedTo] = useQueryState("shippedTo", { defaultValue: "" });
   const [returnedFrom, setReturnedFrom] = useQueryState("returnedFrom", { defaultValue: "" });
   const [returnedTo, setReturnedTo] = useQueryState("returnedTo", { defaultValue: "" });
+  const [showArchived, setShowArchived] = useQueryState("archived", { defaultValue: "false" });
   const [page, setPage] = useQueryState("page", { defaultValue: "1" });
 
   const [searchInput, setSearchInput] = useState(search);
@@ -147,7 +152,7 @@ export function LinesClient() {
   const [isSaving, setIsSaving] = useState(false);
 
   // フィルターが設定されているかチェック
-  const hasFilters = !!(search || simLocationTagIds || lineReserveTagIds || statuses || shippedFrom || shippedTo || returnedFrom || returnedTo || page !== "1");
+  const hasFilters = !!(search || simLocationTagIds || lineReserveTagIds || statuses || shippedFrom || shippedTo || returnedFrom || returnedTo || showArchived === "true" || page !== "1");
 
   // クエリパラメータ生成
   const queryParams = useMemo(() => {
@@ -161,9 +166,10 @@ export function LinesClient() {
     if (shippedTo) params.shippedTo = shippedTo;
     if (returnedFrom) params.returnedFrom = returnedFrom;
     if (returnedTo) params.returnedTo = returnedTo;
+    if (showArchived === "true") params.includeArchived = "true";
     params.page = page;
     return params;
-  }, [hasFilters, search, simLocationTagIds, lineReserveTagIds, statuses, shippedFrom, shippedTo, returnedFrom, returnedTo, page]);
+  }, [hasFilters, search, simLocationTagIds, lineReserveTagIds, statuses, shippedFrom, shippedTo, returnedFrom, returnedTo, showArchived, page]);
 
   // Lines data from cache (prefetched at login for default view)
   const { data: linesData, isLoading: isLoadingLines, error } = useQuery<LinesResponse>({
@@ -178,6 +184,7 @@ export function LinesClient() {
       if (shippedTo) params.set("shippedTo", shippedTo);
       if (returnedFrom) params.set("returnedFrom", returnedFrom);
       if (returnedTo) params.set("returnedTo", returnedTo);
+      if (showArchived === "true") params.set("includeArchived", "true");
       params.set("page", page);
       return api.getLines(params);
     },
@@ -579,6 +586,22 @@ export function LinesClient() {
                 </div>
               </div>
             </div>
+
+            {/* Archive Filter */}
+            <div className="mt-4 pt-4 border-t">
+              <label className="flex items-center gap-2 text-sm text-gray-600">
+                <input
+                  type="checkbox"
+                  checked={showArchived === "true"}
+                  onChange={(e) => {
+                    setShowArchived(e.target.checked ? "true" : "false");
+                    setPage("1");
+                  }}
+                  className="rounded"
+                />
+                アーカイブ済み申し込みの回線を表示
+              </label>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -749,7 +772,12 @@ export function LinesClient() {
                 </thead>
                 <tbody>
                   {lines.map((line) => (
-                    <tr key={line.id} className={`border-b hover:bg-gray-50 ${hasLineChanges(line.id) ? "bg-yellow-50" : ""}`}>
+                    <tr
+                      key={line.id}
+                      className={`border-b hover:bg-gray-50 ${
+                        hasLineChanges(line.id) ? "bg-yellow-50" : ""
+                      } ${line.application.isArchived ? "bg-gray-100 opacity-75" : ""}`}
+                    >
                       <td className="py-3 px-4">
                         <input
                           type="checkbox"
@@ -759,15 +787,22 @@ export function LinesClient() {
                         />
                       </td>
                       <td className="py-3 px-4">
-                        <button
-                          onClick={() => {
-                            setSelectedCustomer(line.application.customer);
-                            setIsCustomerModalOpen(true);
-                          }}
-                          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer text-left"
-                        >
-                          {getCustomerName(line)}
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              setSelectedCustomer(line.application.customer);
+                              setIsCustomerModalOpen(true);
+                            }}
+                            className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer text-left"
+                          >
+                            {getCustomerName(line)}
+                          </button>
+                          {line.application.isArchived && (
+                            <Badge variant="secondary" className="text-xs">
+                              アーカイブ
+                            </Badge>
+                          )}
+                        </div>
                       </td>
                       <td className="py-3 px-4">
                         {line.application.customer.companyName || "—"}

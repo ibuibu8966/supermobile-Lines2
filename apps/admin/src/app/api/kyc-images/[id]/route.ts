@@ -48,9 +48,9 @@ export async function PATCH(
       },
     });
 
-    // 申込のステータスを更新
-    // すべてのKYC画像がAPPROVEDの場合、申込をKYC_APPROVEDに
-    // 1つでもREJECTEDの場合、申込をKYC_REJECTEDに
+    // 申込のkycStatusを更新
+    // すべてのKYC画像がAPPROVEDの場合、kycStatusをAPPROVEDに
+    // 1つでもREJECTEDの場合、kycStatusをREJECTEDに
     const allKycImages = kycImage.application.kycImages.map((img) =>
       img.id === id ? { ...img, status: validated.status } : img
     );
@@ -58,23 +58,22 @@ export async function PATCH(
     const hasRejected = allKycImages.some((img) => img.status === "REJECTED");
     const allApproved = allKycImages.every((img) => img.status === "APPROVED");
 
-    let newApplicationStatus = kycImage.application.status;
+    type KycVerificationStatus = "PENDING" | "APPROVED" | "REJECTED";
+    let newKycStatus: KycVerificationStatus = "PENDING";
     if (hasRejected) {
-      newApplicationStatus = "KYC_REJECTED";
+      newKycStatus = "REJECTED";
     } else if (allApproved && allKycImages.length > 0) {
-      newApplicationStatus = "KYC_APPROVED";
+      newKycStatus = "APPROVED";
     }
 
-    if (newApplicationStatus !== kycImage.application.status) {
-      await prisma.application.update({
-        where: { id: kycImage.application.id },
-        data: { status: newApplicationStatus },
-      });
-    }
+    await prisma.application.update({
+      where: { id: kycImage.application.id },
+      data: { kycStatus: newKycStatus },
+    });
 
     return NextResponse.json({
       kycImage: updatedKycImage,
-      applicationStatus: newApplicationStatus,
+      kycStatus: newKycStatus,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {

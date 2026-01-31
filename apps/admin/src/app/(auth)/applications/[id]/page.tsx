@@ -26,6 +26,8 @@ import {
   ChevronRight,
   Check,
   X,
+  Archive,
+  ArchiveRestore,
 } from "lucide-react";
 import { IccidScanModal } from "./iccid-scan-modal";
 
@@ -123,6 +125,8 @@ interface Application {
   comment1: string | null;
   comment2: string | null;
   note: string | null;
+  isArchived: boolean;
+  archivedAt: string | null;
   createdAt: string;
   customer: Customer;
   service: Service;
@@ -194,6 +198,10 @@ export default function ApplicationDetailPage() {
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
   const [rejectNote, setRejectNote] = useState("");
   const [kycProcessing, setKycProcessing] = useState(false);
+
+  // アーカイブ関連の状態
+  const [isArchiveConfirmOpen, setIsArchiveConfirmOpen] = useState(false);
+  const [archiveProcessing, setArchiveProcessing] = useState(false);
 
   const fetchApplication = useCallback(async () => {
     setLoading(true);
@@ -328,6 +336,44 @@ export default function ApplicationDetailPage() {
       console.error("KYC不備処理エラー:", error);
     } finally {
       setKycProcessing(false);
+    }
+  };
+
+  // アーカイブ操作
+  const handleArchive = async () => {
+    setArchiveProcessing(true);
+    try {
+      const res = await fetch(`/api/applications/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isArchived: true }),
+      });
+      if (res.ok) {
+        setIsArchiveConfirmOpen(false);
+        fetchApplication();
+      }
+    } catch (error) {
+      console.error("アーカイブエラー:", error);
+    } finally {
+      setArchiveProcessing(false);
+    }
+  };
+
+  const handleUnarchive = async () => {
+    setArchiveProcessing(true);
+    try {
+      const res = await fetch(`/api/applications/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isArchived: false }),
+      });
+      if (res.ok) {
+        fetchApplication();
+      }
+    } catch (error) {
+      console.error("アーカイブ解除エラー:", error);
+    } finally {
+      setArchiveProcessing(false);
     }
   };
 
@@ -517,13 +563,51 @@ export default function ApplicationDetailPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">
-          申し込み詳細 - {application.applicationNumber}
-        </h1>
-        <p className="text-sm text-gray-500 mt-1">
-          {getCustomerName(application.customer)} / {application.service.name}
-        </p>
+      <div className="mb-6 flex justify-between items-start">
+        <div>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-gray-900">
+              申し込み詳細 - {application.applicationNumber}
+            </h1>
+            {application.isArchived && (
+              <Badge variant="secondary">
+                アーカイブ済み
+              </Badge>
+            )}
+          </div>
+          <p className="text-sm text-gray-500 mt-1">
+            {getCustomerName(application.customer)} / {application.service.name}
+            {application.archivedAt && (
+              <span className="ml-2 text-gray-400">
+                （{formatDate(application.archivedAt)} アーカイブ）
+              </span>
+            )}
+          </p>
+        </div>
+        <div className="flex gap-2">
+          {application.isArchived ? (
+            <Button
+              variant="outline"
+              onClick={handleUnarchive}
+              disabled={archiveProcessing}
+            >
+              {archiveProcessing ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <ArchiveRestore className="h-4 w-4 mr-2" />
+              )}
+              アーカイブ解除
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              onClick={() => setIsArchiveConfirmOpen(true)}
+            >
+              <Archive className="h-4 w-4 mr-2" />
+              アーカイブ
+            </Button>
+          )}
+        </div>
       </div>
         {/* 基本情報 */}
         <Card>
@@ -1220,6 +1304,45 @@ export default function ApplicationDetailPage() {
               disabled={kycProcessing}
             >
               不備として登録
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* アーカイブ確認ダイアログ */}
+      <Dialog open={isArchiveConfirmOpen} onOpenChange={setIsArchiveConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>申し込みをアーカイブ</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">
+              この申し込みをアーカイブしますか？
+            </p>
+            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-sm text-yellow-700">
+                アーカイブすると、この申し込みと関連する全ての回線が一覧から非表示になります。
+                総合回線管理・SIM管理でもアーカイブ状態として表示されます。
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsArchiveConfirmOpen(false)}
+            >
+              キャンセル
+            </Button>
+            <Button
+              onClick={handleArchive}
+              disabled={archiveProcessing}
+            >
+              {archiveProcessing ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Archive className="h-4 w-4 mr-2" />
+              )}
+              アーカイブする
             </Button>
           </DialogFooter>
         </DialogContent>

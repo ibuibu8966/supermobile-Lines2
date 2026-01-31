@@ -16,9 +16,12 @@ const updateApplicationSchema = z.object({
     "COMPLETED",
     "CANCELLED",
   ]).optional(),
+  kycStatus: z.enum(["PENDING", "APPROVED", "REJECTED"]).optional(),
+  paymentConfirmed: z.boolean().optional(),
   comment1: z.string().max(1000).optional().nullable(),
   comment2: z.string().max(1000).optional().nullable(),
   note: z.string().optional().nullable(),
+  isArchived: z.boolean().optional(),
 });
 
 // 詳細取得
@@ -131,9 +134,19 @@ export async function PATCH(
       );
     }
 
+    // アーカイブ時にarchivedAtを自動設定
+    const updateData: typeof validated & { archivedAt?: Date | null } = {
+      ...validated,
+    };
+    if (validated.isArchived === true) {
+      updateData.archivedAt = new Date();
+    } else if (validated.isArchived === false) {
+      updateData.archivedAt = null;
+    }
+
     const application = await prisma.application.update({
       where: { id },
-      data: validated,
+      data: updateData,
       include: {
         customer: true,
         service: true,
