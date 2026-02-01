@@ -9,7 +9,7 @@ import {
   DialogTitle,
   Badge,
 } from "@repo/ui";
-import { Loader2 } from "lucide-react";
+import { Loader2, ImageOff } from "lucide-react";
 
 interface KycModalProps {
   applicationId: string | null;
@@ -20,7 +20,7 @@ interface KycModalProps {
 interface KycImage {
   id: string;
   type: string;
-  signedUrl: string;
+  signedUrl: string | null;
   status: string;
   expiryDate: string | null;
 }
@@ -77,6 +77,7 @@ const isPdfUrl = (url: string | null): boolean => {
 
 export function KycModal({ applicationId, isOpen, onClose }: KycModalProps) {
   const [selectedImageType, setSelectedImageType] = useState<string | null>(null);
+  const [imageError, setImageError] = useState(false);
 
   const { data: application, isLoading } = useQuery<ApplicationDetail>({
     queryKey: ["application-kyc", applicationId],
@@ -204,7 +205,10 @@ export function KycModal({ applicationId, isOpen, onClose }: KycModalProps) {
                 {application.kycImages.map((img) => (
                   <button
                     key={img.id}
-                    onClick={() => setSelectedImageType(img.type)}
+                    onClick={() => {
+                      setSelectedImageType(img.type);
+                      setImageError(false);
+                    }}
                     className={`px-4 py-2 font-medium text-sm transition-colors ${
                       currentImageType === img.type
                         ? "border-b-2 border-blue-600 text-blue-600"
@@ -219,18 +223,31 @@ export function KycModal({ applicationId, isOpen, onClose }: KycModalProps) {
               {/* 画像表示 */}
               <div className="bg-gray-100 rounded-lg p-4 flex items-center justify-center min-h-[400px]">
                 {currentImage ? (
-                  isPdfUrl(currentImage.signedUrl) ? (
-                    <iframe
-                      src={currentImage.signedUrl}
-                      className="w-full h-[500px]"
-                      title={KYC_TYPE_FULL_LABELS[currentImage.type] || currentImage.type}
-                    />
+                  currentImage.signedUrl ? (
+                    imageError ? (
+                      <div className="flex flex-col items-center gap-2 text-gray-400">
+                        <ImageOff className="h-12 w-12" />
+                        <p>画像の読み込みに失敗しました</p>
+                      </div>
+                    ) : isPdfUrl(currentImage.signedUrl) ? (
+                      <iframe
+                        src={currentImage.signedUrl}
+                        className="w-full h-[500px]"
+                        title={KYC_TYPE_FULL_LABELS[currentImage.type] || currentImage.type}
+                      />
+                    ) : (
+                      <img
+                        src={currentImage.signedUrl}
+                        alt={KYC_TYPE_FULL_LABELS[currentImage.type] || currentImage.type}
+                        className="max-w-full max-h-[500px] object-contain"
+                        onError={() => setImageError(true)}
+                      />
+                    )
                   ) : (
-                    <img
-                      src={currentImage.signedUrl}
-                      alt={KYC_TYPE_FULL_LABELS[currentImage.type] || currentImage.type}
-                      className="max-w-full max-h-[500px] object-contain"
-                    />
+                    <div className="flex flex-col items-center gap-2 text-gray-400">
+                      <ImageOff className="h-12 w-12" />
+                      <p>画像URLの取得に失敗しました</p>
+                    </div>
                   )
                 ) : (
                   <p className="text-gray-400">画像がありません</p>
