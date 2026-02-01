@@ -31,12 +31,13 @@ export const getSignedUrl = async (
   expiresIn: number = 3600
 ): Promise<string | null> => {
   const supabase = createServerClient();
+  console.log(`getSignedUrl: bucket=${bucket}, path=${path}`);
   const { data, error } = await supabase.storage
     .from(bucket)
     .createSignedUrl(path, expiresIn);
 
   if (error) {
-    console.error("Error creating signed URL:", error);
+    console.error("Error creating signed URL:", error, `bucket=${bucket}, path=${path}`);
     return null;
   }
 

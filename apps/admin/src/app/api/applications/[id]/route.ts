@@ -85,7 +85,9 @@ export async function GET(
     // KYC画像に署名付きURLを追加
     const kycImagesWithUrls = await Promise.all(
       application.kycImages.map(async (img) => {
+        console.log("KYC image storagePath:", img.storagePath);
         const signedUrl = await getSignedUrl("kyc", img.storagePath);
+        console.log("KYC image signedUrl:", signedUrl ? "success" : "failed");
         return {
           ...img,
           signedUrl,
