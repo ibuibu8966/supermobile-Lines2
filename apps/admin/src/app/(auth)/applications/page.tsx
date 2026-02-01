@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { useQueryState } from "nuqs";
 import { queryKeys } from "@/lib/query-keys";
 import { api } from "@/lib/api";
+import { KycModal } from "@/components/kyc-modal";
 
 interface Application {
   id: string;
@@ -101,6 +102,13 @@ export default function ApplicationsPage() {
 
   // ローカル状態
   const [searchInput, setSearchInput] = useState(search);
+  const [isKycModalOpen, setIsKycModalOpen] = useState(false);
+  const [selectedApplicationId, setSelectedApplicationId] = useState<string | null>(null);
+
+  const openKycModal = (applicationId: string) => {
+    setSelectedApplicationId(applicationId);
+    setIsKycModalOpen(true);
+  };
 
   // フィルターが設定されているかチェック
   const hasFilters = !!(search || statusFilter || serviceFilter || customerTypeFilter || showArchived === "true" || page !== "1");
@@ -443,12 +451,12 @@ export default function ApplicationsPage() {
                       <td className="py-2 px-2 text-center">{app.stats.returnedCount}</td>
                       <td className="py-2 px-2">
                         {app.kycImages.length > 0 ? (
-                          <Link
-                            href={`/applications/${app.id}#kyc`}
+                          <button
+                            onClick={() => openKycModal(app.id)}
                             className="text-blue-600 hover:underline text-xs"
                           >
                             {app.kycImages.length}件
-                          </Link>
+                          </button>
                         ) : (
                           <span className="text-gray-400">—</span>
                         )}
@@ -547,6 +555,15 @@ export default function ApplicationsPage() {
           )}
         </CardContent>
       </Card>
+
+      <KycModal
+        applicationId={selectedApplicationId}
+        isOpen={isKycModalOpen}
+        onClose={() => {
+          setIsKycModalOpen(false);
+          setSelectedApplicationId(null);
+        }}
+      />
     </div>
   );
 }
