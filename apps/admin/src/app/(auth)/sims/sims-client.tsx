@@ -384,14 +384,14 @@ export function SimsClient() {
                     <thead>
                       <tr className="border-b">
                         <th className="text-left py-3 px-4 w-8"></th>
-                        <th className="text-left py-3 px-4">ICCID</th>
-                        <th className="text-left py-3 px-4">電話番号</th>
-                        <th className="text-left py-3 px-4">キャリア</th>
-                        <th className="text-left py-3 px-4">MNP</th>
-                        <th className="text-left py-3 px-4">消費済みタグ</th>
-                        <th className="text-left py-3 px-4">SIMの場所</th>
-                        <th className="text-left py-3 px-4">ステータス</th>
-                        <th className="text-left py-3 px-4">仕入れ先</th>
+                        <th className="text-left py-3 px-4 whitespace-nowrap min-w-[150px]">ICCID</th>
+                        <th className="text-left py-3 px-4 whitespace-nowrap min-w-[110px]">電話番号</th>
+                        <th className="text-left py-3 px-4 whitespace-nowrap min-w-[90px]">キャリア</th>
+                        <th className="text-left py-3 px-4 whitespace-nowrap min-w-[50px]">MNP</th>
+                        <th className="text-left py-3 px-4 whitespace-nowrap min-w-[120px]">消費済みタグ</th>
+                        <th className="text-left py-3 px-4 whitespace-nowrap min-w-[110px]">SIMの場所</th>
+                        <th className="text-left py-3 px-4 whitespace-nowrap min-w-[90px]">ステータス</th>
+                        <th className="text-left py-3 px-4 whitespace-nowrap min-w-[100px]">仕入れ先</th>
                       </tr>
                     </thead>
                     <tbody>

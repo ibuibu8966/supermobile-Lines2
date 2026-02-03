@@ -64,13 +64,6 @@ export default async function HistoryPage() {
             発送済み
           </span>
         );
-      case "KYC_PENDING":
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">
-            <Clock className="h-3 w-3" />
-            本人確認中
-          </span>
-        );
       case "SUBMITTED":
       case "PENDING":
         return (
@@ -143,12 +136,12 @@ export default async function HistoryPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>申込番号</TableHead>
-                    <TableHead>申込日</TableHead>
-                    <TableHead>プラン</TableHead>
-                    <TableHead className="text-right">回線数</TableHead>
-                    <TableHead className="text-right">金額</TableHead>
-                    <TableHead>ステータス</TableHead>
+                    <TableHead className="min-w-[100px]">申込番号</TableHead>
+                    <TableHead className="min-w-[90px]">申込日</TableHead>
+                    <TableHead className="min-w-[100px]">プラン</TableHead>
+                    <TableHead className="text-right min-w-[70px]">回線数</TableHead>
+                    <TableHead className="text-right min-w-[80px]">金額</TableHead>
+                    <TableHead className="min-w-[90px]">ステータス</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

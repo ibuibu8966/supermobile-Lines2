@@ -103,7 +103,7 @@ export default function LinesPage() {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case "ACTIVE":
+      case "ACTIVATED":
       case "SHIPPED":
         return (
           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
@@ -111,8 +111,7 @@ export default function LinesPage() {
           </span>
         );
       case "PENDING":
-      case "ASSIGNED":
-      case "UNASSIGNED":
+      case "NOT_ACTIVATED":
         return (
           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">
             処理中
@@ -143,14 +142,14 @@ export default function LinesPage() {
   const filteredLines = lines.filter((line) => {
     if (activeTab === "all") return true;
     if (activeTab === "active")
-      return line.status === "ACTIVE" || line.status === "SHIPPED";
+      return line.status === "ACTIVATED" || line.status === "SHIPPED";
     if (activeTab === "cancelled")
       return line.status === "CANCELLED" || line.status === "RETURNED";
     return true;
   });
 
   const canCancel = (status: string) => {
-    return status === "ACTIVE" || status === "SHIPPED";
+    return status === "ACTIVATED" || status === "SHIPPED";
   };
 
   if (loading) {
@@ -196,12 +195,12 @@ export default function LinesPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>電話番号</TableHead>
-                        <TableHead>プラン</TableHead>
-                        <TableHead>申込番号</TableHead>
-                        <TableHead>契約日</TableHead>
-                        <TableHead>ステータス</TableHead>
-                        <TableHead></TableHead>
+                        <TableHead className="min-w-[110px]">電話番号</TableHead>
+                        <TableHead className="min-w-[100px]">プラン</TableHead>
+                        <TableHead className="min-w-[100px]">申込番号</TableHead>
+                        <TableHead className="min-w-[90px]">契約日</TableHead>
+                        <TableHead className="min-w-[90px]">ステータス</TableHead>
+                        <TableHead className="min-w-[80px]"></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>

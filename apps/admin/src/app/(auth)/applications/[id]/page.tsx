@@ -148,7 +148,7 @@ interface Application {
   stats: {
     lineCount: number;
     shippedCount: number;
-    unassignedCount: number;
+    notActivatedCount: number;
     returnedCount: number;
   };
   latestExpiryDate: string | null;
@@ -156,9 +156,6 @@ interface Application {
 
 const STATUS_LABELS: Record<string, string> = {
   SUBMITTED: "申込済み",
-  KYC_PENDING: "本人確認待ち",
-  KYC_APPROVED: "本人確認OK",
-  KYC_REJECTED: "本人確認NG",
   PAYMENT_PENDING: "入金待ち",
   PAID: "入金済み",
   SHIPPING: "発送中",
@@ -167,21 +164,19 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const LINE_STATUS_LABELS: Record<string, string> = {
-  UNASSIGNED: "未割当",
-  ASSIGNED: "割当済み",
+  NOT_ACTIVATED: "未開通",
+  ACTIVATED: "開通済み",
   SHIPPED: "発送済み",
-  ACTIVE: "利用中",
-  CANCELLED: "解約済み",
   RETURNED: "返却済み",
+  CANCELLED: "解約",
 };
 
 const LINE_STATUS_VARIANTS: Record<string, "default" | "success" | "destructive" | "secondary" | "outline"> = {
-  UNASSIGNED: "secondary",
-  ASSIGNED: "default",
+  NOT_ACTIVATED: "secondary",
+  ACTIVATED: "success",
   SHIPPED: "default",
-  ACTIVE: "success",
-  CANCELLED: "destructive",
   RETURNED: "destructive",
+  CANCELLED: "destructive",
 };
 
 const KYC_TYPE_LABELS: Record<string, string> = {
@@ -585,7 +580,7 @@ export default function ApplicationDetailPage() {
     );
   }
 
-  const unassignedCount = application.lines.filter((l) => l.status === "UNASSIGNED").length;
+  const notActivatedCount = application.lines.filter((l) => l.status === "NOT_ACTIVATED").length;
 
   return (
     <div className="p-6 space-y-6">
@@ -907,10 +902,10 @@ export default function ApplicationDetailPage() {
               <CardTitle className="text-base">
                 回線管理
                 <span className="text-sm font-normal text-gray-500 ml-2">
-                  {application.lines.length}回線（未割当: {unassignedCount}）
+                  {application.lines.length}回線（未割当: {notActivatedCount}）
                 </span>
               </CardTitle>
-              {unassignedCount > 0 && (
+              {notActivatedCount > 0 && (
                 <Button onClick={() => setShowScanModal(true)}>
                   <ScanLine className="h-4 w-4 mr-2" />
                   ICCID連続入力
@@ -1035,16 +1030,16 @@ export default function ApplicationDetailPage() {
                         className="rounded"
                       />
                     </th>
-                    <th className="text-left py-2 px-2 whitespace-nowrap">#</th>
-                    <th className="text-left py-2 px-2 whitespace-nowrap">電話番号</th>
-                    <th className="text-left py-2 px-2 whitespace-nowrap">ICCID</th>
-                    <th className="text-left py-2 px-2 whitespace-nowrap">SIMの場所</th>
-                    <th className="text-left py-2 px-2 whitespace-nowrap">回線タグ</th>
-                    <th className="text-left py-2 px-2 whitespace-nowrap">予備タグ</th>
-                    <th className="text-left py-2 px-2 whitespace-nowrap">発送日</th>
-                    <th className="text-left py-2 px-2 whitespace-nowrap">返却日</th>
-                    <th className="text-left py-2 px-2 whitespace-nowrap">契約月</th>
-                    <th className="text-left py-2 px-2 whitespace-nowrap">ステータス</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap min-w-[30px]">#</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap min-w-[100px]">電話番号</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap min-w-[150px]">ICCID</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap min-w-[90px]">SIMの場所</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap min-w-[90px]">回線タグ</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap min-w-[90px]">予備タグ</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap min-w-[100px]">発送日</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap min-w-[100px]">返却日</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap min-w-[100px]">契約月</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap min-w-[90px]">ステータス</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1310,7 +1305,7 @@ export default function ApplicationDetailPage() {
       {showScanModal && (
         <IccidScanModal
           applicationId={id}
-          unassignedCount={unassignedCount}
+          notActivatedCount={notActivatedCount}
           lineTags={lineTags}
           lineReserveTags={lineReserveTags}
           onClose={() => setShowScanModal(false)}

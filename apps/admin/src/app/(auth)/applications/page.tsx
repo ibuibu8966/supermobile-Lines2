@@ -15,8 +15,8 @@ interface Application {
   id: string;
   applicationNumber: string;
   status: string;
-  kycStatus: "PENDING" | "APPROVED" | "REJECTED";
-  paymentConfirmed: boolean;
+  kycStatus: "PENDING" | "DEFICIENT" | "RESUBMIT" | "COMPLETED";
+  paymentStatus: "BEFORE_INVOICE" | "INVOICED" | "PAID";
   comment1: string | null;
   comment2: string | null;
   isArchived: boolean;
@@ -40,7 +40,7 @@ interface Application {
   stats: {
     lineCount: number;
     shippedCount: number;
-    unassignedCount: number;
+    notActivatedCount: number;
     returnedCount: number;
   };
   kycImages: { id: string }[];
@@ -58,9 +58,6 @@ interface ApplicationsResponse {
 
 const STATUS_LABELS: Record<string, string> = {
   SUBMITTED: "申込済み",
-  KYC_PENDING: "本人確認待ち",
-  KYC_APPROVED: "本人確認OK",
-  KYC_REJECTED: "本人確認NG",
   PAYMENT_PENDING: "入金待ち",
   PAID: "入金済み",
   SHIPPING: "発送中",
@@ -69,14 +66,16 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const KYC_STATUS_OPTIONS = [
-  { value: "PENDING", label: "未確認" },
-  { value: "APPROVED", label: "OK" },
-  { value: "REJECTED", label: "NG" },
+  { value: "PENDING", label: "確認待ち" },
+  { value: "DEFICIENT", label: "不備" },
+  { value: "RESUBMIT", label: "再提出" },
+  { value: "COMPLETED", label: "完了" },
 ];
 
-const PAYMENT_OPTIONS = [
-  { value: "false", label: "未確認" },
-  { value: "true", label: "入金済み" },
+const PAYMENT_STATUS_OPTIONS = [
+  { value: "BEFORE_INVOICE", label: "請求書発行前" },
+  { value: "INVOICED", label: "請求書発行済み" },
+  { value: "PAID", label: "入金済み" },
 ];
 
 export default function ApplicationsPage() {
@@ -380,23 +379,23 @@ export default function ApplicationsPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-gray-50">
-                    <th className="text-left py-2 px-2 whitespace-nowrap">詳細</th>
-                    <th className="text-left py-2 px-2 whitespace-nowrap">個人/法人</th>
-                    <th className="text-left py-2 px-2 whitespace-nowrap">名前/会社名</th>
-                    <th className="text-left py-2 px-2 whitespace-nowrap">カナ</th>
-                    <th className="text-left py-2 px-2 whitespace-nowrap">電話番号</th>
-                    <th className="text-left py-2 px-2 whitespace-nowrap">メール</th>
-                    <th className="text-left py-2 px-2 whitespace-nowrap">サービス</th>
-                    <th className="text-left py-2 px-2 whitespace-nowrap">回線数</th>
-                    <th className="text-left py-2 px-2 whitespace-nowrap">発送</th>
-                    <th className="text-left py-2 px-2 whitespace-nowrap">未発行</th>
-                    <th className="text-left py-2 px-2 whitespace-nowrap">返却</th>
-                    <th className="text-left py-2 px-2 whitespace-nowrap">画像</th>
-                    <th className="text-left py-2 px-2 whitespace-nowrap">有効期限</th>
-                    <th className="text-left py-2 px-2 whitespace-nowrap">本人確認</th>
-                    <th className="text-left py-2 px-2 whitespace-nowrap">決済確認</th>
-                    <th className="text-left py-2 px-2 whitespace-nowrap">コメント1</th>
-                    <th className="text-left py-2 px-2 whitespace-nowrap">コメント2</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap min-w-[60px]">詳細</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap min-w-[70px]">個人/法人</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap min-w-[120px]">名前/会社名</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap min-w-[120px]">カナ</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap min-w-[110px]">電話番号</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap min-w-[180px]">メール</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap min-w-[100px]">サービス</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap min-w-[50px]">回線数</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap min-w-[50px]">発送</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap min-w-[50px]">未開通</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap min-w-[50px]">返却</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap min-w-[50px]">画像</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap min-w-[90px]">有効期限</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap min-w-[100px]">本人確認</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap min-w-[120px]">決済確認</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap min-w-[100px]">コメント1</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap min-w-[100px]">コメント2</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -447,7 +446,7 @@ export default function ApplicationsPage() {
                       </td>
                       <td className="py-2 px-2 text-center">{app.stats.lineCount}</td>
                       <td className="py-2 px-2 text-center">{app.stats.shippedCount}</td>
-                      <td className="py-2 px-2 text-center">{app.stats.unassignedCount}</td>
+                      <td className="py-2 px-2 text-center">{app.stats.notActivatedCount}</td>
                       <td className="py-2 px-2 text-center">{app.stats.returnedCount}</td>
                       <td className="py-2 px-2">
                         {app.kycImages.length > 0 ? (
@@ -482,12 +481,12 @@ export default function ApplicationsPage() {
                       <td className="py-2 px-2">
                         <select
                           className="px-2 py-1 border rounded text-xs"
-                          value={app.paymentConfirmed.toString()}
+                          value={app.paymentStatus}
                           onChange={(e) => {
-                            updateApplicationField(app.id, "paymentConfirmed", e.target.value === "true");
+                            updateApplicationField(app.id, "paymentStatus", e.target.value);
                           }}
                         >
-                          {PAYMENT_OPTIONS.map((opt) => (
+                          {PAYMENT_STATUS_OPTIONS.map((opt) => (
                             <option key={opt.value} value={opt.value}>
                               {opt.label}
                             </option>

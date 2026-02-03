@@ -53,21 +53,19 @@ interface LinesResponse {
 }
 
 const STATUS_LABELS: Record<string, string> = {
-  UNASSIGNED: "未割当",
-  ASSIGNED: "割当済み",
+  NOT_ACTIVATED: "未開通",
+  ACTIVATED: "開通済み",
   SHIPPED: "発送済み",
-  ACTIVE: "利用中",
-  CANCELLED: "解約済み",
   RETURNED: "返却済み",
+  CANCELLED: "解約",
 };
 
 const STATUS_VARIANTS: Record<string, "default" | "secondary" | "destructive" | "success" | "warning"> = {
-  UNASSIGNED: "secondary",
-  ASSIGNED: "default",
+  NOT_ACTIVATED: "secondary",
+  ACTIVATED: "success",
   SHIPPED: "default",
-  ACTIVE: "success",
-  CANCELLED: "destructive",
   RETURNED: "warning",
+  CANCELLED: "destructive",
 };
 
 export default function LinesPage() {
@@ -241,18 +239,18 @@ export default function LinesPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b bg-gray-50">
-                      <th className="text-left py-2 px-2">申込番号</th>
-                      <th className="text-left py-2 px-2">顧客名</th>
-                      <th className="text-left py-2 px-2">電話番号</th>
-                      <th className="text-left py-2 px-2">ICCID</th>
-                      <th className="text-left py-2 px-2">MSISDN</th>
-                      <th className="text-left py-2 px-2">回線タグ</th>
-                      <th className="text-left py-2 px-2">予備タグ</th>
-                      <th className="text-left py-2 px-2">発送日</th>
-                      <th className="text-left py-2 px-2">返却日</th>
-                      <th className="text-left py-2 px-2">契約月</th>
-                      <th className="text-left py-2 px-2">ステータス</th>
-                      <th className="text-left py-2 px-2">操作</th>
+                      <th className="text-left py-2 px-2 whitespace-nowrap min-w-[100px]">申込番号</th>
+                      <th className="text-left py-2 px-2 whitespace-nowrap min-w-[120px]">顧客名</th>
+                      <th className="text-left py-2 px-2 whitespace-nowrap min-w-[110px]">電話番号</th>
+                      <th className="text-left py-2 px-2 whitespace-nowrap min-w-[150px]">ICCID</th>
+                      <th className="text-left py-2 px-2 whitespace-nowrap min-w-[110px]">MSISDN</th>
+                      <th className="text-left py-2 px-2 whitespace-nowrap min-w-[90px]">回線タグ</th>
+                      <th className="text-left py-2 px-2 whitespace-nowrap min-w-[90px]">予備タグ</th>
+                      <th className="text-left py-2 px-2 whitespace-nowrap min-w-[100px]">発送日</th>
+                      <th className="text-left py-2 px-2 whitespace-nowrap min-w-[100px]">返却日</th>
+                      <th className="text-left py-2 px-2 whitespace-nowrap min-w-[100px]">契約月</th>
+                      <th className="text-left py-2 px-2 whitespace-nowrap min-w-[90px]">ステータス</th>
+                      <th className="text-left py-2 px-2 whitespace-nowrap min-w-[70px]">操作</th>
                     </tr>
                   </thead>
                   <tbody>

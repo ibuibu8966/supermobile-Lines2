@@ -14,8 +14,8 @@ interface Application {
   id: string;
   applicationNumber: string;
   status: string;
-  kycStatus: "PENDING" | "APPROVED" | "REJECTED";
-  paymentConfirmed: boolean;
+  kycStatus: "PENDING" | "DEFICIENT" | "RESUBMIT" | "COMPLETED";
+  paymentStatus: "BEFORE_INVOICE" | "INVOICED" | "PAID";
   comment1: string | null;
   comment2: string | null;
   isArchived: boolean;
@@ -39,7 +39,7 @@ interface Application {
   stats: {
     lineCount: number;
     shippedCount: number;
-    unassignedCount: number;
+    notActivatedCount: number;
     returnedCount: number;
   };
   kycImages: { id: string }[];
@@ -57,9 +57,6 @@ interface ApplicationsResponse {
 
 const STATUS_LABELS: Record<string, string> = {
   SUBMITTED: "申込済み",
-  KYC_PENDING: "本人確認待ち",
-  KYC_APPROVED: "本人確認OK",
-  KYC_REJECTED: "本人確認NG",
   PAYMENT_PENDING: "入金待ち",
   PAID: "入金済み",
   SHIPPING: "発送中",
@@ -271,16 +268,16 @@ export default function ArchivedApplicationsPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-gray-50">
-                    <th className="text-left py-2 px-2 whitespace-nowrap">詳細</th>
-                    <th className="text-left py-2 px-2 whitespace-nowrap">個人/法人</th>
-                    <th className="text-left py-2 px-2 whitespace-nowrap">名前/会社名</th>
-                    <th className="text-left py-2 px-2 whitespace-nowrap">カナ</th>
-                    <th className="text-left py-2 px-2 whitespace-nowrap">電話番号</th>
-                    <th className="text-left py-2 px-2 whitespace-nowrap">メール</th>
-                    <th className="text-left py-2 px-2 whitespace-nowrap">サービス</th>
-                    <th className="text-left py-2 px-2 whitespace-nowrap">回線数</th>
-                    <th className="text-left py-2 px-2 whitespace-nowrap">アーカイブ日</th>
-                    <th className="text-left py-2 px-2 whitespace-nowrap">操作</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap min-w-[60px]">詳細</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap min-w-[70px]">個人/法人</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap min-w-[120px]">名前/会社名</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap min-w-[120px]">カナ</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap min-w-[110px]">電話番号</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap min-w-[180px]">メール</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap min-w-[100px]">サービス</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap min-w-[50px]">回線数</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap min-w-[100px]">アーカイブ日</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap min-w-[70px]">操作</th>
                   </tr>
                 </thead>
                 <tbody>

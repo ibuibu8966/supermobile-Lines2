@@ -44,9 +44,6 @@ interface ApplicationsResponse {
 
 const STATUS_LABELS: Record<string, string> = {
   SUBMITTED: "申込済み",
-  KYC_PENDING: "本人確認待ち",
-  KYC_APPROVED: "本人確認OK",
-  KYC_REJECTED: "本人確認NG",
   PAYMENT_PENDING: "入金待ち",
   PAID: "入金済み",
   SHIPPING: "発送中",
@@ -56,9 +53,6 @@ const STATUS_LABELS: Record<string, string> = {
 
 const STATUS_VARIANTS: Record<string, "default" | "secondary" | "destructive" | "success" | "warning" | "outline"> = {
   SUBMITTED: "secondary",
-  KYC_PENDING: "warning",
-  KYC_APPROVED: "success",
-  KYC_REJECTED: "destructive",
   PAYMENT_PENDING: "warning",
   PAID: "success",
   SHIPPING: "default",
@@ -256,16 +250,16 @@ export default function ApplicationsPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b bg-gray-50">
-                      <th className="text-left py-2 px-2">申込番号</th>
-                      <th className="text-left py-2 px-2">区分</th>
-                      <th className="text-left py-2 px-2">顧客名</th>
-                      <th className="text-left py-2 px-2">電話番号</th>
-                      <th className="text-left py-2 px-2">プラン</th>
-                      <th className="text-left py-2 px-2">回線数</th>
-                      <th className="text-left py-2 px-2">金額</th>
-                      <th className="text-left py-2 px-2">ステータス</th>
-                      <th className="text-left py-2 px-2">申込日</th>
-                      <th className="text-left py-2 px-2">操作</th>
+                      <th className="text-left py-2 px-2 whitespace-nowrap min-w-[100px]">申込番号</th>
+                      <th className="text-left py-2 px-2 whitespace-nowrap min-w-[70px]">区分</th>
+                      <th className="text-left py-2 px-2 whitespace-nowrap min-w-[120px]">顧客名</th>
+                      <th className="text-left py-2 px-2 whitespace-nowrap min-w-[110px]">電話番号</th>
+                      <th className="text-left py-2 px-2 whitespace-nowrap min-w-[100px]">プラン</th>
+                      <th className="text-left py-2 px-2 whitespace-nowrap min-w-[50px]">回線数</th>
+                      <th className="text-left py-2 px-2 whitespace-nowrap min-w-[80px]">金額</th>
+                      <th className="text-left py-2 px-2 whitespace-nowrap min-w-[90px]">ステータス</th>
+                      <th className="text-left py-2 px-2 whitespace-nowrap min-w-[90px]">申込日</th>
+                      <th className="text-left py-2 px-2 whitespace-nowrap min-w-[60px]">操作</th>
                     </tr>
                   </thead>
                   <tbody>

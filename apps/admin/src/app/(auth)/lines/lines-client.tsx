@@ -84,21 +84,19 @@ interface LinesResponse {
 }
 
 const STATUS_LABELS: Record<string, string> = {
-  UNASSIGNED: "未開通",
-  ASSIGNED: "開通済み",
+  NOT_ACTIVATED: "未開通",
+  ACTIVATED: "開通済み",
   SHIPPED: "発送済み",
-  ACTIVE: "利用中",
-  CANCELLED: "解約済み",
   RETURNED: "返却済み",
+  CANCELLED: "解約",
 };
 
 const STATUS_VARIANTS: Record<string, "default" | "success" | "destructive" | "secondary" | "outline"> = {
-  UNASSIGNED: "secondary",
-  ASSIGNED: "default",
-  SHIPPED: "outline",
-  ACTIVE: "success",
+  NOT_ACTIVATED: "secondary",
+  ACTIVATED: "success",
+  SHIPPED: "default",
+  RETURNED: "destructive",
   CANCELLED: "destructive",
-  RETURNED: "secondary",
 };
 
 export function LinesClient() {
@@ -757,17 +755,17 @@ export function LinesClient() {
                         onChange={toggleSelectAll}
                       />
                     </th>
-                    <th className="text-left py-3 px-4">申込者名</th>
-                    <th className="text-left py-3 px-4">会社名</th>
-                    <th className="text-left py-3 px-4">サービス</th>
-                    <th className="text-left py-3 px-4">プラン</th>
-                    <th className="text-left py-3 px-4">電話番号</th>
-                    <th className="text-left py-3 px-4">ICCID</th>
-                    <th className="text-left py-3 px-4">SIMの場所</th>
-                    <th className="text-left py-3 px-4">予備タグ</th>
-                    <th className="text-left py-3 px-4">発送日</th>
-                    <th className="text-left py-3 px-4">返却日</th>
-                    <th className="text-left py-3 px-4">ステータス</th>
+                    <th className="text-left py-3 px-4 whitespace-nowrap min-w-[120px]">申込者名</th>
+                    <th className="text-left py-3 px-4 whitespace-nowrap min-w-[120px]">会社名</th>
+                    <th className="text-left py-3 px-4 whitespace-nowrap min-w-[100px]">サービス</th>
+                    <th className="text-left py-3 px-4 whitespace-nowrap min-w-[100px]">プラン</th>
+                    <th className="text-left py-3 px-4 whitespace-nowrap min-w-[110px]">電話番号</th>
+                    <th className="text-left py-3 px-4 whitespace-nowrap min-w-[150px]">ICCID</th>
+                    <th className="text-left py-3 px-4 whitespace-nowrap min-w-[130px]">SIMの場所</th>
+                    <th className="text-left py-3 px-4 whitespace-nowrap min-w-[130px]">予備タグ</th>
+                    <th className="text-left py-3 px-4 whitespace-nowrap min-w-[100px]">発送日</th>
+                    <th className="text-left py-3 px-4 whitespace-nowrap min-w-[100px]">返却日</th>
+                    <th className="text-left py-3 px-4 whitespace-nowrap min-w-[90px]">ステータス</th>
                   </tr>
                 </thead>
                 <tbody>
