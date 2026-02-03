@@ -115,6 +115,18 @@ interface ApplicationLine {
   lineReserveTag: LineReserveTag | null;
 }
 
+// 回線フィールドの変更を蓄積するための型
+interface PendingLineChange {
+  simId?: string | null;
+  simLocationTagId?: number | null;
+  lineTagId?: number | null;
+  lineReserveTagId?: number | null;
+  shippedAt?: string | null;
+  returnedAt?: string | null;
+  contractMonth?: string | null;
+  status?: string;
+}
+
 interface Application {
   id: string;
   applicationNumber: string;
@@ -241,36 +253,6 @@ export default function ApplicationDetailPage() {
     };
     fetchTags();
   }, []);
-
-  const updateLine = async (lineId: string, data: Record<string, unknown>) => {
-    try {
-      const res = await fetch(`/api/applications/${id}/lines/${lineId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (res.ok) {
-        fetchApplication();
-      }
-    } catch (error) {
-      console.error("回線更新エラー:", error);
-    }
-  };
-
-  const updateSimLocationTag = async (iccid: string, simLocationTagId: number | null) => {
-    try {
-      const res = await fetch(`/api/sims/${iccid}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ simLocationTagId }),
-      });
-      if (res.ok) {
-        fetchApplication();
-      }
-    } catch (error) {
-      console.error("SIMの場所更新エラー:", error);
-    }
-  };
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return "";
@@ -411,58 +393,57 @@ export default function ApplicationDetailPage() {
   const [bulkShippedAt, setBulkShippedAt] = useState<string>("");
   const [bulkReturnedAt, setBulkReturnedAt] = useState<string>("");
   const [bulkContractMonth, setBulkContractMonth] = useState<string>("");
-  const [bulkUpdating, setBulkUpdating] = useState(false);
 
-  const applyBulkUpdate = async () => {
+  const applyBulkUpdate = () => {
     if (selectedLines.size === 0) return;
 
-    const updateData: Record<string, unknown> = {
-      lineIds: Array.from(selectedLines),
-    };
+    // 選択された回線に変更を適用（pendingChangesに追加）
+    selectedLines.forEach((lineId) => {
+      const changes: PendingLineChange = {};
 
-    if (bulkLineTagId) {
-      updateData.lineTagId = bulkLineTagId === "clear" ? null : parseInt(bulkLineTagId);
-    }
-    if (bulkLineReserveTagId) {
-      updateData.lineReserveTagId = bulkLineReserveTagId === "clear" ? null : parseInt(bulkLineReserveTagId);
-    }
-    if (bulkShippedAt) {
-      updateData.shippedAt = bulkShippedAt === "clear" ? null : new Date(bulkShippedAt);
-    }
-    if (bulkReturnedAt) {
-      updateData.returnedAt = bulkReturnedAt === "clear" ? null : new Date(bulkReturnedAt);
-    }
-    if (bulkContractMonth) {
-      updateData.contractMonth = bulkContractMonth === "clear" ? null : new Date(bulkContractMonth + "-01");
-    }
-
-    setBulkUpdating(true);
-    try {
-      const res = await fetch(`/api/applications/${id}/lines/bulk`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updateData),
-      });
-      if (res.ok) {
-        fetchApplication();
-        setSelectedLines(new Set());
-        setBulkLineTagId("");
-        setBulkLineReserveTagId("");
-        setBulkShippedAt("");
-        setBulkReturnedAt("");
-        setBulkContractMonth("");
+      if (bulkLineTagId) {
+        changes.lineTagId = bulkLineTagId === "clear" ? null : parseInt(bulkLineTagId);
       }
-    } catch (error) {
-      console.error("一括更新エラー:", error);
-    } finally {
-      setBulkUpdating(false);
-    }
+      if (bulkLineReserveTagId) {
+        changes.lineReserveTagId = bulkLineReserveTagId === "clear" ? null : parseInt(bulkLineReserveTagId);
+      }
+      if (bulkShippedAt) {
+        changes.shippedAt = bulkShippedAt === "clear" ? null : bulkShippedAt;
+        if (bulkShippedAt !== "clear") {
+          changes.status = "SHIPPED";
+        }
+      }
+      if (bulkReturnedAt) {
+        changes.returnedAt = bulkReturnedAt === "clear" ? null : bulkReturnedAt;
+        if (bulkReturnedAt !== "clear") {
+          changes.status = "RETURNED";
+        }
+      }
+      if (bulkContractMonth) {
+        changes.contractMonth = bulkContractMonth === "clear" ? null : bulkContractMonth + "-01";
+      }
+
+      if (Object.keys(changes).length > 0) {
+        setPendingChanges((prev) => ({
+          ...prev,
+          [lineId]: { ...prev[lineId], ...changes },
+        }));
+      }
+    });
+
+    // UIリセット
+    setSelectedLines(new Set());
+    setBulkLineTagId("");
+    setBulkLineReserveTagId("");
+    setBulkShippedAt("");
+    setBulkReturnedAt("");
+    setBulkContractMonth("");
   };
 
-  // ICCID編集用の状態（クライアント側一時保存）
-  const [editedIccids, setEditedIccids] = useState<Record<string, string>>({});
+  // 回線フィールド編集用の状態（クライアント側一時保存 - 一括更新用）
+  const [pendingChanges, setPendingChanges] = useState<Record<string, PendingLineChange>>({});
   const [iccidErrors, setIccidErrors] = useState<Record<string, string>>({});
-  const [savingIccids, setSavingIccids] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const validateIccid = (iccid: string): string | null => {
     if (!iccid) return null; // 空は許可
@@ -472,9 +453,25 @@ export default function ApplicationDetailPage() {
     return null;
   };
 
+  // 回線フィールドの変更を追跡
+  const handleLineChange = (
+    lineId: string,
+    field: keyof PendingLineChange,
+    value: string | number | null
+  ) => {
+    setPendingChanges((prev) => ({
+      ...prev,
+      [lineId]: {
+        ...prev[lineId],
+        [field]: value,
+      },
+    }));
+  };
+
+  // ICCID変更（バリデーション付き）
   const handleIccidChange = (lineId: string, value: string) => {
     const upperValue = value.toUpperCase().replace(/[^A-Z0-9]/g, "");
-    setEditedIccids((prev) => ({ ...prev, [lineId]: upperValue }));
+    handleLineChange(lineId, "simId", upperValue || null);
 
     // リアルタイムバリデーション
     const error = validateIccid(upperValue);
@@ -488,53 +485,82 @@ export default function ApplicationDetailPage() {
     });
   };
 
-  const hasIccidChanges = () => {
-    if (!application) return false;
-    return Object.entries(editedIccids).some(([lineId, iccid]) => {
-      const line = application.lines.find((l) => l.id === lineId);
-      return line && iccid !== (line.simId || "");
-    });
+  // 現在の値を取得（保留中の変更があればそれを、なければ元の値を返す）
+  const getCurrentValue = <T,>(
+    lineId: string,
+    field: keyof PendingLineChange,
+    originalValue: T
+  ): T => {
+    const pending = pendingChanges[lineId];
+    if (pending && field in pending) {
+      return pending[field] as T;
+    }
+    return originalValue;
   };
 
-  const hasIccidErrors = () => {
-    return Object.keys(iccidErrors).length > 0;
-  };
+  // 変更があるかチェック
+  const hasChanges = () => Object.keys(pendingChanges).length > 0;
 
-  const saveIccidChanges = async () => {
-    if (!application || hasIccidErrors()) return;
+  // 特定の回線に変更があるかチェック
+  const hasLineChanges = (lineId: string) => lineId in pendingChanges;
 
-    const changesToSave = Object.entries(editedIccids).filter(([lineId, iccid]) => {
-      const line = application.lines.find((l) => l.id === lineId);
-      return line && iccid !== (line.simId || "");
-    });
+  // 変更された回線数を取得
+  const getChangedLinesCount = () => Object.keys(pendingChanges).length;
 
-    if (changesToSave.length === 0) return;
+  // バリデーションエラーがあるかチェック
+  const hasValidationErrors = () => Object.keys(iccidErrors).length > 0;
 
-    setSavingIccids(true);
+  // 全変更を保存
+  const handleSaveAll = async () => {
+    if (!hasChanges() || hasValidationErrors()) return;
+
+    setIsSaving(true);
     try {
+      const updates = Object.entries(pendingChanges);
+
       const results = await Promise.all(
-        changesToSave.map(([lineId, iccid]) =>
-          fetch(`/api/applications/${id}/lines/${lineId}`, {
+        updates.map(async ([lineId, changes]) => {
+          const { simLocationTagId, ...lineChanges } = changes;
+
+          // 回線の更新
+          const lineRes = await fetch(`/api/applications/${id}/lines/${lineId}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ simId: iccid || null }),
-          })
-        )
+            body: JSON.stringify(lineChanges),
+          });
+
+          // SIMの場所の更新（simLocationTagIdが変更されている場合）
+          if (simLocationTagId !== undefined) {
+            const line = application?.lines.find((l) => l.id === lineId);
+            const simId = changes.simId !== undefined ? changes.simId : line?.simId;
+            if (simId) {
+              await fetch(`/api/sims/${simId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ simLocationTagId }),
+              });
+            }
+          }
+
+          return lineRes.ok;
+        })
       );
 
-      if (results.every((res) => res.ok)) {
-        setEditedIccids({});
+      if (results.every((r) => r)) {
+        setPendingChanges({});
+        setIccidErrors({});
         fetchApplication();
       }
     } catch (error) {
-      console.error("ICCID保存エラー:", error);
+      console.error("保存エラー:", error);
     } finally {
-      setSavingIccids(false);
+      setIsSaving(false);
     }
   };
 
-  const cancelIccidChanges = () => {
-    setEditedIccids({});
+  // 全変更をキャンセル
+  const handleCancelAll = () => {
+    setPendingChanges({});
     setIccidErrors({});
   };
 
@@ -949,13 +975,9 @@ export default function ApplicationDetailPage() {
                 <Button
                   size="sm"
                   onClick={applyBulkUpdate}
-                  disabled={bulkUpdating || (!bulkLineTagId && !bulkLineReserveTagId && !bulkShippedAt && !bulkReturnedAt && !bulkContractMonth)}
+                  disabled={!bulkLineTagId && !bulkLineReserveTagId && !bulkShippedAt && !bulkReturnedAt && !bulkContractMonth}
                 >
-                  {bulkUpdating ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    "適用"
-                  )}
+                  適用
                 </Button>
                 <Button
                   size="sm"
@@ -966,32 +988,32 @@ export default function ApplicationDetailPage() {
                 </Button>
               </div>
             )}
-            {/* ICCID変更保存バー */}
-            {hasIccidChanges() && (
+            {/* 変更保存バー */}
+            {hasChanges() && (
               <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg flex flex-wrap items-center gap-3">
                 <span className="text-sm font-medium text-yellow-700">
-                  ICCIDに未保存の変更があります
+                  未保存の変更があります（{getChangedLinesCount()}件）
                 </span>
-                {hasIccidErrors() && (
+                {hasValidationErrors() && (
                   <span className="text-sm text-red-600">
                     （入力エラーがあります）
                   </span>
                 )}
                 <Button
                   size="sm"
-                  onClick={saveIccidChanges}
-                  disabled={savingIccids || hasIccidErrors()}
+                  onClick={handleSaveAll}
+                  disabled={isSaving || hasValidationErrors()}
                 >
-                  {savingIccids ? (
+                  {isSaving ? (
                     <Loader2 className="h-3 w-3 animate-spin" />
                   ) : (
-                    "ICCID保存"
+                    "保存"
                   )}
                 </Button>
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={cancelIccidChanges}
+                  onClick={handleCancelAll}
                 >
                   キャンセル
                 </Button>
@@ -1026,163 +1048,209 @@ export default function ApplicationDetailPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {application.lines.map((line) => (
-                    <tr key={line.id} className="border-b hover:bg-gray-50">
-                      <td className="py-2 px-2">
-                        <input
-                          type="checkbox"
-                          checked={selectedLines.has(line.id)}
-                          onChange={() => toggleLineSelection(line.id)}
-                          className="rounded"
-                        />
-                      </td>
-                      <td className="py-2 px-2">{line.lineNumber}</td>
-                      <td className="py-2 px-2">{line.msisdn || "—"}</td>
-                      <td className="py-2 px-2">
-                        <div className="flex flex-col gap-1">
-                          <div className="flex items-center gap-1">
-                            <input
-                              type="text"
-                              className={`px-2 py-1 border rounded text-xs font-mono w-[140px] ${
-                                iccidErrors[line.id] ? "border-red-500 bg-red-50" : ""
-                              }`}
-                              value={editedIccids[line.id] ?? line.simId ?? ""}
-                              placeholder="ICCID"
-                              maxLength={15}
-                              onChange={(e) => handleIccidChange(line.id, e.target.value)}
-                            />
-                            {(editedIccids[line.id] ?? line.simId) && (
-                              <Link
-                                href={`/sims/${editedIccids[line.id] ?? line.simId}`}
-                                className="text-blue-600 hover:text-blue-800"
-                                title="SIM詳細"
-                              >
-                                <ExternalLink className="h-3 w-3" />
-                              </Link>
+                  {application.lines.map((line) => {
+                    const currentSimId = getCurrentValue(line.id, "simId", line.simId);
+                    const currentSimLocationTagId = getCurrentValue(
+                      line.id,
+                      "simLocationTagId",
+                      line.sim?.simLocationTag?.id ?? null
+                    );
+                    const currentLineTagId = getCurrentValue(
+                      line.id,
+                      "lineTagId",
+                      line.lineTag?.id ?? null
+                    );
+                    const currentLineReserveTagId = getCurrentValue(
+                      line.id,
+                      "lineReserveTagId",
+                      line.lineReserveTag?.id ?? null
+                    );
+                    const currentShippedAt = getCurrentValue(line.id, "shippedAt", line.shippedAt);
+                    const currentReturnedAt = getCurrentValue(line.id, "returnedAt", line.returnedAt);
+                    const currentContractMonth = getCurrentValue(line.id, "contractMonth", line.contractMonth);
+                    const currentStatus = getCurrentValue(line.id, "status", line.status);
+
+                    return (
+                      <tr
+                        key={line.id}
+                        className={`border-b hover:bg-gray-50 ${
+                          hasLineChanges(line.id) ? "bg-yellow-50" : ""
+                        }`}
+                      >
+                        <td className="py-2 px-2">
+                          <input
+                            type="checkbox"
+                            checked={selectedLines.has(line.id)}
+                            onChange={() => toggleLineSelection(line.id)}
+                            className="rounded"
+                          />
+                        </td>
+                        <td className="py-2 px-2">{line.lineNumber}</td>
+                        <td className="py-2 px-2">{line.msisdn || "—"}</td>
+                        <td className="py-2 px-2">
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="text"
+                                className={`px-2 py-1 border rounded text-xs font-mono w-[140px] ${
+                                  iccidErrors[line.id] ? "border-red-500 bg-red-50" : ""
+                                }`}
+                                value={currentSimId ?? ""}
+                                placeholder="ICCID"
+                                maxLength={15}
+                                onChange={(e) => handleIccidChange(line.id, e.target.value)}
+                              />
+                              {currentSimId && (
+                                <Link
+                                  href={`/sims/${currentSimId}`}
+                                  className="text-blue-600 hover:text-blue-800"
+                                  title="SIM詳細"
+                                >
+                                  <ExternalLink className="h-3 w-3" />
+                                </Link>
+                              )}
+                            </div>
+                            {iccidErrors[line.id] && (
+                              <span className="text-xs text-red-500">{iccidErrors[line.id]}</span>
                             )}
                           </div>
-                          {iccidErrors[line.id] && (
-                            <span className="text-xs text-red-500">{iccidErrors[line.id]}</span>
+                        </td>
+                        <td className="py-2 px-2">
+                          {(line.sim || currentSimId) ? (
+                            <select
+                              className="px-2 py-1 border rounded text-xs min-w-[80px]"
+                              value={currentSimLocationTagId?.toString() || ""}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                handleLineChange(
+                                  line.id,
+                                  "simLocationTagId",
+                                  value ? parseInt(value) : null
+                                );
+                              }}
+                            >
+                              <option value="">未設定</option>
+                              {simLocationTags.map((tag) => (
+                                <option key={tag.id} value={tag.id.toString()}>
+                                  {tag.name}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            "—"
                           )}
-                        </div>
-                      </td>
-                      <td className="py-2 px-2">
-                        {line.sim ? (
+                        </td>
+                        <td className="py-2 px-2">
                           <select
                             className="px-2 py-1 border rounded text-xs min-w-[80px]"
-                            value={line.sim.simLocationTag?.id?.toString() || ""}
+                            value={currentLineTagId?.toString() || ""}
                             onChange={(e) => {
                               const value = e.target.value;
-                              updateSimLocationTag(
-                                line.simId!,
+                              handleLineChange(
+                                line.id,
+                                "lineTagId",
                                 value ? parseInt(value) : null
                               );
                             }}
                           >
                             <option value="">未設定</option>
-                            {simLocationTags.map((tag) => (
+                            {lineTags.map((tag) => (
                               <option key={tag.id} value={tag.id.toString()}>
                                 {tag.name}
                               </option>
                             ))}
                           </select>
-                        ) : (
-                          "—"
-                        )}
-                      </td>
-                      <td className="py-2 px-2">
-                        <select
-                          className="px-2 py-1 border rounded text-xs min-w-[80px]"
-                          value={line.lineTag?.id?.toString() || ""}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            updateLine(line.id, {
-                              lineTagId: value ? parseInt(value) : null,
-                            });
-                          }}
-                        >
-                          <option value="">未設定</option>
-                          {lineTags.map((tag) => (
-                            <option key={tag.id} value={tag.id.toString()}>
-                              {tag.name}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="py-2 px-2">
-                        <select
-                          className="px-2 py-1 border rounded text-xs min-w-[80px]"
-                          value={line.lineReserveTag?.id?.toString() || ""}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            updateLine(line.id, {
-                              lineReserveTagId: value ? parseInt(value) : null,
-                            });
-                          }}
-                        >
-                          <option value="">未設定</option>
-                          {lineReserveTags.map((tag) => (
-                            <option key={tag.id} value={tag.id.toString()}>
-                              {tag.name}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="py-2 px-2">
-                        <input
-                          type="date"
-                          className="px-2 py-1 border rounded text-xs"
-                          value={line.shippedAt ? line.shippedAt.split("T")[0] : ""}
-                          onChange={(e) => {
-                            updateLine(line.id, {
-                              shippedAt: e.target.value ? new Date(e.target.value) : null,
-                              status: e.target.value ? "SHIPPED" : line.status,
-                            });
-                          }}
-                        />
-                      </td>
-                      <td className="py-2 px-2">
-                        <input
-                          type="date"
-                          className="px-2 py-1 border rounded text-xs"
-                          value={line.returnedAt ? line.returnedAt.split("T")[0] : ""}
-                          onChange={(e) => {
-                            updateLine(line.id, {
-                              returnedAt: e.target.value ? new Date(e.target.value) : null,
-                              status: e.target.value ? "RETURNED" : line.status,
-                            });
-                          }}
-                        />
-                      </td>
-                      <td className="py-2 px-2">
-                        <input
-                          type="month"
-                          className="px-2 py-1 border rounded text-xs"
-                          value={formatMonth(line.contractMonth)}
-                          onChange={(e) => {
-                            updateLine(line.id, {
-                              contractMonth: e.target.value ? new Date(e.target.value + "-01") : null,
-                            });
-                          }}
-                        />
-                      </td>
-                      <td className="py-2 px-2">
-                        <select
-                          className="px-2 py-1 border rounded text-xs"
-                          value={line.status}
-                          onChange={(e) => {
-                            updateLine(line.id, { status: e.target.value });
-                          }}
-                        >
-                          {Object.entries(LINE_STATUS_LABELS).map(([value, label]) => (
-                            <option key={value} value={value}>
-                              {label}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="py-2 px-2">
+                          <select
+                            className="px-2 py-1 border rounded text-xs min-w-[80px]"
+                            value={currentLineReserveTagId?.toString() || ""}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              handleLineChange(
+                                line.id,
+                                "lineReserveTagId",
+                                value ? parseInt(value) : null
+                              );
+                            }}
+                          >
+                            <option value="">未設定</option>
+                            {lineReserveTags.map((tag) => (
+                              <option key={tag.id} value={tag.id.toString()}>
+                                {tag.name}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="py-2 px-2">
+                          <input
+                            type="date"
+                            className="px-2 py-1 border rounded text-xs"
+                            value={currentShippedAt ? String(currentShippedAt).split("T")[0] : ""}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              handleLineChange(
+                                line.id,
+                                "shippedAt",
+                                value ? value : null
+                              );
+                              if (value) {
+                                handleLineChange(line.id, "status", "SHIPPED");
+                              }
+                            }}
+                          />
+                        </td>
+                        <td className="py-2 px-2">
+                          <input
+                            type="date"
+                            className="px-2 py-1 border rounded text-xs"
+                            value={currentReturnedAt ? String(currentReturnedAt).split("T")[0] : ""}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              handleLineChange(
+                                line.id,
+                                "returnedAt",
+                                value ? value : null
+                              );
+                              if (value) {
+                                handleLineChange(line.id, "status", "RETURNED");
+                              }
+                            }}
+                          />
+                        </td>
+                        <td className="py-2 px-2">
+                          <input
+                            type="month"
+                            className="px-2 py-1 border rounded text-xs"
+                            value={currentContractMonth ? formatMonth(String(currentContractMonth)) : ""}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              handleLineChange(
+                                line.id,
+                                "contractMonth",
+                                value ? value + "-01" : null
+                              );
+                            }}
+                          />
+                        </td>
+                        <td className="py-2 px-2">
+                          <select
+                            className="px-2 py-1 border rounded text-xs"
+                            value={currentStatus || ""}
+                            onChange={(e) => {
+                              handleLineChange(line.id, "status", e.target.value);
+                            }}
+                          >
+                            {Object.entries(LINE_STATUS_LABELS).map(([value, label]) => (
+                              <option key={value} value={value}>
+                                {label}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
