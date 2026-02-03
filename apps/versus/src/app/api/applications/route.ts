@@ -257,7 +257,7 @@ export async function POST(request: NextRequest) {
           lineCount,
           unitPrice,
           totalAmount,
-          status: "KYC_PENDING",
+          status: "SUBMITTED",
         },
         include: {
           customer: true,
@@ -269,7 +269,7 @@ export async function POST(request: NextRequest) {
       const linesData = Array.from({ length: lineCount }, (_, i) => ({
         applicationId: application.id,
         lineNumber: i + 1,
-        status: "UNASSIGNED" as const,
+        status: "NOT_ACTIVATED" as const,
       }));
 
       await tx.applicationLine.createMany({

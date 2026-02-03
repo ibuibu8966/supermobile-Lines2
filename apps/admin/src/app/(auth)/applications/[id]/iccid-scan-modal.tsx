@@ -18,7 +18,7 @@ interface LineReserveTag {
 
 interface IccidScanModalProps {
   applicationId: string;
-  unassignedCount: number;
+  notActivatedCount: number;
   lineTags: LineTag[];
   lineReserveTags: LineReserveTag[];
   onClose: () => void;
@@ -27,7 +27,7 @@ interface IccidScanModalProps {
 
 export function IccidScanModal({
   applicationId,
-  unassignedCount,
+  notActivatedCount,
   lineTags,
   lineReserveTags,
   onClose,
@@ -83,7 +83,7 @@ export function IccidScanModal({
       return;
     }
 
-    if (iccids.length >= unassignedCount) {
+    if (iccids.length >= notActivatedCount) {
       setError("未割当回線数の上限に達しました");
       return;
     }
@@ -139,7 +139,7 @@ export function IccidScanModal({
     }
   };
 
-  const remaining = unassignedCount - iccids.length;
+  const remaining = notActivatedCount - iccids.length;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -255,7 +255,7 @@ export function IccidScanModal({
           {/* 進捗 */}
           <div className="flex items-center justify-between text-sm text-gray-600 mt-4">
             <span>
-              進捗: <span className="font-bold text-blue-600">{iccids.length}</span> / {unassignedCount} 回線
+              進捗: <span className="font-bold text-blue-600">{iccids.length}</span> / {notActivatedCount} 回線
             </span>
             <span>
               残り: <span className="font-bold">{remaining}</span> 回線
@@ -266,7 +266,7 @@ export function IccidScanModal({
           <div className="h-2 bg-gray-200 rounded-full mt-2 overflow-hidden">
             <div
               className="h-full bg-blue-500 transition-all duration-300"
-              style={{ width: `${(iccids.length / unassignedCount) * 100}%` }}
+              style={{ width: `${(iccids.length / notActivatedCount) * 100}%` }}
             />
           </div>
         </div>

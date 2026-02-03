@@ -7,17 +7,14 @@ export const dynamic = "force-dynamic";
 const updateApplicationSchema = z.object({
   status: z.enum([
     "SUBMITTED",
-    "KYC_PENDING",
-    "KYC_APPROVED",
-    "KYC_REJECTED",
     "PAYMENT_PENDING",
     "PAID",
     "SHIPPING",
     "COMPLETED",
     "CANCELLED",
   ]).optional(),
-  kycStatus: z.enum(["PENDING", "APPROVED", "REJECTED"]).optional(),
-  paymentConfirmed: z.boolean().optional(),
+  kycStatus: z.enum(["PENDING", "DEFICIENT", "RESUBMIT", "COMPLETED"]).optional(),
+  paymentStatus: z.enum(["BEFORE_INVOICE", "INVOICED", "PAID"]).optional(),
   comment1: z.string().max(1000).optional().nullable(),
   comment2: z.string().max(1000).optional().nullable(),
   note: z.string().optional().nullable(),
@@ -65,10 +62,10 @@ export async function GET(
 
     // 回線統計を計算
     const shippedCount = application.lines.filter(
-      (l) => l.status === "SHIPPED" || l.status === "ACTIVE"
+      (l) => l.status === "SHIPPED" || l.status === "ACTIVATED"
     ).length;
-    const unassignedCount = application.lines.filter(
-      (l) => l.status === "UNASSIGNED"
+    const notActivatedCount = application.lines.filter(
+      (l) => l.status === "NOT_ACTIVATED"
     ).length;
     const returnedCount = application.lines.filter(
       (l) => l.status === "RETURNED"
@@ -101,7 +98,7 @@ export async function GET(
       stats: {
         lineCount: application.lineCount,
         shippedCount,
-        unassignedCount,
+        notActivatedCount,
         returnedCount,
       },
       latestExpiryDate,

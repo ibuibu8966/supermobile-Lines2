@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
           applicationNumber: true,
           status: true,
           kycStatus: true,
-          paymentConfirmed: true,
+          paymentStatus: true,
           lineCount: true,
           unitPrice: true,
           totalAmount: true,
@@ -125,10 +125,10 @@ export async function GET(request: NextRequest) {
     // 回線統計を計算
     const applicationsWithStats = applications.map((app) => {
       const shippedCount = app.lines.filter(
-        (l) => l.status === "SHIPPED" || l.status === "ACTIVE"
+        (l) => l.status === "SHIPPED" || l.status === "ACTIVATED"
       ).length;
-      const unassignedCount = app.lines.filter(
-        (l) => l.status === "UNASSIGNED"
+      const notActivatedCount = app.lines.filter(
+        (l) => l.status === "NOT_ACTIVATED"
       ).length;
       const returnedCount = app.lines.filter(
         (l) => l.status === "RETURNED"
@@ -150,7 +150,7 @@ export async function GET(request: NextRequest) {
         stats: {
           lineCount: app.lineCount,
           shippedCount,
-          unassignedCount,
+          notActivatedCount,
           returnedCount,
         },
         latestExpiryDate,

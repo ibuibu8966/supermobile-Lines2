@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
       const allLines = await tx.applicationLine.findMany({
         where: { applicationId: application.id },
       });
-      const allShipped = allLines.every((l) => l.status === "SHIPPED");
+      const allShipped = allLines.every((l) => l.status === "SHIPPED" || l.status === "ACTIVATED");
 
       const updatedApplication = await tx.application.update({
         where: { id: application.id },

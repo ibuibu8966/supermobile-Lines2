@@ -26,7 +26,7 @@ export async function POST(
       where: { id },
       include: {
         lines: {
-          where: { status: "UNASSIGNED" },
+          where: { status: "NOT_ACTIVATED" },
           orderBy: { lineNumber: "asc" },
         },
       },
@@ -39,9 +39,9 @@ export async function POST(
       );
     }
 
-    const unassignedLines = application.lines;
+    const notActivatedLines = application.lines;
 
-    if (unassignedLines.length === 0) {
+    if (notActivatedLines.length === 0) {
       return NextResponse.json(
         { error: "未割当の回線がありません" },
         { status: 400 }
@@ -85,9 +85,9 @@ export async function POST(
     }
 
     // 割当数の確認
-    if (uniqueIccids.length > unassignedLines.length) {
+    if (uniqueIccids.length > notActivatedLines.length) {
       return NextResponse.json(
-        { error: `未割当回線数(${unassignedLines.length})より多くのICCIDが指定されています(${uniqueIccids.length})` },
+        { error: `未割当回線数(${notActivatedLines.length})より多くのICCIDが指定されています(${uniqueIccids.length})` },
         { status: 400 }
       );
     }
@@ -124,7 +124,7 @@ export async function POST(
 
       for (let i = 0; i < uniqueIccids.length; i++) {
         const iccid = uniqueIccids[i];
-        const line = unassignedLines[i];
+        const line = notActivatedLines[i];
         const sim = simMap.get(iccid);
 
         // 回線にSIMを割当（SIMが存在しない場合もICCIDは登録）
@@ -133,7 +133,7 @@ export async function POST(
           data: {
             simId: iccid,
             msisdn: sim?.msisdn || null,
-            status: "ASSIGNED",
+            status: "ACTIVATED",
             contractMonth: validated.contractMonth,
             lineTagId: validated.lineTagId,
             lineReserveTagId: validated.lineReserveTagId,

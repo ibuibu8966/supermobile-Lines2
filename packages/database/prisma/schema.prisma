@@ -60,24 +60,26 @@ enum UserRole {
 }
 
 enum ApplicationStatus {
-  SUBMITTED // 申込済み
-  KYC_PENDING // 本人確認待ち
-  KYC_APPROVED // 本人確認OK
-  KYC_REJECTED // 本人確認NG
+  SUBMITTED       // 申込済み
   PAYMENT_PENDING // 入金待ち
-  PAID // 入金済み
-  SHIPPING // 発送中
-  COMPLETED // 完了
-  CANCELLED // キャンセル
+  PAID            // 入金済み
+  SHIPPING        // 発送中
+  COMPLETED       // 完了
+  CANCELLED       // キャンセル
 }
 
 enum ApplicationLineStatus {
-  UNASSIGNED // 未割当
-  ASSIGNED // SIM割当済み
-  SHIPPED // 発送済み
-  ACTIVE // 利用中
-  CANCELLED // 解約済み
-  RETURNED // 返却済み
+  NOT_ACTIVATED // 未開通
+  ACTIVATED     // 開通済み
+  SHIPPED       // 発送済み
+  RETURNED      // 返却済み
+  CANCELLED     // 解約
+}
+
+enum PaymentStatus {
+  BEFORE_INVOICE // 請求書発行前
+  INVOICED       // 請求書発行済み
+  PAID           // 入金済み
 }
 
 enum KycImageType {
@@ -95,9 +97,10 @@ enum KycImageStatus {
 }
 
 enum KycVerificationStatus {
-  PENDING  // 未確認
-  APPROVED // OK
-  REJECTED // NG
+  PENDING   // 確認待ち
+  DEFICIENT // 不備
+  RESUBMIT  // 再提出
+  COMPLETED // 完了
 }
 
 // ==================== SIM管理 ====================
@@ -437,8 +440,8 @@ model Application {
   note              String?           @db.Text
 
   // 独立した確認ステータス
-  kycStatus        KycVerificationStatus @default(PENDING)
-  paymentConfirmed Boolean               @default(false)
+  kycStatus     KycVerificationStatus @default(PENDING)
+  paymentStatus PaymentStatus         @default(BEFORE_INVOICE)
 
   // アーカイブ
   isArchived Boolean   @default(false)
@@ -472,7 +475,7 @@ model ApplicationLine {
   simId         String?               @db.VarChar(20)
   contractId    String?
   msisdn        String?               @db.VarChar(20)
-  status        ApplicationLineStatus @default(UNASSIGNED)
+  status        ApplicationLineStatus @default(NOT_ACTIVATED)
   shippedAt     DateTime?
   returnedAt    DateTime?
   note          String?               @db.Text

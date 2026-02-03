@@ -219,7 +219,7 @@ export default function ShippingManagementPage() {
   const selectAllAssignedLines = () => {
     if (!selectedApplication) return;
     const assignedLineIds = selectedApplication.lines
-      .filter((l) => l.simId && l.status === "ASSIGNED")
+      .filter((l) => l.simId && l.status === "ACTIVATED")
       .map((l) => l.id);
     setSelectedLineIds(assignedLineIds);
   };
@@ -236,9 +236,9 @@ export default function ShippingManagementPage() {
 
   const getLineStatusBadge = (status: string) => {
     switch (status) {
-      case "UNASSIGNED":
+      case "NOT_ACTIVATED":
         return <Badge variant="secondary">未割当</Badge>;
-      case "ASSIGNED":
+      case "ACTIVATED":
         return <Badge variant="warning">割当済</Badge>;
       case "SHIPPED":
         return <Badge variant="success">発送済</Badge>;
@@ -488,7 +488,7 @@ export default function ShippingManagementPage() {
                           onClick={selectAllAssignedLines}
                           disabled={
                             !selectedApplication.lines.some(
-                              (l) => l.simId && l.status === "ASSIGNED"
+                              (l) => l.simId && l.status === "ACTIVATED"
                             )
                           }
                         >
@@ -506,19 +506,19 @@ export default function ShippingManagementPage() {
                                 ? "border-primary bg-primary/5"
                                 : "border-gray-200"
                             } ${
-                              line.status === "UNASSIGNED"
+                              line.status === "NOT_ACTIVATED"
                                 ? "cursor-pointer hover:bg-gray-50"
                                 : ""
                             }`}
                             onClick={() => {
-                              if (line.status === "UNASSIGNED") {
+                              if (line.status === "NOT_ACTIVATED") {
                                 setSelectedLineId(line.id);
                                 setScanError(null);
                               }
                             }}
                           >
                             <div className="flex items-center gap-3">
-                              {line.status === "ASSIGNED" && (
+                              {line.status === "ACTIVATED" && (
                                 <Checkbox
                                   checked={selectedLineIds.includes(line.id)}
                                   onCheckedChange={() =>
@@ -545,7 +545,7 @@ export default function ShippingManagementPage() {
                             </div>
                             <div className="flex items-center gap-2">
                               {getLineStatusBadge(line.status)}
-                              {line.status === "UNASSIGNED" && (
+                              {line.status === "NOT_ACTIVATED" && (
                                 <Button variant="outline" size="sm">
                                   スキャン
                                 </Button>

@@ -44,9 +44,6 @@ export const kycImageSchema = z.object({
 export const updateApplicationStatusSchema = z.object({
   status: z.enum([
     'SUBMITTED',
-    'KYC_PENDING',
-    'KYC_APPROVED',
-    'KYC_REJECTED',
     'PAYMENT_PENDING',
     'PAID',
     'SHIPPING',
@@ -55,6 +52,30 @@ export const updateApplicationStatusSchema = z.object({
   ]),
   note: z.string().optional(),
 })
+
+// 本人確認ステータス
+export const kycVerificationStatusSchema = z.enum([
+  'PENDING',    // 確認待ち
+  'DEFICIENT',  // 不備
+  'RESUBMIT',   // 再提出
+  'COMPLETED',  // 完了
+])
+
+// 決済ステータス
+export const paymentStatusSchema = z.enum([
+  'BEFORE_INVOICE', // 請求書発行前
+  'INVOICED',       // 請求書発行済み
+  'PAID',           // 入金済み
+])
+
+// 回線ステータス
+export const lineStatusSchema = z.enum([
+  'NOT_ACTIVATED', // 未開通
+  'ACTIVATED',     // 開通済み
+  'SHIPPED',       // 発送済み
+  'RETURNED',      // 返却済み
+  'CANCELLED',     // 解約
+])
 
 // 申込メモ更新スキーマ
 export const updateApplicationNoteSchema = z.object({

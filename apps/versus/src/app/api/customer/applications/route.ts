@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
 
     // 申込作成（トランザクション）
     const application = await prisma.$transaction(async (tx) => {
-      // 申込作成（追加申込はKYC不要なのでAPPROVEDステータス）
+      // 申込作成（追加申込はKYC不要なのでkycStatusをCOMPLETEDに）
       const newApplication = await tx.application.create({
         data: {
           applicationNumber,
@@ -99,7 +99,8 @@ export async function POST(request: NextRequest) {
           lineCount,
           unitPrice,
           totalAmount,
-          status: "KYC_APPROVED", // 追加申込は本人確認済み
+          status: "SUBMITTED",
+          kycStatus: "COMPLETED", // 追加申込は本人確認済み
         },
       });
 
@@ -109,7 +110,7 @@ export async function POST(request: NextRequest) {
           data: {
             applicationId: newApplication.id,
             lineNumber: i,
-            status: "UNASSIGNED",
+            status: "NOT_ACTIVATED",
           },
         });
       }

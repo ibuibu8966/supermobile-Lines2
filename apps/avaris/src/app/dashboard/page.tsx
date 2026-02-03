@@ -70,15 +70,15 @@ export default async function DashboardPage() {
   // 回線ステータス集計
   const allLines = applications.flatMap((app) => app.lines);
   const activeLines = allLines.filter(
-    (line) => line.status === "ACTIVE" || line.status === "SHIPPED"
+    (line) => line.status === "ACTIVATED" || line.status === "SHIPPED"
   );
   const cancelledLines = allLines.filter(
     (line) => line.status === "CANCELLED" || line.status === "RETURNED"
   );
   const pendingLines = allLines.filter(
     (line) =>
-      line.status === "UNASSIGNED" ||
-      line.status === "ASSIGNED"
+      line.status === "NOT_ACTIVATED" ||
+      line.status === "ACTIVATED"
   );
 
   // 最新の申込（最大3件）
@@ -94,7 +94,6 @@ export default async function DashboardPage() {
             承認済み
           </span>
         );
-      case "KYC_PENDING":
       case "SUBMITTED":
       case "PENDING":
         return (

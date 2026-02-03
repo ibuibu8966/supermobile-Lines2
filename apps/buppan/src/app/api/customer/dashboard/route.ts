@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
 
     // 利用中の回線数を計算
     const activeLines = applications.flatMap((app) =>
-      app.lines.filter((line) => line.status === "ACTIVE")
+      app.lines.filter((line) => line.status === "ACTIVATED")
     );
 
     // 月額料金を計算

@@ -8,7 +8,7 @@ export async function GET() {
     // Overview counts
     const [totalInStockSims, totalActiveLines, totalReturningLines] = await Promise.all([
       prisma.sim.count({ where: { status: "IN_STOCK" } }),
-      prisma.applicationLine.count({ where: { status: "ACTIVE" } }),
+      prisma.applicationLine.count({ where: { status: "ACTIVATED" } }),
       prisma.applicationLine.count({ where: { status: "RETURNED" } }),
     ]);
 
@@ -57,7 +57,7 @@ export async function GET() {
       JOIN "Application" a ON al."applicationId" = a.id
       JOIN "Plan" p ON a."planId" = p.id
       JOIN "Service" s ON p."serviceId" = s.id
-      WHERE al.status = 'ACTIVE'
+      WHERE al.status = 'ACTIVATED'
       GROUP BY p.id, p.code, p.name, s.name
       ORDER BY "activeCount" DESC
     `;

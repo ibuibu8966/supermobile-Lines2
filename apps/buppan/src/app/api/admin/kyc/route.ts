@@ -23,10 +23,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // KYC_PENDING状態の申込を取得
+    // SUBMITTED状態の申込を取得（KYC確認待ち）
     const where: Record<string, unknown> = {
       serviceId: service.id,
-      status: "KYC_PENDING",
+      status: "SUBMITTED",
     };
 
     // KycImageStatusの型に変換

@@ -96,13 +96,8 @@ export async function POST(
       });
     }
 
-    // 申込ステータスをKYC_PENDINGに更新（SUBMITTEDの場合のみ）
-    if (application.status === "SUBMITTED") {
-      await prisma.application.update({
-        where: { id },
-        data: { status: "KYC_PENDING" },
-      });
-    }
+    // 申込ステータスはSUBMITTEDのまま維持（KYC確認待ち状態）
+    // KYC画像登録時にステータス変更は不要
 
     return NextResponse.json(kycImage, { status: existingImage ? 200 : 201 });
   } catch (error) {

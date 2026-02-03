@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
       data: {
         simId: sim.iccid,
         msisdn: sim.msisdn,
-        status: "ASSIGNED",
+        status: "ACTIVATED",
         contractMonth: validated.contractMonth,
         lineTagId: validated.lineTagId,
         lineReserveTagId: validated.lineReserveTagId,

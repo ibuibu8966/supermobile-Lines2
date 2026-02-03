@@ -49,8 +49,8 @@ export async function PATCH(
     });
 
     // 申込のkycStatusを更新
-    // すべてのKYC画像がAPPROVEDの場合、kycStatusをAPPROVEDに
-    // 1つでもREJECTEDの場合、kycStatusをREJECTEDに
+    // すべてのKYC画像がAPPROVEDの場合、kycStatusをCOMPLETEDに
+    // 1つでもREJECTEDの場合、kycStatusをDEFICIENTに
     const allKycImages = kycImage.application.kycImages.map((img) =>
       img.id === id ? { ...img, status: validated.status } : img
     );
@@ -58,12 +58,12 @@ export async function PATCH(
     const hasRejected = allKycImages.some((img) => img.status === "REJECTED");
     const allApproved = allKycImages.every((img) => img.status === "APPROVED");
 
-    type KycVerificationStatus = "PENDING" | "APPROVED" | "REJECTED";
+    type KycVerificationStatus = "PENDING" | "DEFICIENT" | "RESUBMIT" | "COMPLETED";
     let newKycStatus: KycVerificationStatus = "PENDING";
     if (hasRejected) {
-      newKycStatus = "REJECTED";
+      newKycStatus = "DEFICIENT";
     } else if (allApproved && allKycImages.length > 0) {
-      newKycStatus = "APPROVED";
+      newKycStatus = "COMPLETED";
     }
 
     await prisma.application.update({

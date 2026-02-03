@@ -6,9 +6,6 @@ import { z } from "zod";
 const updateStatusSchema = z.object({
   status: z.enum([
     "SUBMITTED",
-    "KYC_PENDING",
-    "KYC_APPROVED",
-    "KYC_REJECTED",
     "PAYMENT_PENDING",
     "PAID",
     "SHIPPING",

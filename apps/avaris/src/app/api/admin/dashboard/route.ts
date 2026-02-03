@@ -33,7 +33,7 @@ export async function GET() {
     const kycPendingCount = await prisma.application.count({
       where: {
         serviceId: service.id,
-        status: "KYC_PENDING",
+        status: "SUBMITTED",
       },
     });
 
@@ -69,7 +69,7 @@ export async function GET() {
     const kycPendingList = await prisma.application.findMany({
       where: {
         serviceId: service.id,
-        status: "KYC_PENDING",
+        status: "SUBMITTED",
       },
       include: {
         customer: true,

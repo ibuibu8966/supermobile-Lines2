@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 解約可能なステータスか確認
-    if (line.status !== "ACTIVE" && line.status !== "SHIPPED") {
+    if (line.status !== "ACTIVATED" && line.status !== "SHIPPED") {
       return NextResponse.json(
         { error: "この回線は解約申請できません" },
         { status: 400 }
