@@ -51,7 +51,7 @@ export function IccidScanModal({
   }, []);
 
   const validateIccid = (iccid: string): boolean => {
-    return /^[A-Z0-9]{15}$/.test(iccid);
+    return /^[A-Z0-9]{15,20}$/.test(iccid);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -234,7 +234,7 @@ export function IccidScanModal({
                 value={currentInput}
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
-                maxLength={15}
+                maxLength={20}
               />
             </div>
             <Button

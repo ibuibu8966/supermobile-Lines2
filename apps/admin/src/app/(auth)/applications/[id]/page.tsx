@@ -442,8 +442,8 @@ export default function ApplicationDetailPage() {
 
   const validateIccid = (iccid: string): string | null => {
     if (!iccid) return null; // 空は許可
-    if (!/^[A-Z0-9]{15}$/.test(iccid.toUpperCase())) {
-      return "ICCIDは15桁の英数字です";
+    if (!/^[A-Z0-9]{15,20}$/.test(iccid.toUpperCase())) {
+      return "ICCIDは15〜20桁の英数字です";
     }
     return null;
   };
@@ -1092,7 +1092,7 @@ export default function ApplicationDetailPage() {
                                 }`}
                                 value={currentSimId ?? ""}
                                 placeholder="ICCID"
-                                maxLength={15}
+                                maxLength={20}
                                 onChange={(e) => handleIccidChange(line.id, e.target.value)}
                               />
                               {currentSimId && (

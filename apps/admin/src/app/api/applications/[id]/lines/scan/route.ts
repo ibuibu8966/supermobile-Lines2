@@ -5,7 +5,7 @@ import { z } from "zod";
 export const dynamic = "force-dynamic";
 
 const scanSchema = z.object({
-  iccids: z.array(z.string().regex(/^[A-Z0-9]{15}$/, "ICCIDは15桁の英数字（大文字）です")).min(1).max(1000),
+  iccids: z.array(z.string().regex(/^[A-Z0-9]{15,20}$/, "ICCIDは15〜20桁の英数字（大文字）です")).min(1).max(1000),
   contractMonth: z.coerce.date(),
   lineTagId: z.number().int().positive().optional().nullable(),
   lineReserveTagId: z.number().int().positive().optional().nullable(),

@@ -5,7 +5,7 @@ import { z } from "zod";
 export const dynamic = "force-dynamic";
 
 const updateLineSchema = z.object({
-  simId: z.string().regex(/^[A-Z0-9]{15}$/, "ICCIDは15桁の英数字（大文字）です").optional().nullable(),
+  simId: z.string().regex(/^[A-Z0-9]{15,20}$/, "ICCIDは15〜20桁の英数字（大文字）です").optional().nullable(),
   msisdn: z.string().regex(/^0\d{9,10}$/).optional().nullable(),
   status: z.enum([
     "NOT_ACTIVATED",

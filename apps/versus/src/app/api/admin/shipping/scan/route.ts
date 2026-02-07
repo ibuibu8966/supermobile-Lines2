@@ -5,7 +5,7 @@ import { z } from "zod";
 // スキャンリクエストスキーマ
 const scanSchema = z.object({
   applicationLineId: z.string().min(1, "回線IDは必須です"),
-  iccid: z.string().regex(/^[A-Z0-9]{15}$/, "ICCIDは15桁の英数字（大文字）です"),
+  iccid: z.string().regex(/^[A-Z0-9]{15,20}$/, "ICCIDは15〜20桁の英数字（大文字）です"),
   contractMonth: z.coerce.date().optional(),
   lineTagId: z.number().int().positive().optional().nullable(),
   lineReserveTagId: z.number().int().positive().optional().nullable(),

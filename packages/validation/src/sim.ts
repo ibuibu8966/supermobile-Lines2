@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 // ICCID検証
 export const iccidSchema = z.string()
-  .regex(/^[A-Z0-9]{15}$/, 'ICCIDは15桁の英数字（大文字）です')
+  .regex(/^[A-Z0-9]{15,20}$/, 'ICCIDは15〜20桁の英数字（大文字）です')
 
 // 電話番号検証（固定電話・携帯電話両対応: 0始まり10〜11桁）
 export const msisdnSchema = z.string()
