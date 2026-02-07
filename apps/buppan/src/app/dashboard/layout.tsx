@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import { Button, cn } from "@repo/ui";
+import { DashboardProvider } from "./context";
 import {
   LayoutDashboard,
   Phone,
@@ -155,7 +156,9 @@ export default function DashboardLayout({
         </div>
 
         {/* ページコンテンツ */}
-        <main className="p-4 lg:p-8">{children}</main>
+        <main className="p-4 lg:p-8">
+          <DashboardProvider>{children}</DashboardProvider>
+        </main>
       </div>
     </div>
   );

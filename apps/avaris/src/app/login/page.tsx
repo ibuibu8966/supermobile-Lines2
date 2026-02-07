@@ -14,7 +14,7 @@ import {
   Input,
   Label,
 } from "@repo/ui";
-import { ArrowLeft, AlertCircle, LogIn, Mail, Lock } from "lucide-react";
+import { ArrowLeft, AlertCircle, LogIn, Mail, Lock, Loader2 } from "lucide-react";
 
 function LoginForm() {
   const router = useRouter();
@@ -41,99 +41,125 @@ function LoginForm() {
 
       if (result?.error) {
         setFormError("メールアドレスまたはパスワードが正しくありません");
+        setIsLoading(false);
         return;
+      }
+
+      // ダッシュボードデータをプリフェッチ
+      try {
+        const res = await fetch("/api/customer/dashboard");
+        if (res.ok) {
+          const data = await res.json();
+          sessionStorage.setItem("dashboardCache", JSON.stringify(data));
+        }
+      } catch {
+        // プリフェッチ失敗は無視
       }
 
       router.push(callbackUrl);
       router.refresh();
+      // 成功時はisLoadingをクリアしない（ページ遷移するため）
     } catch (err) {
       setFormError("ログイン処理中にエラーが発生しました");
-    } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <Card>
-      <CardHeader className="text-center">
-        <CardTitle>ログイン</CardTitle>
-        <CardDescription>
-          メールアドレスとパスワードでログイン
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {(error || formError) && (
-          <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg flex items-center gap-2 text-destructive text-sm">
-            <AlertCircle className="h-4 w-4 flex-shrink-0" />
-            <span>
-              {formError || "ログインに失敗しました。再度お試しください。"}
-            </span>
+    <>
+      {isLoading && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="text-center">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+            <p className="text-lg font-medium">ログイン中です...</p>
           </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label htmlFor="email">メールアドレス</Label>
-            <div className="relative mt-1">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                id="email"
-                type="email"
-                placeholder="example@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="pl-10"
-                required
-                disabled={isLoading}
-              />
-            </div>
-          </div>
-          <div>
-            <Label htmlFor="password">パスワード</Label>
-            <div className="relative mt-1">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                id="password"
-                type="password"
-                placeholder="********"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="pl-10"
-                required
-                disabled={isLoading}
-              />
-            </div>
-          </div>
-          <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? (
-              "ログイン中..."
-            ) : (
-              <>
-                <LogIn className="h-4 w-4 mr-2" />
-                ログイン
-              </>
-            )}
-          </Button>
-        </form>
-
-        <div className="mt-4 text-center text-sm">
-          <Link href="/forgot-password" className="text-primary underline">
-            パスワードをお忘れの方
-          </Link>
         </div>
+      )}
 
-        <div className="mt-6 pt-6 border-t text-center">
-          <p className="text-sm text-muted-foreground mb-4">
-            アカウントをお持ちでない方
-          </p>
-          <Link href="/apply">
-            <Button variant="outline" className="w-full">
-              新規お申込み
+      <Card>
+        <CardHeader className="text-center">
+          <CardTitle>ログイン</CardTitle>
+          <CardDescription>
+            メールアドレスとパスワードでログイン
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {(error || formError) && (
+            <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg flex items-center gap-2 text-destructive text-sm">
+              <AlertCircle className="h-4 w-4 flex-shrink-0" />
+              <span>
+                {formError || "ログインに失敗しました。再度お試しください。"}
+              </span>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <Label htmlFor="email">メールアドレス</Label>
+              <div className="relative mt-1">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="example@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="pl-10"
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="password">パスワード</Label>
+              <div className="relative mt-1">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="********"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="pl-10"
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+            </div>
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ログイン中...
+                </>
+              ) : (
+                <>
+                  <LogIn className="h-4 w-4 mr-2" />
+                  ログイン
+                </>
+              )}
             </Button>
-          </Link>
-        </div>
-      </CardContent>
-    </Card>
+          </form>
+
+          <div className="mt-4 text-center text-sm">
+            <Link href="/forgot-password" className="text-primary underline">
+              パスワードをお忘れの方
+            </Link>
+          </div>
+
+          <div className="mt-6 pt-6 border-t text-center">
+            <p className="text-sm text-muted-foreground mb-4">
+              アカウントをお持ちでない方
+            </p>
+            <Link href="/apply">
+              <Button variant="outline" className="w-full">
+                新規お申込み
+              </Button>
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
+    </>
   );
 }
 

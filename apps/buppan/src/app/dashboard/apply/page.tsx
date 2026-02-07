@@ -12,11 +12,7 @@ import {
   CardTitle,
   Label,
   Checkbox,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Input,
   cn,
 } from "@repo/ui";
 import {
@@ -86,9 +82,11 @@ export default function AdditionalApplyPage() {
 
   const selectedPlan = plans.find((p) => p.id === selectedPlanId);
 
-  // 回線数に応じた単価を取得
+  // 回線数に応じた単価を取得（階層料金対応）
   const getUnitPrice = (plan: Plan, quantity: number): number => {
-    const sortedPricings = [...plan.pricings].sort((a, b) => a.minQuantity - b.minQuantity);
+    const sortedPricings = [...plan.pricings].sort(
+      (a, b) => a.minQuantity - b.minQuantity
+    );
     if (sortedPricings.length === 0) return 0;
 
     let unitPrice = sortedPricings[0].unitPrice;
@@ -100,11 +98,6 @@ export default function AdditionalApplyPage() {
       }
     }
     return unitPrice;
-  };
-
-  // プランの基本価格を取得（1回線目の価格）
-  const getPlanPrice = (plan: Plan) => {
-    return getUnitPrice(plan, 1);
   };
 
   const canProceedStep1 = () => {
@@ -160,7 +153,9 @@ export default function AdditionalApplyPage() {
     );
   }
 
-  const selectedPlanPrice = selectedPlan ? getPlanPrice(selectedPlan) : 0;
+  const selectedPlanPrice = selectedPlan
+    ? getUnitPrice(selectedPlan, lineCount)
+    : 0;
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -177,9 +172,7 @@ export default function AdditionalApplyPage() {
       <Card>
         <CardHeader>
           <CardTitle>追加申込</CardTitle>
-          <CardDescription>
-            新しい回線を追加申込します
-          </CardDescription>
+          <CardDescription>新しい回線を追加申込します</CardDescription>
         </CardHeader>
         <CardContent>
           {/* ステップインジケーター */}
@@ -237,7 +230,9 @@ export default function AdditionalApplyPage() {
                 </Label>
                 <div className="mt-3 space-y-3">
                   {plans.map((plan) => {
-                    const price = getPlanPrice(plan);
+                    const sortedPricings = [...plan.pricings].sort(
+                      (a, b) => a.minQuantity - b.minQuantity
+                    );
                     return (
                       <div
                         key={plan.id}
@@ -263,8 +258,24 @@ export default function AdditionalApplyPage() {
                         </div>
                         <div className="ml-3 flex-1">
                           <div className="font-medium">{plan.name}</div>
-                          <div className="mt-1 text-sm text-gray-500">
-                            単価: <strong>{formatCurrency(price)}</strong>
+                          <div className="mt-1 space-y-0.5">
+                            {sortedPricings.map((p, i) => {
+                              const rangeText = p.maxQuantity
+                                ? `${p.minQuantity}〜${p.maxQuantity}回線`
+                                : `${p.minQuantity}回線以上`;
+                              return (
+                                <div
+                                  key={i}
+                                  className="text-xs text-gray-500"
+                                >
+                                  {rangeText}:{" "}
+                                  <strong>
+                                    {formatCurrency(p.unitPrice)}
+                                  </strong>
+                                  /回線
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       </div>
@@ -277,35 +288,69 @@ export default function AdditionalApplyPage() {
                 <Label htmlFor="lineCount" className="text-base font-medium">
                   回線数 *
                 </Label>
-                <Select
-                  value={lineCount.toString()}
-                  onValueChange={(v) => setLineCount(parseInt(v))}
-                >
-                  <SelectTrigger className="w-32 mt-2">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
-                      <SelectItem key={n} value={n.toString()}>
-                        {n}回線
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Input
+                  id="lineCount"
+                  type="number"
+                  min="1"
+                  value={lineCount}
+                  onChange={(e) =>
+                    setLineCount(parseInt(e.target.value) || 1)
+                  }
+                  className="w-32 mt-2"
+                />
               </div>
 
+              {/* 料金テーブル */}
+              {selectedPlan && selectedPlan.pricings.length > 1 && (
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-blue-900">
+                  <h4 className="font-medium text-blue-900 mb-2">
+                    回線数別料金（まとめてお得！）
+                  </h4>
+                  <div className="space-y-1">
+                    {[...selectedPlan.pricings]
+                      .sort((a, b) => a.minQuantity - b.minQuantity)
+                      .map((pricing, i) => {
+                        const isCurrentTier =
+                          lineCount >= pricing.minQuantity &&
+                          (!pricing.maxQuantity ||
+                            lineCount <= pricing.maxQuantity);
+                        const rangeText = pricing.maxQuantity
+                          ? `${pricing.minQuantity}〜${pricing.maxQuantity}回線`
+                          : `${pricing.minQuantity}回線以上`;
+                        return (
+                          <div
+                            key={i}
+                            className={`flex justify-between text-sm py-1 px-2 rounded ${
+                              isCurrentTier
+                                ? "bg-blue-100 font-medium text-blue-900"
+                                : ""
+                            }`}
+                          >
+                            <span>{rangeText}</span>
+                            <span>
+                              {formatCurrency(pricing.unitPrice)}/回線
+                            </span>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              )}
+
               {selectedPlan && (
-                <div className="p-4 bg-gray-50 rounded-lg">
+                <div className="p-4 bg-gray-50 rounded-lg text-gray-900">
                   <h4 className="font-medium mb-2">お見積り</h4>
                   <div className="space-y-1 text-sm">
                     <div className="flex justify-between">
-                      <span>単価 × {lineCount}回線</span>
+                      <span>
+                        {formatCurrency(selectedPlanPrice)} × {lineCount}回線
+                      </span>
                       <span>
                         {formatCurrency(selectedPlanPrice * lineCount)}
                       </span>
                     </div>
-                    <div className="border-t pt-2 mt-2 flex justify-between font-medium">
-                      <span>合計</span>
+                    <div className="border-t pt-2 mt-2 flex justify-between font-medium text-lg">
+                      <span>月額合計（税込）</span>
                       <span>
                         {formatCurrency(selectedPlanPrice * lineCount)}
                       </span>
@@ -319,7 +364,7 @@ export default function AdditionalApplyPage() {
           {/* Step 2: 確認・同意 */}
           {step === 2 && selectedPlan && (
             <div className="space-y-6">
-              <div className="p-4 bg-gray-50 rounded-lg">
+              <div className="p-4 bg-gray-50 rounded-lg text-gray-900">
                 <h4 className="font-medium mb-3 flex items-center gap-2">
                   <Package className="h-4 w-4" />
                   申込内容
@@ -334,8 +379,14 @@ export default function AdditionalApplyPage() {
                     <span className="font-medium">{lineCount}回線</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">合計金額</span>
+                    <span className="text-gray-500">単価</span>
                     <span className="font-medium">
+                      {formatCurrency(selectedPlanPrice)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between font-medium text-base border-t pt-2">
+                    <span>月額合計（税込）</span>
+                    <span>
                       {formatCurrency(selectedPlanPrice * lineCount)}
                     </span>
                   </div>
@@ -377,7 +428,10 @@ export default function AdditionalApplyPage() {
                         setAgreements({ ...agreements, privacy: !!checked })
                       }
                     />
-                    <label htmlFor="privacy" className="text-sm cursor-pointer">
+                    <label
+                      htmlFor="privacy"
+                      className="text-sm cursor-pointer"
+                    >
                       <span className="text-primary underline">
                         プライバシーポリシー
                       </span>
@@ -422,7 +476,10 @@ export default function AdditionalApplyPage() {
             )}
 
             {step < 2 ? (
-              <Button onClick={() => setStep(step + 1)} disabled={!canProceedStep1()}>
+              <Button
+                onClick={() => setStep(step + 1)}
+                disabled={!canProceedStep1()}
+              >
                 次へ
                 <ChevronRight className="h-4 w-4 ml-1" />
               </Button>

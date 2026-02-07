@@ -1,6 +1,5 @@
-import { auth } from "@/auth";
-import { prisma } from "@repo/database";
-import { redirect } from "next/navigation";
+"use client";
+
 import Link from "next/link";
 import {
   Card,
@@ -21,21 +20,24 @@ import {
   CheckCircle,
   Clock,
   XCircle,
+  Loader2,
 } from "lucide-react";
+import { useDashboard } from "./context";
 
-export default async function DashboardPage() {
-  const session = await auth();
+export default function DashboardPage() {
+  const { data, loading } = useDashboard();
 
-  if (!session?.user?.id) {
-    redirect("/login");
+  if (loading && !data) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+      </div>
+    );
   }
 
-  // ユーザーに紐づく顧客情報を取得
-  const customer = await prisma.customer.findFirst({
-    where: {
-      userId: session.user.id,
-    },
-  });
+  const customer = data?.customer;
+  const applications = data?.applications ?? [];
+  const lineStats = data?.lineStats ?? { active: 0, pending: 0, cancelled: 0 };
 
   if (!customer) {
     return (
@@ -53,35 +55,6 @@ export default async function DashboardPage() {
     );
   }
 
-  // 申込と回線情報を取得
-  const applications = await prisma.application.findMany({
-    where: {
-      customerId: customer.id,
-    },
-    include: {
-      plan: true,
-      lines: true,
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-  });
-
-  // 回線ステータス集計
-  const allLines = applications.flatMap((app) => app.lines);
-  const activeLines = allLines.filter(
-    (line) => line.status === "ACTIVATED" || line.status === "SHIPPED"
-  );
-  const cancelledLines = allLines.filter(
-    (line) => line.status === "CANCELLED" || line.status === "RETURNED"
-  );
-  const pendingLines = allLines.filter(
-    (line) =>
-      line.status === "NOT_ACTIVATED" ||
-      line.status === "ACTIVATED"
-  );
-
-  // 最新の申込（最大3件）
   const recentApplications = applications.slice(0, 3);
 
   const getStatusBadge = (status: string) => {
@@ -172,7 +145,7 @@ export default async function DashboardPage() {
           <CardContent className="pt-6">
             <div className="text-center">
               <p className="text-3xl font-bold text-green-600">
-                {activeLines.length}
+                {lineStats.active}
               </p>
               <p className="text-sm text-gray-500 mt-1">契約中の回線</p>
             </div>
@@ -182,7 +155,7 @@ export default async function DashboardPage() {
           <CardContent className="pt-6">
             <div className="text-center">
               <p className="text-3xl font-bold text-yellow-600">
-                {pendingLines.length}
+                {lineStats.pending}
               </p>
               <p className="text-sm text-gray-500 mt-1">処理中の回線</p>
             </div>
@@ -192,7 +165,7 @@ export default async function DashboardPage() {
           <CardContent className="pt-6">
             <div className="text-center">
               <p className="text-3xl font-bold text-gray-400">
-                {cancelledLines.length}
+                {lineStats.cancelled}
               </p>
               <p className="text-sm text-gray-500 mt-1">解約済みの回線</p>
             </div>
