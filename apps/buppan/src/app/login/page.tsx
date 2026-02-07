@@ -45,16 +45,13 @@ function LoginForm() {
         return;
       }
 
-      // ダッシュボードデータをプリフェッチ
-      try {
-        const res = await fetch("/api/customer/dashboard");
-        if (res.ok) {
-          const data = await res.json();
-          sessionStorage.setItem("dashboardCache", JSON.stringify(data));
-        }
-      } catch {
-        // プリフェッチ失敗は無視
-      }
+      // ダッシュボードデータをバックグラウンドでプリフェッチ（ナビゲーションをブロックしない）
+      fetch("/api/customer/dashboard")
+        .then((res) => res.ok ? res.json() : null)
+        .then((data) => {
+          if (data) sessionStorage.setItem("dashboardCache", JSON.stringify(data));
+        })
+        .catch(() => {});
 
       router.push(callbackUrl);
       router.refresh();
