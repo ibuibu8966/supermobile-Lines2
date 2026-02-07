@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma, uploadFile } from "@repo/database";
+import { prisma } from "@repo/database";
 import { hashPassword } from "@repo/auth";
 import { z } from "zod";
 
@@ -38,12 +38,6 @@ function generateApplicationNumber(): string {
   return `BP${year}${month}${day}${random}`;
 }
 
-// ファイルをBufferに変換
-async function fileToBuffer(file: File): Promise<Buffer> {
-  const arrayBuffer = await file.arrayBuffer();
-  return Buffer.from(arrayBuffer);
-}
-
 // 申込作成
 export async function POST(request: NextRequest) {
   try {
@@ -58,10 +52,10 @@ export async function POST(request: NextRequest) {
     const agreeTerms = formData.get("agreeTerms") === "true";
     const agreePrivacy = formData.get("agreePrivacy") === "true";
 
-    // KYCファイル
-    const idFront = formData.get("idFront") as File | null;
-    const idBack = formData.get("idBack") as File | null;
-    const corporateRegistry = formData.get("corporateRegistry") as File | null;
+    // KYC書類パス（クライアントからSupabase Storageに直接アップロード済み）
+    const idFrontPath = formData.get("idFrontPath") as string | null;
+    const idBackPath = formData.get("idBackPath") as string | null;
+    const corporateRegistryPath = formData.get("corporateRegistryPath") as string | null;
     const idExpiryDateStr = formData.get("idExpiryDate") as string | null;
     const idExpiryDate = idExpiryDateStr ? new Date(idExpiryDateStr) : null;
 
@@ -87,17 +81,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // KYC書類チェック
-    if (!idFront || !idBack) {
+    // KYC書類パスチェック
+    if (!idFrontPath || !idBackPath) {
       return NextResponse.json(
         { error: "本人確認書類をアップロードしてください" },
         { status: 400 }
       );
     }
 
-    if (customerType === "CORPORATE" && !corporateRegistry) {
+    if (!idFrontPath.startsWith("kyc/") || !idBackPath.startsWith("kyc/")) {
+      return NextResponse.json(
+        { error: "不正なファイルパスです" },
+        { status: 400 }
+      );
+    }
+
+    if (customerType === "CORPORATE" && !corporateRegistryPath) {
       return NextResponse.json(
         { error: "登記簿謄本をアップロードしてください" },
+        { status: 400 }
+      );
+    }
+
+    if (corporateRegistryPath && !corporateRegistryPath.startsWith("kyc/")) {
+      return NextResponse.json(
+        { error: "不正なファイルパスです" },
         { status: 400 }
       );
     }
@@ -279,14 +287,10 @@ export async function POST(request: NextRequest) {
       return { application, applicationNumber };
     });
 
-    // KYC書類をアップロード（トランザクション外）
+    // KYC画像レコードを作成（ファイルはクライアントからSupabaseに直接アップロード済み）
     const applicationId = result.application.id;
-    const timestamp = Date.now();
 
     // ID表面
-    const idFrontPath = `kyc/${applicationId}/id_front_${timestamp}`;
-    const idFrontBuffer = await fileToBuffer(idFront);
-    await uploadFile("kyc", idFrontPath, idFrontBuffer, idFront.type);
     await prisma.kycImage.create({
       data: {
         applicationId,
@@ -298,9 +302,6 @@ export async function POST(request: NextRequest) {
     });
 
     // ID裏面
-    const idBackPath = `kyc/${applicationId}/id_back_${timestamp}`;
-    const idBackBuffer = await fileToBuffer(idBack);
-    await uploadFile("kyc", idBackPath, idBackBuffer, idBack.type);
     await prisma.kycImage.create({
       data: {
         applicationId,
@@ -312,15 +313,12 @@ export async function POST(request: NextRequest) {
     });
 
     // 登記簿謄本（法人のみ）
-    if (corporateRegistry) {
-      const corpPath = `kyc/${applicationId}/corporate_registry_${timestamp}`;
-      const corpBuffer = await fileToBuffer(corporateRegistry);
-      await uploadFile("kyc", corpPath, corpBuffer, corporateRegistry.type);
+    if (corporateRegistryPath) {
       await prisma.kycImage.create({
         data: {
           applicationId,
           type: "CORPORATE_REGISTRY",
-          storagePath: corpPath,
+          storagePath: corporateRegistryPath,
           status: "PENDING",
         },
       });

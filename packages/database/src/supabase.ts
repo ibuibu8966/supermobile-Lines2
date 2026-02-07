@@ -67,6 +67,24 @@ export const uploadFile = async (
   return { path: data.path };
 };
 
+// 署名付きアップロードURL生成（クライアントから直接アップロード用）
+export const createSignedUploadUrl = async (
+  bucket: string,
+  path: string
+): Promise<{ signedUrl: string; path: string } | null> => {
+  const supabase = createServerClient();
+  const { data, error } = await supabase.storage
+    .from(bucket)
+    .createSignedUploadUrl(path);
+
+  if (error) {
+    console.error("Error creating signed upload URL:", error);
+    return null;
+  }
+
+  return { signedUrl: data.signedUrl, path: data.path };
+};
+
 // ファイル削除
 export const deleteFile = async (
   bucket: string,

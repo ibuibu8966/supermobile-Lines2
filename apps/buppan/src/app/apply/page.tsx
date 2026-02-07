@@ -61,44 +61,104 @@ const prefectures = [
   "熊本県", "大分県", "宮崎県", "鹿児島県", "沖縄県",
 ];
 
+// Supabase Storageへ直接アップロード
+async function uploadToSupabase(
+  file: File,
+  fileType: string
+): Promise<string> {
+  const timestamp = Date.now();
+  const tempId = crypto.randomUUID();
+  const path = `kyc/${tempId}/${fileType}_${timestamp}`;
+
+  // 署名付きアップロードURLを取得
+  const urlRes = await fetch("/api/upload-url", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ bucket: "kyc", path }),
+  });
+
+  if (!urlRes.ok) {
+    throw new Error("アップロードURLの取得に失敗しました");
+  }
+
+  const { signedUrl } = await urlRes.json();
+
+  // Supabase Storageに直接アップロード
+  const uploadRes = await fetch(signedUrl, {
+    method: "PUT",
+    headers: { "Content-Type": file.type },
+    body: file,
+  });
+
+  if (!uploadRes.ok) {
+    throw new Error("ファイルのアップロードに失敗しました");
+  }
+
+  return path;
+}
+
+interface UploadedFile {
+  file: File;
+  storagePath: string;
+}
+
 // ファイルアップロードコンポーネント
 function FileUpload({
   label,
-  file,
-  onFileChange,
+  uploadedFile,
+  onFileUploaded,
   accept = "image/*",
   required = false,
+  fileType,
 }: {
   label: string;
-  file: File | null;
-  onFileChange: (file: File | null) => void;
+  uploadedFile: UploadedFile | null;
+  onFileUploaded: (uploaded: UploadedFile | null) => void;
   accept?: string;
   required?: boolean;
+  fileType: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (file) {
-      const url = URL.createObjectURL(file);
+    if (uploadedFile?.file) {
+      const url = URL.createObjectURL(uploadedFile.file);
       setPreview(url);
       return () => URL.revokeObjectURL(url);
     } else {
       setPreview(null);
     }
-  }, [file]);
+  }, [uploadedFile]);
 
   const handleClick = () => {
     inputRef.current?.click();
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0] || null;
-    onFileChange(selectedFile);
+    if (!selectedFile) return;
+
+    setUploading(true);
+    setUploadError(null);
+
+    try {
+      const storagePath = await uploadToSupabase(selectedFile, fileType);
+      onFileUploaded({ file: selectedFile, storagePath });
+    } catch (err) {
+      console.error("アップロードエラー:", err);
+      setUploadError("アップロードに失敗しました。再度お試しください。");
+      onFileUploaded(null);
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleRemove = () => {
-    onFileChange(null);
+    onFileUploaded(null);
+    setUploadError(null);
     if (inputRef.current) {
       inputRef.current.value = "";
     }
@@ -116,10 +176,15 @@ function FileUpload({
         onChange={handleChange}
         className="hidden"
       />
-      {file && preview ? (
+      {uploading ? (
+        <div className="flex items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-6">
+          <Loader2 className="h-6 w-6 animate-spin text-gray-400 mr-2" />
+          <span className="text-sm text-gray-500">アップロード中...</span>
+        </div>
+      ) : uploadedFile && preview ? (
         <div className="relative border rounded-lg p-2 bg-gray-50">
           <div className="flex items-center gap-3">
-            {file.type.startsWith("image/") ? (
+            {uploadedFile.file.type.startsWith("image/") ? (
               <Image
                 src={preview}
                 alt="プレビュー"
@@ -133,9 +198,9 @@ function FileUpload({
               </div>
             )}
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">{file.name}</p>
+              <p className="text-sm font-medium truncate">{uploadedFile.file.name}</p>
               <p className="text-xs text-gray-500">
-                {(file.size / 1024 / 1024).toFixed(2)} MB
+                {(uploadedFile.file.size / 1024 / 1024).toFixed(2)} MB
               </p>
             </div>
             <button
@@ -162,6 +227,9 @@ function FileUpload({
           </div>
         </button>
       )}
+      {uploadError && (
+        <p className="text-sm text-red-500">{uploadError}</p>
+      )}
     </div>
   );
 }
@@ -187,10 +255,10 @@ export default function ApplyPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
 
-  // KYC書類
-  const [idFront, setIdFront] = useState<File | null>(null);
-  const [idBack, setIdBack] = useState<File | null>(null);
-  const [corporateRegistry, setCorporateRegistry] = useState<File | null>(null);
+  // KYC書類（Supabaseに直接アップロード済みのファイル情報）
+  const [idFront, setIdFront] = useState<UploadedFile | null>(null);
+  const [idBack, setIdBack] = useState<UploadedFile | null>(null);
+  const [corporateRegistry, setCorporateRegistry] = useState<UploadedFile | null>(null);
   const [idExpiryDate, setIdExpiryDate] = useState("");
 
   // 顧客情報
@@ -278,10 +346,10 @@ export default function ApplyPage() {
       formData.append("agreeTerms", agreeTerms.toString());
       formData.append("agreePrivacy", agreePrivacy.toString());
 
-      // KYC書類
-      if (idFront) formData.append("idFront", idFront);
-      if (idBack) formData.append("idBack", idBack);
-      if (corporateRegistry) formData.append("corporateRegistry", corporateRegistry);
+      // KYC書類（Supabaseにアップロード済みのパスを送信）
+      if (idFront) formData.append("idFrontPath", idFront.storagePath);
+      if (idBack) formData.append("idBackPath", idBack.storagePath);
+      if (corporateRegistry) formData.append("corporateRegistryPath", corporateRegistry.storagePath);
       if (idExpiryDate) formData.append("idExpiryDate", idExpiryDate);
 
       const res = await fetch("/api/applications", {
@@ -752,14 +820,16 @@ export default function ApplyPage() {
                   <div className="grid gap-4 sm:grid-cols-2">
                     <FileUpload
                       label="免許証（表面）"
-                      file={idFront}
-                      onFileChange={setIdFront}
+                      uploadedFile={idFront}
+                      onFileUploaded={setIdFront}
+                      fileType="id_front"
                       required
                     />
                     <FileUpload
                       label="免許証（裏面）"
-                      file={idBack}
-                      onFileChange={setIdBack}
+                      uploadedFile={idBack}
+                      onFileUploaded={setIdBack}
+                      fileType="id_back"
                       required
                     />
                   </div>
@@ -770,9 +840,10 @@ export default function ApplyPage() {
                     <h4 className="font-medium">法人確認書類</h4>
                     <FileUpload
                       label="登記簿謄本（履歴事項全部証明書）"
-                      file={corporateRegistry}
-                      onFileChange={setCorporateRegistry}
+                      uploadedFile={corporateRegistry}
+                      onFileUploaded={setCorporateRegistry}
                       accept="image/*,.pdf"
+                      fileType="corporate_registry"
                       required
                     />
                     <p className="text-sm text-muted-foreground">
@@ -784,14 +855,16 @@ export default function ApplyPage() {
                     <div className="grid gap-4 sm:grid-cols-2">
                       <FileUpload
                         label="身分証明書（表面）"
-                        file={idFront}
-                        onFileChange={setIdFront}
+                        uploadedFile={idFront}
+                        onFileUploaded={setIdFront}
+                        fileType="id_front"
                         required
                       />
                       <FileUpload
                         label="身分証明書（裏面）"
-                        file={idBack}
-                        onFileChange={setIdBack}
+                        uploadedFile={idBack}
+                        onFileUploaded={setIdBack}
+                        fileType="id_back"
                         required
                       />
                     </div>
@@ -939,10 +1012,10 @@ export default function ApplyPage() {
                   <h4 className="font-medium mb-2">本人確認書類</h4>
                   <ul className="text-sm text-muted-foreground space-y-1">
                     {customerType === "CORPORATE" && corporateRegistry && (
-                      <li>・登記簿謄本: {corporateRegistry.name}</li>
+                      <li>・登記簿謄本: {corporateRegistry.file.name}</li>
                     )}
-                    {idFront && <li>・身分証明書（表）: {idFront.name}</li>}
-                    {idBack && <li>・身分証明書（裏）: {idBack.name}</li>}
+                    {idFront && <li>・身分証明書（表）: {idFront.file.name}</li>}
+                    {idBack && <li>・身分証明書（裏）: {idBack.file.name}</li>}
                   </ul>
                 </div>
                 <div className="p-4 bg-gray-50 rounded-lg text-gray-900">
