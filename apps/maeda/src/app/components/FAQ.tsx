@@ -52,12 +52,12 @@ const faqItems = [
 
 export function FAQ() {
   return (
-    <section id="faq" className="py-20 bg-card">
+    <section id="faq" className="py-20 bg-white">
       <div className="max-w-4xl mx-auto px-4">
-        <h2 className="text-3xl font-bold text-center mb-4">
-          よくある<span className="text-gold">質問</span>
+        <h2 className="text-3xl font-bold text-center mb-4 text-amber-900">
+          よくある<span className="text-orange-500">質問</span>
         </h2>
-        <p className="text-muted-foreground text-center mb-12">
+        <p className="text-amber-800/60 text-center mb-12">
           お客様からよくいただくご質問をまとめました
         </p>
 
@@ -66,12 +66,12 @@ export function FAQ() {
             <AccordionItem
               key={index}
               value={`item-${index}`}
-              className="bg-background border border-border rounded-lg px-6"
+              className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-xl px-6"
             >
-              <AccordionTrigger className="text-left hover:text-gold">
+              <AccordionTrigger className="text-left text-amber-900 hover:text-orange-500">
                 {item.question}
               </AccordionTrigger>
-              <AccordionContent className="text-muted-foreground">
+              <AccordionContent className="text-amber-800/70">
                 {item.answer}
               </AccordionContent>
             </AccordionItem>

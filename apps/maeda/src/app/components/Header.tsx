@@ -16,12 +16,12 @@ export function Header() {
   ];
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-black/90 backdrop-blur-sm border-b border-border">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-b border-orange-100 shadow-sm">
       <div className="max-w-6xl mx-auto px-4 py-4">
         <div className="flex justify-between items-center">
           <Link href="/" className="flex items-center gap-1">
-            <span className="text-2xl font-bold text-white">モバイル</span>
-            <span className="text-2xl font-bold text-gold">前田</span>
+            <span className="text-2xl font-bold text-orange-500">モバイル</span>
+            <span className="text-2xl font-bold text-amber-900">前田</span>
           </Link>
 
           {/* Desktop Navigation */}
@@ -30,13 +30,13 @@ export function Header() {
               <Link
                 key={item.href}
                 href={item.href}
-                className="text-muted-foreground hover:text-gold transition-colors"
+                className="text-amber-800/70 hover:text-orange-500 transition-colors font-medium"
               >
                 {item.label}
               </Link>
             ))}
             <Link href="/apply">
-              <Button className="bg-gold-gradient text-black font-semibold hover:opacity-90">
+              <Button className="bg-gold-gradient text-white font-semibold hover:opacity-90 shadow-md">
                 今すぐ申し込む
               </Button>
             </Link>
@@ -44,7 +44,7 @@ export function Header() {
 
           {/* Mobile Menu Button */}
           <button
-            className="md:hidden text-white p-2"
+            className="md:hidden text-amber-900 p-2"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
             aria-label="メニュー"
           >
@@ -54,20 +54,20 @@ export function Header() {
 
         {/* Mobile Navigation */}
         {isMenuOpen && (
-          <nav className="md:hidden mt-4 pb-4 border-t border-border pt-4">
+          <nav className="md:hidden mt-4 pb-4 border-t border-orange-100 pt-4">
             <div className="flex flex-col gap-4">
               {navItems.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="text-muted-foreground hover:text-gold transition-colors"
+                  className="text-amber-800/70 hover:text-orange-500 transition-colors font-medium"
                   onClick={() => setIsMenuOpen(false)}
                 >
                   {item.label}
                 </Link>
               ))}
               <Link href="/apply" onClick={() => setIsMenuOpen(false)}>
-                <Button className="w-full bg-gold-gradient text-black font-semibold hover:opacity-90">
+                <Button className="w-full bg-gold-gradient text-white font-semibold hover:opacity-90">
                   今すぐ申し込む
                 </Button>
               </Link>

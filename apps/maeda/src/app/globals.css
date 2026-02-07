@@ -4,32 +4,34 @@
 
 @layer base {
   :root {
-    /* MAEDA Amber/Orange Theme - Dark by default */
-    --background: 30 33% 4%; /* #0f0a05 dark brown */
-    --foreground: 0 0% 100%; /* white */
-    --card: 30 25% 7%; /* slightly elevated */
-    --card-foreground: 0 0% 100%;
-    --popover: 30 25% 7%;
-    --popover-foreground: 0 0% 100%;
-    --primary: 38 92% 50%; /* #f59e0b amber */
-    --primary-foreground: 0 0% 0%;
-    --secondary: 45 93% 58%; /* #fbbf24 light amber */
-    --secondary-foreground: 0 0% 0%;
-    --muted: 30 15% 15%;
-    --muted-foreground: 0 0% 65%;
-    --accent: 38 92% 50%; /* amber */
-    --accent-foreground: 0 0% 0%;
+    /* MAEDA Light & Warm Theme - ゆるくて明るい雰囲気 */
+    --background: 40 50% 97%; /* #fdfbf7 warm cream */
+    --foreground: 30 40% 20%; /* dark brown text */
+    --card: 40 40% 100%; /* white with warm tint */
+    --card-foreground: 30 40% 20%;
+    --popover: 40 40% 100%;
+    --popover-foreground: 30 40% 20%;
+    --primary: 25 95% 55%; /* #f97316 vibrant orange */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 35 100% 65%; /* #fbbf24 warm yellow */
+    --secondary-foreground: 30 40% 20%;
+    --muted: 40 30% 92%;
+    --muted-foreground: 30 20% 45%;
+    --accent: 25 95% 55%; /* orange */
+    --accent-foreground: 0 0% 100%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 100%;
-    --border: 30 20% 20%;
-    --input: 30 20% 20%;
-    --ring: 38 92% 50%; /* amber */
-    --radius: 0.5rem;
+    --border: 35 30% 85%;
+    --input: 35 30% 90%;
+    --ring: 25 95% 55%; /* orange */
+    --radius: 0.75rem;
 
-    /* Custom amber colors */
-    --amber: #f59e0b;
-    --amber-light: #fbbf24;
-    --amber-dark: #d97706;
+    /* Custom warm colors */
+    --maeda-orange: #f97316;
+    --maeda-orange-light: #fb923c;
+    --maeda-yellow: #fbbf24;
+    --maeda-cream: #fef7ed;
+    --maeda-brown: #78350f;
   }
 }
 
@@ -43,32 +45,39 @@
 }
 
 @layer utilities {
-  .text-amber {
-    color: var(--amber);
+  .text-maeda {
+    color: var(--maeda-orange);
   }
-  .text-amber-light {
-    color: var(--amber-light);
+  .text-maeda-light {
+    color: var(--maeda-orange-light);
   }
-  .bg-amber {
-    background-color: var(--amber);
+  .bg-maeda {
+    background-color: var(--maeda-orange);
   }
-  .bg-amber-gradient {
-    background: linear-gradient(135deg, var(--amber) 0%, var(--amber-light) 100%);
+  .bg-maeda-gradient {
+    background: linear-gradient(135deg, var(--maeda-orange) 0%, var(--maeda-orange-light) 50%, var(--maeda-yellow) 100%);
   }
-  .border-amber {
-    border-color: var(--amber);
+  .bg-maeda-soft {
+    background-color: var(--maeda-cream);
+  }
+  .border-maeda {
+    border-color: var(--maeda-orange);
   }
   /* Alias for compatibility */
   .text-gold {
-    color: var(--amber);
+    color: var(--maeda-orange);
   }
   .bg-gold {
-    background-color: var(--amber);
+    background-color: var(--maeda-orange);
   }
   .bg-gold-gradient {
-    background: linear-gradient(135deg, var(--amber) 0%, var(--amber-light) 100%);
+    background: linear-gradient(135deg, var(--maeda-orange) 0%, var(--maeda-orange-light) 50%, var(--maeda-yellow) 100%);
   }
   .border-gold {
-    border-color: var(--amber);
+    border-color: var(--maeda-orange);
+  }
+  /* Warm shadow for cards */
+  .shadow-warm {
+    box-shadow: 0 4px 14px -3px rgba(249, 115, 22, 0.15);
   }
 }

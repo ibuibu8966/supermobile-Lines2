@@ -41,8 +41,8 @@ export default async function LandingPage() {
 
       {/* Hero Section */}
       <section className="relative pt-20 min-h-[80vh] flex items-center overflow-hidden">
-        {/* アンバーグラデーション背景 */}
-        <div className="absolute inset-0 z-0 bg-gradient-to-br from-background via-background to-amber-950/30" />
+        {/* 明るいグラデーション背景 */}
+        <div className="absolute inset-0 z-0 bg-gradient-to-br from-orange-50 via-amber-50 to-yellow-50" />
 
         <div className="relative z-10 max-w-6xl mx-auto px-4 py-20 w-full">
           <div className="flex flex-col md:flex-row items-center gap-8">
@@ -52,7 +52,7 @@ export default async function LandingPage() {
                 src="/images/hero.jpg"
                 alt="モバイル前田 キャラクター"
                 fill
-                className="object-contain drop-shadow-2xl"
+                className="object-contain drop-shadow-xl"
                 priority
               />
             </div>
@@ -60,10 +60,10 @@ export default async function LandingPage() {
             {/* テキストコンテンツ */}
             <div className="flex-1 text-center md:text-left">
               <h1 className="text-5xl md:text-6xl font-bold mb-6">
-                <span className="text-white">仕入れの</span>
+                <span className="text-amber-900">仕入れの</span>
                 <span className="text-gold">相棒。</span>
               </h1>
-              <p className="text-xl text-gray-300 mb-8">
+              <p className="text-xl text-amber-800/80 mb-8">
                 法人向けモバイル回線サービス。音声通話付きSIMを業界最安値でご提供。
                 物販ビジネスに必要な回線を、シンプルな料金体系でお届けします。
               </p>
@@ -71,7 +71,7 @@ export default async function LandingPage() {
                 <Link href="/apply">
                   <Button
                     size="lg"
-                    className="bg-gold-gradient text-black font-semibold hover:opacity-90 text-lg px-8"
+                    className="bg-gold-gradient text-white font-semibold hover:opacity-90 text-lg px-8 shadow-lg"
                   >
                     今すぐ申し込む
                   </Button>
@@ -80,7 +80,7 @@ export default async function LandingPage() {
                   <Button
                     size="lg"
                     variant="outline"
-                    className="border-gold text-gold hover:bg-gold/10 text-lg px-8"
+                    className="border-gold text-gold hover:bg-orange-50 text-lg px-8"
                   >
                     料金を見る
                   </Button>
@@ -92,54 +92,54 @@ export default async function LandingPage() {
       </section>
 
       {/* Features Section */}
-      <section id="features" className="py-20 bg-card">
+      <section id="features" className="py-20 bg-white">
         <div className="max-w-6xl mx-auto px-4">
           <h2 className="text-3xl font-bold text-center mb-4">
             <span className="text-gold">モバイル前田</span>
-            <span className="text-white">の特徴</span>
+            <span className="text-amber-900">の特徴</span>
           </h2>
           <p className="text-muted-foreground text-center mb-12">
             物販ビジネスに最適化されたサービス
           </p>
 
           <div className="grid md:grid-cols-3 gap-8">
-            <Card className="bg-background border-border hover:border-gold/50 transition-colors">
+            <Card className="bg-gradient-to-br from-orange-50 to-amber-50 border-orange-200 hover:border-gold/50 transition-colors shadow-warm">
               <CardHeader>
-                <div className="h-14 w-14 bg-gold/10 rounded-lg flex items-center justify-center mb-4">
-                  <Phone className="h-7 w-7 text-gold" />
+                <div className="h-14 w-14 bg-gold-gradient rounded-2xl flex items-center justify-center mb-4 shadow-md">
+                  <Phone className="h-7 w-7 text-white" />
                 </div>
-                <CardTitle className="text-white">音声通話込み</CardTitle>
+                <CardTitle className="text-amber-900">音声通話込み</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-muted-foreground">
+                <p className="text-amber-800/70">
                   全プランに音声通話機能を標準搭載。追加料金なしで通話可能なSIMをご提供します。
                 </p>
               </CardContent>
             </Card>
 
-            <Card className="bg-background border-border hover:border-gold/50 transition-colors">
+            <Card className="bg-gradient-to-br from-orange-50 to-amber-50 border-orange-200 hover:border-gold/50 transition-colors shadow-warm">
               <CardHeader>
-                <div className="h-14 w-14 bg-gold/10 rounded-lg flex items-center justify-center mb-4">
-                  <Settings className="h-7 w-7 text-gold" />
+                <div className="h-14 w-14 bg-gold-gradient rounded-2xl flex items-center justify-center mb-4 shadow-md">
+                  <Settings className="h-7 w-7 text-white" />
                 </div>
-                <CardTitle className="text-white">選べる設計</CardTitle>
+                <CardTitle className="text-amber-900">選べる設計</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-muted-foreground">
+                <p className="text-amber-800/70">
                   docomo、au、SoftBank、楽天モバイル。ビジネスニーズに合わせてキャリアを選択できます。
                 </p>
               </CardContent>
             </Card>
 
-            <Card className="bg-background border-border hover:border-gold/50 transition-colors">
+            <Card className="bg-gradient-to-br from-orange-50 to-amber-50 border-orange-200 hover:border-gold/50 transition-colors shadow-warm">
               <CardHeader>
-                <div className="h-14 w-14 bg-gold/10 rounded-lg flex items-center justify-center mb-4">
-                  <FileText className="h-7 w-7 text-gold" />
+                <div className="h-14 w-14 bg-gold-gradient rounded-2xl flex items-center justify-center mb-4 shadow-md">
+                  <FileText className="h-7 w-7 text-white" />
                 </div>
-                <CardTitle className="text-white">シンプルな請求</CardTitle>
+                <CardTitle className="text-amber-900">シンプルな請求</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-muted-foreground">
+                <p className="text-amber-800/70">
                   回線数に応じた明確な料金体系。隠れた費用は一切なく、予算管理も簡単です。
                 </p>
               </CardContent>
@@ -149,10 +149,10 @@ export default async function LandingPage() {
       </section>
 
       {/* Pricing Section */}
-      <section id="pricing" className="py-20 bg-background">
+      <section id="pricing" className="py-20 bg-gradient-to-b from-amber-50 to-orange-50">
         <div className="max-w-6xl mx-auto px-4">
           <h2 className="text-3xl font-bold text-center mb-4">
-            <span className="text-white">料金</span>
+            <span className="text-amber-900">料金</span>
             <span className="text-gold">プラン</span>
           </h2>
           <p className="text-muted-foreground text-center mb-12">
@@ -168,17 +168,17 @@ export default async function LandingPage() {
                 return (
                   <Card
                     key={plan.id}
-                    className={`bg-card border-2 ${
-                      isPopular ? "border-gold" : "border-border"
+                    className={`bg-white border-2 ${
+                      isPopular ? "border-gold shadow-lg" : "border-orange-200"
                     } relative overflow-hidden`}
                   >
                     {isPopular && (
-                      <div className="absolute top-0 right-0 bg-gold text-black text-xs font-bold px-3 py-1">
+                      <div className="absolute top-0 right-0 bg-gold-gradient text-white text-xs font-bold px-3 py-1 rounded-bl-lg">
                         人気
                       </div>
                     )}
                     <CardHeader>
-                      <CardTitle className="text-white">{plan.name}</CardTitle>
+                      <CardTitle className="text-amber-900">{plan.name}</CardTitle>
                       {plan.description && (
                         <p className="text-sm text-muted-foreground mt-2">
                           {plan.description}
@@ -212,7 +212,7 @@ export default async function LandingPage() {
                                     ? `${pricing.minQuantity}〜${pricing.maxQuantity}回線`
                                     : `${pricing.minQuantity}回線〜`}
                                 </span>
-                                <span className="text-white font-medium">
+                                <span className="text-amber-900 font-medium">
                                   ¥{pricing.unitPrice.toLocaleString()}/回線
                                 </span>
                               </div>
@@ -223,19 +223,19 @@ export default async function LandingPage() {
                       <ul className="space-y-2 mb-6">
                         <li className="flex items-center gap-2 text-sm">
                           <Check className="h-4 w-4 text-gold" />
-                          <span className="text-muted-foreground">
+                          <span className="text-amber-800/70">
                             音声通話付き
                           </span>
                         </li>
                         <li className="flex items-center gap-2 text-sm">
                           <Check className="h-4 w-4 text-gold" />
-                          <span className="text-muted-foreground">
+                          <span className="text-amber-800/70">
                             最短翌営業日発送
                           </span>
                         </li>
                         <li className="flex items-center gap-2 text-sm">
                           <Check className="h-4 w-4 text-gold" />
-                          <span className="text-muted-foreground">
+                          <span className="text-amber-800/70">
                             法人契約対応
                           </span>
                         </li>
@@ -244,8 +244,8 @@ export default async function LandingPage() {
                         <Button
                           className={`w-full ${
                             isPopular
-                              ? "bg-gold-gradient text-black font-semibold hover:opacity-90"
-                              : "border-gold text-gold hover:bg-gold/10"
+                              ? "bg-gold-gradient text-white font-semibold hover:opacity-90 shadow-md"
+                              : "border-gold text-gold hover:bg-orange-50"
                           }`}
                           variant={isPopular ? "default" : "outline"}
                         >
@@ -263,7 +263,7 @@ export default async function LandingPage() {
                 現在利用可能なプランがありません
               </p>
               <Link href="/apply">
-                <Button className="bg-gold-gradient text-black font-semibold hover:opacity-90">
+                <Button className="bg-gold-gradient text-white font-semibold hover:opacity-90">
                   お問い合わせ
                 </Button>
               </Link>
@@ -282,29 +282,18 @@ export default async function LandingPage() {
       </section>
 
       {/* Call to Action */}
-      <section className="relative py-20">
-        <div className="absolute inset-0 z-0">
-          <Image
-            src="/images/call-71170_1920.jpg"
-            alt="CTA background"
-            fill
-            className="object-cover"
-          />
-          <div className="absolute inset-0 bg-black/80" />
-        </div>
-
+      <section className="relative py-20 bg-gold-gradient">
         <div className="relative z-10 max-w-4xl mx-auto px-4 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold mb-6">
-            <span className="text-white">今すぐ</span>
-            <span className="text-gold">始めましょう</span>
+          <h2 className="text-3xl md:text-4xl font-bold mb-6 text-white">
+            今すぐ始めましょう
           </h2>
-          <p className="text-xl text-gray-300 mb-8">
+          <p className="text-xl text-white/90 mb-8">
             お申し込みから最短翌営業日で発送。すぐにビジネスでご利用いただけます。
           </p>
           <Link href="/apply">
             <Button
               size="lg"
-              className="bg-gold-gradient text-black font-semibold hover:opacity-90 text-lg px-12"
+              className="bg-white text-orange-600 font-semibold hover:bg-orange-50 text-lg px-12 shadow-lg"
             >
               無料で申し込む
             </Button>
