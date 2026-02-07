@@ -1,0 +1,74 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* MASHINGAN Teal/Cyan Theme - Dark by default */
+    --background: 170 33% 5%; /* #0a1a1a dark navy-teal */
+    --foreground: 0 0% 100%; /* white */
+    --card: 170 25% 8%; /* slightly elevated */
+    --card-foreground: 0 0% 100%;
+    --popover: 170 25% 8%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 168 76% 42%; /* #14b8a6 teal */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 168 64% 52%; /* #2dd4bf light teal */
+    --secondary-foreground: 0 0% 0%;
+    --muted: 170 15% 15%;
+    --muted-foreground: 0 0% 65%;
+    --accent: 168 76% 42%; /* teal */
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 170 20% 20%;
+    --input: 170 20% 20%;
+    --ring: 168 76% 42%; /* teal */
+    --radius: 0.5rem;
+
+    /* Custom teal colors */
+    --teal: #14b8a6;
+    --teal-light: #2dd4bf;
+    --teal-dark: #0d9488;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .text-teal {
+    color: var(--teal);
+  }
+  .text-teal-light {
+    color: var(--teal-light);
+  }
+  .bg-teal {
+    background-color: var(--teal);
+  }
+  .bg-teal-gradient {
+    background: linear-gradient(135deg, var(--teal) 0%, var(--teal-light) 100%);
+  }
+  .border-teal {
+    border-color: var(--teal);
+  }
+  /* Alias for compatibility */
+  .text-gold {
+    color: var(--teal);
+  }
+  .bg-gold {
+    background-color: var(--teal);
+  }
+  .bg-gold-gradient {
+    background: linear-gradient(135deg, var(--teal) 0%, var(--teal-light) 100%);
+  }
+  .border-gold {
+    border-color: var(--teal);
+  }
+}

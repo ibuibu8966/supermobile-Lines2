@@ -1,0 +1,132 @@
+import { NextRequest, NextResponse } from "next/server";
+import { prisma, getSignedUrl } from "@repo/database";
+import { z } from "zod";
+
+// KYC画像ステータス更新スキーマ
+const updateKycStatusSchema = z.object({
+  status: z.enum(["APPROVED", "REJECTED"]),
+  reviewNote: z.string().optional(),
+});
+
+// KYC画像詳細を取得
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+
+    const kycImage = await prisma.kycImage.findUnique({
+      where: { id },
+      include: {
+        application: {
+          include: {
+            customer: true,
+            plan: true,
+          },
+        },
+      },
+    });
+
+    if (!kycImage) {
+      return NextResponse.json(
+        { error: "KYC画像が見つかりません" },
+        { status: 404 }
+      );
+    }
+
+    // 署名付きURLを生成
+    const signedUrl = await getSignedUrl("kyc", kycImage.storagePath);
+
+    return NextResponse.json({
+      ...kycImage,
+      signedUrl,
+    });
+  } catch (error) {
+    console.error("KYC画像詳細取得エラー:", error);
+    return NextResponse.json(
+      { error: "KYC画像詳細の取得に失敗しました" },
+      { status: 500 }
+    );
+  }
+}
+
+// KYC画像ステータスを更新
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const body = await request.json();
+    const validated = updateKycStatusSchema.parse(body);
+
+    const kycImage = await prisma.kycImage.findUnique({
+      where: { id },
+      include: {
+        application: {
+          include: {
+            kycImages: true,
+          },
+        },
+      },
+    });
+
+    if (!kycImage) {
+      return NextResponse.json(
+        { error: "KYC画像が見つかりません" },
+        { status: 404 }
+      );
+    }
+
+    // KYC画像を更新
+    const updatedKycImage = await prisma.kycImage.update({
+      where: { id },
+      data: {
+        status: validated.status,
+        reviewNote: validated.reviewNote || null,
+        reviewedAt: new Date(),
+      },
+    });
+
+    // 申込のkycStatusを更新
+    // すべてのKYC画像がAPPROVEDの場合、kycStatusをCOMPLETEDに
+    // 1つでもREJECTEDの場合、kycStatusをDEFICIENTに
+    const allKycImages = kycImage.application.kycImages.map((img) =>
+      img.id === id ? { ...img, status: validated.status } : img
+    );
+
+    const hasRejected = allKycImages.some((img) => img.status === "REJECTED");
+    const allApproved = allKycImages.every((img) => img.status === "APPROVED");
+
+    type KycVerificationStatus = "PENDING" | "DEFICIENT" | "RESUBMIT" | "COMPLETED";
+    let newKycStatus: KycVerificationStatus = "PENDING";
+    if (hasRejected) {
+      newKycStatus = "DEFICIENT";
+    } else if (allApproved && allKycImages.length > 0) {
+      newKycStatus = "COMPLETED";
+    }
+
+    await prisma.application.update({
+      where: { id: kycImage.application.id },
+      data: { kycStatus: newKycStatus },
+    });
+
+    return NextResponse.json({
+      kycImage: updatedKycImage,
+      kycStatus: newKycStatus,
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: error.issues.map((e) => e.message).join(", ") },
+        { status: 400 }
+      );
+    }
+    console.error("KYC画像ステータス更新エラー:", error);
+    return NextResponse.json(
+      { error: "KYC画像ステータスの更新に失敗しました" },
+      { status: 500 }
+    );
+  }
+}

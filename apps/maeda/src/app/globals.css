@@ -1,0 +1,74 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* MAEDA Amber/Orange Theme - Dark by default */
+    --background: 30 33% 4%; /* #0f0a05 dark brown */
+    --foreground: 0 0% 100%; /* white */
+    --card: 30 25% 7%; /* slightly elevated */
+    --card-foreground: 0 0% 100%;
+    --popover: 30 25% 7%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 38 92% 50%; /* #f59e0b amber */
+    --primary-foreground: 0 0% 0%;
+    --secondary: 45 93% 58%; /* #fbbf24 light amber */
+    --secondary-foreground: 0 0% 0%;
+    --muted: 30 15% 15%;
+    --muted-foreground: 0 0% 65%;
+    --accent: 38 92% 50%; /* amber */
+    --accent-foreground: 0 0% 0%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 30 20% 20%;
+    --input: 30 20% 20%;
+    --ring: 38 92% 50%; /* amber */
+    --radius: 0.5rem;
+
+    /* Custom amber colors */
+    --amber: #f59e0b;
+    --amber-light: #fbbf24;
+    --amber-dark: #d97706;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .text-amber {
+    color: var(--amber);
+  }
+  .text-amber-light {
+    color: var(--amber-light);
+  }
+  .bg-amber {
+    background-color: var(--amber);
+  }
+  .bg-amber-gradient {
+    background: linear-gradient(135deg, var(--amber) 0%, var(--amber-light) 100%);
+  }
+  .border-amber {
+    border-color: var(--amber);
+  }
+  /* Alias for compatibility */
+  .text-gold {
+    color: var(--amber);
+  }
+  .bg-gold {
+    background-color: var(--amber);
+  }
+  .bg-gold-gradient {
+    background: linear-gradient(135deg, var(--amber) 0%, var(--amber-light) 100%);
+  }
+  .border-gold {
+    border-color: var(--amber);
+  }
+}
