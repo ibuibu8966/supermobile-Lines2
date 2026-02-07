@@ -21,6 +21,7 @@ interface Plan {
   id: string;
   code: string;
   name: string;
+  features: string[];
   isActive: boolean;
   serviceId: string;
   service: { id: string; code: string; name: string };
@@ -79,6 +80,7 @@ function PlansContent() {
     serviceId: "",
     code: "",
     name: "",
+    features: [] as string[],
     usageTagIds: [] as number[],
     pricings: [] as PricingInput[],
   });
@@ -91,6 +93,7 @@ function PlansContent() {
       serviceId: filterServiceId || "",
       code: "",
       name: "",
+      features: [],
       usageTagIds: [],
       pricings: [
         { minQuantity: 1, maxQuantity: null, unitPrice: 0, description: "" },
@@ -106,6 +109,7 @@ function PlansContent() {
       serviceId: plan.serviceId,
       code: plan.code,
       name: plan.name,
+      features: plan.features || [],
       usageTagIds: plan.usageTags.map((pt) => pt.usageTag.id),
       pricings: plan.pricings.map((p) => ({
         minQuantity: p.minQuantity,
@@ -460,6 +464,59 @@ function PlansContent() {
                     placeholder="アダアフィプラン"
                     required
                   />
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="block text-sm font-medium text-gray-700">
+                      特徴
+                    </label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setFormData({
+                          ...formData,
+                          features: [...formData.features, ""],
+                        })
+                      }
+                      disabled={formData.features.length >= 10}
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      追加
+                    </Button>
+                  </div>
+                  <div className="space-y-2">
+                    {formData.features.map((feature, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={feature}
+                          onChange={(e) => {
+                            const newFeatures = [...formData.features];
+                            newFeatures[index] = e.target.value;
+                            setFormData({ ...formData, features: newFeatures });
+                          }}
+                          className="flex-1 px-3 py-2 border rounded-md text-sm"
+                          placeholder="例: 音声通話付き"
+                          maxLength={50}
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setFormData({
+                              ...formData,
+                              features: formData.features.filter((_, i) => i !== index),
+                            })
+                          }
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
                 <div>

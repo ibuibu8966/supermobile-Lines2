@@ -4,7 +4,7 @@ import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@repo/ui";
-import { Pencil, Trash2, Loader2, X, Plus, Save } from "lucide-react";
+import { Pencil, Trash2, Loader2, X, Plus, Save, Check } from "lucide-react";
 
 interface UsageTag {
   id: number;
@@ -35,6 +35,7 @@ interface Plan {
   code: string;
   name: string;
   description: string | null;
+  features: string[];
   isActive: boolean;
   serviceId: string;
   service: Service;
@@ -70,6 +71,7 @@ export default function PlanDetailPage({
     code: "",
     name: "",
     description: "",
+    features: [] as string[],
     usageTagIds: [] as number[],
     pricings: [] as PricingInput[],
   });
@@ -86,6 +88,7 @@ export default function PlanDetailPage({
           code: data.code,
           name: data.name,
           description: data.description || "",
+          features: data.features || [],
           usageTagIds: data.usageTags.map((pt: PlanUsageTag) => pt.usageTag.id),
           pricings: data.pricings.map((p: PlanPricing) => ({
             minQuantity: p.minQuantity,
@@ -204,6 +207,7 @@ export default function PlanDetailPage({
         code: plan.code,
         name: plan.name,
         description: plan.description || "",
+        features: plan.features || [],
         usageTagIds: plan.usageTags.map((pt) => pt.usageTag.id),
         pricings: plan.pricings.map((p) => ({
           minQuantity: p.minQuantity,
@@ -355,6 +359,67 @@ export default function PlanDetailPage({
                   />
                   <p className="text-xs text-gray-500 mt-1">
                     申込画面のプラン選択時に表示されます（最大500文字）
+                  </p>
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      特徴（料金カードに表示）
+                    </label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setFormData({
+                          ...formData,
+                          features: [...formData.features, ""],
+                        })
+                      }
+                      disabled={formData.features.length >= 10}
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      追加
+                    </Button>
+                  </div>
+                  <div className="space-y-2">
+                    {formData.features.map((feature, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={feature}
+                          onChange={(e) => {
+                            const newFeatures = [...formData.features];
+                            newFeatures[index] = e.target.value;
+                            setFormData({ ...formData, features: newFeatures });
+                          }}
+                          className="flex-1 px-3 py-2 border rounded-md text-sm"
+                          placeholder="例: 音声通話付き"
+                          maxLength={50}
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setFormData({
+                              ...formData,
+                              features: formData.features.filter((_, i) => i !== index),
+                            })
+                          }
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                    {formData.features.length === 0 && (
+                      <div className="text-center py-3 text-gray-500 text-sm border rounded-md">
+                        特徴が設定されていません。「追加」ボタンで追加してください。
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    顧客向け料金カードにチェックマーク付きで表示されます（最大10件）
                   </p>
                 </div>
 
@@ -538,6 +603,27 @@ export default function PlanDetailPage({
                   </div>
                 ) : (
                   <p className="text-gray-500 text-sm">用途タグが設定されていません</p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* 特徴 */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">特徴</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {plan.features.length > 0 ? (
+                  <ul className="space-y-1">
+                    {plan.features.map((feature, i) => (
+                      <li key={i} className="flex items-center gap-2 text-sm">
+                        <Check className="h-4 w-4 text-green-500" />
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-gray-500 text-sm">特徴が設定されていません</p>
                 )}
               </CardContent>
             </Card>

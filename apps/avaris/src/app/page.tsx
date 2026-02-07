@@ -230,26 +230,18 @@ export default async function LandingPage() {
                           </div>
                         </div>
                       )}
-                      <ul className="space-y-2 mb-6">
-                        <li className="flex items-center gap-2 text-sm">
-                          <Check className="h-4 w-4 text-avaris-green" />
-                          <span className="text-muted-foreground">
-                            音声通話付き
-                          </span>
-                        </li>
-                        <li className="flex items-center gap-2 text-sm">
-                          <Check className="h-4 w-4 text-avaris-green" />
-                          <span className="text-muted-foreground">
-                            最短翌営業日発送
-                          </span>
-                        </li>
-                        <li className="flex items-center gap-2 text-sm">
-                          <Check className="h-4 w-4 text-avaris-green" />
-                          <span className="text-muted-foreground">
-                            法人契約対応
-                          </span>
-                        </li>
-                      </ul>
+                      {plan.features && plan.features.length > 0 && (
+                        <ul className="space-y-2 mb-6">
+                          {plan.features.map((feature: string, i: number) => (
+                            <li key={i} className="flex items-center gap-2 text-sm">
+                              <Check className="h-4 w-4 text-avaris-green" />
+                              <span className="text-muted-foreground">
+                                {feature}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                       <Link href={`/apply?plan=${plan.code}`}>
                         <Button
                           className={`w-full ${

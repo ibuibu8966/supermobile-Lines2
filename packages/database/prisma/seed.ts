@@ -190,12 +190,13 @@ async function main() {
     // ===== BUPPAN プラン =====
     prisma.plan.upsert({
       where: { serviceId_code: { serviceId: buppanService.id, code: "buppan-3month" } },
-      update: { name: "3ヶ月パック", description: "SIM登録・個別配送込み" },
+      update: { name: "3ヶ月パック", description: "SIM登録・個別配送込み", features: ["音声通話付き", "最短翌営業日発送", "法人契約対応"] },
       create: {
         serviceId: buppanService.id,
         code: "buppan-3month",
         name: "3ヶ月パック",
         description: "SIM登録・個別配送込み",
+        features: ["音声通話付き", "最短翌営業日発送", "法人契約対応"],
         isActive: true,
       },
     }),
@@ -203,12 +204,13 @@ async function main() {
     // ===== VERSUS プラン =====
     prisma.plan.upsert({
       where: { serviceId_code: { serviceId: versusService.id, code: "versus-auth" } },
-      update: { name: "認証用SIMプラン", description: "SMS・音声・データ対応、当月末自動解約" },
+      update: { name: "認証用SIMプラン", description: "SMS・音声・データ対応、当月末自動解約", features: ["音声通話・SMS対応", "最短翌営業日発送", "各種認証対応"] },
       create: {
         serviceId: versusService.id,
         code: "versus-auth",
         name: "認証用SIMプラン",
         description: "SMS・音声・データ対応、当月末自動解約",
+        features: ["音声通話・SMS対応", "最短翌営業日発送", "各種認証対応"],
         isActive: true,
       },
     }),
@@ -216,12 +218,13 @@ async function main() {
     // ===== AVARIS プラン =====
     prisma.plan.upsert({
       where: { serviceId_code: { serviceId: avarisService.id, code: "avaris-auth" } },
-      update: { name: "認証用SIM", description: "事務手数料込み・翌月末自動解約" },
+      update: { name: "認証用SIM", description: "事務手数料込み・翌月末自動解約", features: ["音声通話付き", "最短翌営業日発送", "法人契約対応"] },
       create: {
         serviceId: avarisService.id,
         code: "avaris-auth",
         name: "認証用SIM",
         description: "事務手数料込み・翌月末自動解約",
+        features: ["音声通話付き", "最短翌営業日発送", "法人契約対応"],
         isActive: true,
       },
     }),
@@ -229,23 +232,25 @@ async function main() {
     // ===== MACHINEGUN プラン =====
     prisma.plan.upsert({
       where: { serviceId_code: { serviceId: machinegunService.id, code: "machinegun-pokeka" } },
-      update: { name: "ポケカ認証専用SIM", description: "10回線単位、MNP転出不可" },
+      update: { name: "ポケカ認証専用SIM", description: "10回線単位、MNP転出不可", features: ["音声通話付き", "最短翌営業日発送", "法人契約対応"] },
       create: {
         serviceId: machinegunService.id,
         code: "machinegun-pokeka",
         name: "ポケカ認証専用SIM",
         description: "10回線単位、MNP転出不可",
+        features: ["音声通話付き", "最短翌営業日発送", "法人契約対応"],
         isActive: true,
       },
     }),
     prisma.plan.upsert({
       where: { serviceId_code: { serviceId: machinegunService.id, code: "machinegun-mnp" } },
-      update: { name: "MNP乗り換えSIM専用プラン", description: "MNP予約番号発行対応" },
+      update: { name: "MNP乗り換えSIM専用プラン", description: "MNP予約番号発行対応", features: ["音声通話付き", "最短翌営業日発送", "法人契約対応"] },
       create: {
         serviceId: machinegunService.id,
         code: "machinegun-mnp",
         name: "MNP乗り換えSIM専用プラン",
         description: "MNP予約番号発行対応",
+        features: ["音声通話付き", "最短翌営業日発送", "法人契約対応"],
         isActive: true,
       },
     }),
@@ -253,12 +258,13 @@ async function main() {
     // ===== MAEDA プラン =====
     prisma.plan.upsert({
       where: { serviceId_code: { serviceId: maedaService.id, code: "maeda-auth" } },
-      update: { name: "認証用SIMプラン", description: "SMS・音声・データ対応" },
+      update: { name: "認証用SIMプラン", description: "SMS・音声・データ対応", features: ["音声通話付き", "最短翌営業日発送", "法人契約対応"] },
       create: {
         serviceId: maedaService.id,
         code: "maeda-auth",
         name: "認証用SIMプラン",
         description: "SMS・音声・データ対応",
+        features: ["音声通話付き", "最短翌営業日発送", "法人契約対応"],
         isActive: true,
       },
     }),
