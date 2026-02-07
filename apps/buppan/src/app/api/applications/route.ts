@@ -184,14 +184,15 @@ export async function POST(request: NextRequest) {
 
     const totalAmount = unitPrice * lineCount;
 
-    // メールアドレスの重複チェック（ユーザー）
-    const existingUser = await prisma.user.findUnique({
-      where: { email: customerData.email },
-    });
+    // メールアドレスの重複チェック（ユーザー・顧客）
+    const [existingUser, existingCustomer] = await Promise.all([
+      prisma.user.findUnique({ where: { email: customerData.email } }),
+      prisma.customer.findFirst({ where: { email: customerData.email } }),
+    ]);
 
-    if (existingUser) {
+    if (existingUser || existingCustomer) {
       return NextResponse.json(
-        { error: "このメールアドレスは既に登録されています" },
+        { error: "このメールアドレスは既に登録されています。すでにアカウントをお持ちの場合はログインしてください。" },
         { status: 400 }
       );
     }
