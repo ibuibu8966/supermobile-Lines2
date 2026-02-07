@@ -67,6 +67,32 @@ function mapRow(
   return result as ParsedSimRow;
 }
 
+// Excelの実際のヘッダーに基づいて最適なheaderMappingを選択
+function selectHeaderMapping(
+  headers: string[],
+  config: SupplierConfig
+): Record<string, string> {
+  const allMappings = [
+    config.headerMapping,
+    ...(config.alternativeHeaderMappings || []),
+  ];
+
+  let bestMapping = config.headerMapping;
+  let bestScore = 0;
+
+  for (const mapping of allMappings) {
+    const score = Object.keys(mapping).filter((key) =>
+      headers.includes(key)
+    ).length;
+    if (score > bestScore) {
+      bestScore = score;
+      bestMapping = mapping;
+    }
+  }
+
+  return bestMapping;
+}
+
 export async function parseXLSX(
   file: File,
   config: SupplierConfig,
@@ -87,12 +113,17 @@ export async function parseXLSX(
         // JSONに変換
         const jsonData = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet);
 
+        // 実際のヘッダーから最適なマッピングを選択
+        const headers = jsonData.length > 0 ? Object.keys(jsonData[0]) : [];
+        const activeMapping = selectHeaderMapping(headers, config);
+        const activeConfig = { ...config, headerMapping: activeMapping };
+
         const data: ParsedSimRow[] = [];
         const errors: Array<{ row: number; message: string }> = [];
 
         jsonData.forEach((row, index) => {
           try {
-            const mappedRow = mapRow(row, config, options);
+            const mappedRow = mapRow(row, activeConfig, options);
 
             if (mappedRow.iccid) {
               data.push(mappedRow);

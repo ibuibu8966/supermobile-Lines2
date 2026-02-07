@@ -156,47 +156,38 @@ async function getAvailableTags(sim: {
   isMnpEligible: boolean;
   supplier: { code: string };
 }) {
-  // 全てのアクティブな用途タグを取得
-  const allTags = await prisma.usageTag.findMany({
-    where: { isActive: true },
-  });
+  // 全てのアクティブな用途タグとルールを一括取得（N+1回→2回のクエリ）
+  const [allTags, allRules] = await Promise.all([
+    prisma.usageTag.findMany({ where: { isActive: true } }),
+    prisma.usageRule.findMany({
+      where: { isActive: true },
+      orderBy: { priority: "desc" },
+    }),
+  ]);
 
-  // 各タグのルールをチェック
+  // ルールをタグIDでグループ化
+  const rulesByTagId = new Map<number, typeof allRules>();
+  for (const rule of allRules) {
+    const existing = rulesByTagId.get(rule.usageTagId) || [];
+    existing.push(rule);
+    rulesByTagId.set(rule.usageTagId, existing);
+  }
+
   const availableTags: typeof allTags = [];
 
   for (const tag of allTags) {
-    // すでに消費済みならスキップ
     if (sim.consumedTagIds.includes(tag.id)) {
       continue;
     }
 
-    // このタグのルールを取得
-    const rules = await prisma.usageRule.findMany({
-      where: {
-        usageTagId: tag.id,
-        isActive: true,
-      },
-      orderBy: {
-        priority: "desc",
-      },
-    });
+    const rules = rulesByTagId.get(tag.id) || [];
 
-    // ルールがない場合は販売可能
     if (rules.length === 0) {
       availableTags.push(tag);
       continue;
     }
 
-    // いずれかのルールを満たすかチェック
-    let isAvailable = false;
-    for (const rule of rules) {
-      if (checkRule(rule, sim)) {
-        isAvailable = true;
-        break;
-      }
-    }
-
-    if (isAvailable) {
+    if (rules.some((rule) => checkRule(rule, sim))) {
       availableTags.push(tag);
     }
   }

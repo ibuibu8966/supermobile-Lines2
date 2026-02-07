@@ -5,7 +5,7 @@ import { z } from "zod";
 export const dynamic = "force-dynamic";
 
 const scanSchema = z.object({
-  iccids: z.array(z.string().regex(/^[A-Z0-9]{15}$/, "ICCIDは15桁の英数字（大文字）です")).min(1),
+  iccids: z.array(z.string().regex(/^[A-Z0-9]{15}$/, "ICCIDは15桁の英数字（大文字）です")).min(1).max(1000),
   contractMonth: z.coerce.date(),
   lineTagId: z.number().int().positive().optional().nullable(),
   lineReserveTagId: z.number().int().positive().optional().nullable(),
@@ -177,9 +177,8 @@ export async function POST(
       );
     }
     console.error("ICCID一括割当エラー:", error);
-    const errorMessage = error instanceof Error ? error.message : "不明なエラー";
     return NextResponse.json(
-      { error: "ICCID一括割当に失敗しました", details: errorMessage },
+      { error: "ICCID一括割当に失敗しました" },
       { status: 500 }
     );
   }

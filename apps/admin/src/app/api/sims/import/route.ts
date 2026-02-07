@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@repo/database";
+import { prisma, Prisma } from "@repo/database";
 import { simImportRowSchema } from "@repo/validation";
 import { z } from "zod";
 
@@ -23,6 +23,22 @@ interface ImportResult {
   failed: number;
   errors: Array<{ row: number; iccid: string; error: string }>;
 }
+
+interface ValidatedRow {
+  index: number;
+  iccid: string;
+  msisdn: string | null;
+  supplierId: number;
+  simType: "INDIVIDUAL" | "CORPORATE";
+  carrierType: "DOCOMO" | "AU" | "SOFTBANK" | "RAKUTEN" | null;
+  plan: string | null;
+  isMnpEligible: boolean;
+  isAutoCancel: boolean;
+  supplierContractStart: Date | null;
+  supplierContractEnd: Date | null;
+}
+
+const BATCH_SIZE = 500;
 
 export async function POST(request: NextRequest) {
   try {
@@ -69,11 +85,12 @@ export async function POST(request: NextRequest) {
       errors: [],
     };
 
-    // 1行ずつ処理
+    // Phase 1: 全行バリデーション（DB呼び出しなし）
+    const validatedRows: ValidatedRow[] = [];
+
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       try {
-        // バリデーション
         const validated = simImportRowSchema.parse({
           ...row,
           isMnpEligible: row.isMnpEligible === true || row.isMnpEligible === "true" || row.isMnpEligible === "1",
@@ -85,35 +102,19 @@ export async function POST(request: NextRequest) {
           throw new Error(`仕入れ先「${validated.supplier}」が見つかりません`);
         }
 
-        // upsert（存在すれば更新、なければ作成）
-        await prisma.sim.upsert({
-          where: { iccid: validated.iccid },
-          update: {
-            msisdn: validated.msisdn,
-            supplierId,
-            simType: validated.simType as "INDIVIDUAL" | "CORPORATE",
-            carrierType: validated.carrierType as "DOCOMO" | "AU" | "SOFTBANK" | "RAKUTEN" | undefined,
-            plan: validated.plan,
-            isMnpEligible: validated.isMnpEligible,
-            isAutoCancel: validated.isAutoCancel,
-            supplierContractStart: validated.supplierContractStart,
-            supplierContractEnd: validated.supplierContractEnd,
-          },
-          create: {
-            iccid: validated.iccid,
-            msisdn: validated.msisdn,
-            supplierId,
-            simType: validated.simType as "INDIVIDUAL" | "CORPORATE",
-            carrierType: validated.carrierType as "DOCOMO" | "AU" | "SOFTBANK" | "RAKUTEN" | undefined,
-            plan: validated.plan,
-            isMnpEligible: validated.isMnpEligible,
-            isAutoCancel: validated.isAutoCancel,
-            supplierContractStart: validated.supplierContractStart,
-            supplierContractEnd: validated.supplierContractEnd,
-          },
+        validatedRows.push({
+          index: i,
+          iccid: validated.iccid,
+          msisdn: validated.msisdn ?? null,
+          supplierId,
+          simType: validated.simType as "INDIVIDUAL" | "CORPORATE",
+          carrierType: (validated.carrierType as "DOCOMO" | "AU" | "SOFTBANK" | "RAKUTEN" | undefined) ?? null,
+          plan: validated.plan ?? null,
+          isMnpEligible: validated.isMnpEligible,
+          isAutoCancel: validated.isAutoCancel,
+          supplierContractStart: validated.supplierContractStart ? new Date(validated.supplierContractStart) : null,
+          supplierContractEnd: validated.supplierContractEnd ? new Date(validated.supplierContractEnd) : null,
         });
-
-        result.success++;
       } catch (error) {
         result.failed++;
         result.errors.push({
@@ -125,6 +126,112 @@ export async function POST(request: NextRequest) {
             ? error.message
             : "不明なエラー",
         });
+      }
+    }
+
+    if (validatedRows.length === 0) {
+      return NextResponse.json(result);
+    }
+
+    // ICCID重複除去（最後の行を優先、現行の逐次処理と同じ挙動）
+    const deduped = new Map<string, ValidatedRow>();
+    for (const row of validatedRows) {
+      deduped.set(row.iccid, row);
+    }
+    const uniqueRows = Array.from(deduped.values());
+
+    // Phase 2: Raw SQLで一括Upsert
+    for (let batchStart = 0; batchStart < uniqueRows.length; batchStart += BATCH_SIZE) {
+      const batch = uniqueRows.slice(batchStart, batchStart + BATCH_SIZE);
+
+      try {
+        const values = batch.map(
+          (row) => Prisma.sql`(
+            ${row.iccid},
+            ${row.msisdn},
+            ${row.supplierId},
+            ${row.simType}::"SimType",
+            ${row.carrierType}::"CarrierType",
+            ${row.plan},
+            ${row.isMnpEligible},
+            ${row.isAutoCancel},
+            ${row.supplierContractStart},
+            ${row.supplierContractEnd},
+            NOW(),
+            NOW()
+          )`
+        );
+
+        await prisma.$executeRaw`
+          INSERT INTO "Sim" (
+            "iccid",
+            "msisdn",
+            "supplierId",
+            "simType",
+            "carrierType",
+            "plan",
+            "isMnpEligible",
+            "isAutoCancel",
+            "supplierContractStart",
+            "supplierContractEnd",
+            "createdAt",
+            "updatedAt"
+          )
+          VALUES ${Prisma.join(values)}
+          ON CONFLICT ("iccid") DO UPDATE SET
+            "msisdn" = EXCLUDED."msisdn",
+            "supplierId" = EXCLUDED."supplierId",
+            "simType" = EXCLUDED."simType",
+            "carrierType" = EXCLUDED."carrierType",
+            "plan" = EXCLUDED."plan",
+            "isMnpEligible" = EXCLUDED."isMnpEligible",
+            "isAutoCancel" = EXCLUDED."isAutoCancel",
+            "supplierContractStart" = EXCLUDED."supplierContractStart",
+            "supplierContractEnd" = EXCLUDED."supplierContractEnd",
+            "updatedAt" = NOW()
+        `;
+
+        result.success += batch.length;
+      } catch (dbError) {
+        // バルクupsert失敗時は個別upsertにフォールバック
+        for (const row of batch) {
+          try {
+            await prisma.sim.upsert({
+              where: { iccid: row.iccid },
+              update: {
+                msisdn: row.msisdn,
+                supplierId: row.supplierId,
+                simType: row.simType,
+                carrierType: row.carrierType,
+                plan: row.plan,
+                isMnpEligible: row.isMnpEligible,
+                isAutoCancel: row.isAutoCancel,
+                supplierContractStart: row.supplierContractStart,
+                supplierContractEnd: row.supplierContractEnd,
+              },
+              create: {
+                iccid: row.iccid,
+                msisdn: row.msisdn,
+                supplierId: row.supplierId,
+                simType: row.simType,
+                carrierType: row.carrierType,
+                plan: row.plan,
+                isMnpEligible: row.isMnpEligible,
+                isAutoCancel: row.isAutoCancel,
+                supplierContractStart: row.supplierContractStart,
+                supplierContractEnd: row.supplierContractEnd,
+              },
+            });
+            result.success++;
+          } catch (rowError) {
+            result.failed++;
+            result.errors.push({
+              row: row.index + 1,
+              iccid: row.iccid,
+              error: rowError instanceof Error ? rowError.message : "データベースエラー",
+            });
+          }
+        }
       }
     }
 

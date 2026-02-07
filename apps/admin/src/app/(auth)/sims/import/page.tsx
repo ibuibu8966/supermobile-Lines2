@@ -110,6 +110,12 @@ export default function SimImportPage() {
           simType: selectedSimType,
           supplierContractEnd: contractEndDate || undefined,
         });
+        if (result.data.length === 0 && result.errors.length === 0) {
+          result.errors.push({
+            row: 0,
+            message: "ファイルからデータを読み取れませんでした。ファイル形式やカラム名を確認してください。",
+          });
+        }
         setParseResult(result);
         if (result.data.length > 0) {
           setStep("preview");

@@ -1,23 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@repo/database";
 import { ApplicationLineStatus } from "@repo/database";
+import { z } from "zod";
 
 export const dynamic = "force-dynamic";
+
+const bulkUpdateSchema = z.object({
+  lineIds: z.array(z.string()).min(1).max(1000),
+  lineReserveTagId: z.number().int().optional().nullable(),
+  shippedAt: z.string().optional().nullable(),
+  returnedAt: z.string().optional().nullable(),
+  status: z.enum(["NOT_ACTIVATED", "ACTIVATED", "SHIPPED", "RETURNED", "CANCELLED"]).optional(),
+  simLocationTagId: z.number().int().optional().nullable(),
+});
 
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
-    const { lineIds, ...updateFields } = body;
-
-    if (!lineIds || !Array.isArray(lineIds) || lineIds.length === 0) {
-      return NextResponse.json(
-        { error: "lineIds array is required" },
-        { status: 400 }
-      );
-    }
+    const { lineIds, ...updateFields } = bulkUpdateSchema.parse(body);
 
     // Validate and prepare update data
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
 
     if (updateFields.lineReserveTagId !== undefined) {
       updateData.lineReserveTagId = updateFields.lineReserveTagId;
@@ -74,6 +77,12 @@ export async function PATCH(request: NextRequest) {
       count: updated.count,
     });
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: error.issues.map((e) => e.message).join(", ") },
+        { status: 400 }
+      );
+    }
     console.error("Bulk line update error:", error);
     return NextResponse.json(
       { error: "Failed to update lines" },

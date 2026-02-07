@@ -9,6 +9,7 @@ export interface SupplierConfig {
   encoding?: "utf-8" | "shift-jis";
   accept: string; // ファイル入力のaccept属性
   headerMapping: Record<string, string>;
+  alternativeHeaderMappings?: Record<string, string>[]; // 代替カラム名マッピング
   simTypeOptions: SimTypeOption[]; // 選択可能なsimTypeオプション
   transformers?: {
     [field: string]: (value: string) => string | boolean | Date | undefined;

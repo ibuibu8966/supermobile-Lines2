@@ -59,6 +59,13 @@ export const SUPPLIER_CONFIGS: Record<string, SupplierConfig> = {
       商品マスタ: "plan",
       キャリア開通日: "supplierContractStart",
     },
+    alternativeHeaderMappings: [
+      {
+        ICCID: "iccid",
+        "SIM電話番号": "msisdn",
+        データ容量: "plan",
+      },
+    ],
     transformers: {
       supplierContractStart: parseJapaneseDate,
     },

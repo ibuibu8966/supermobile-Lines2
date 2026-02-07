@@ -13,8 +13,8 @@ export async function GET(request: NextRequest) {
     const customerType = searchParams.get("customerType") || "";
     const includeArchived = searchParams.get("includeArchived") === "true";
     const archivedOnly = searchParams.get("archivedOnly") === "true";
-    const page = parseInt(searchParams.get("page") || "1");
-    const pageSize = parseInt(searchParams.get("pageSize") || "50");
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1") || 1);
+    const pageSize = Math.min(200, Math.max(1, parseInt(searchParams.get("pageSize") || "50") || 50));
 
     const where: Record<string, unknown> = {};
 

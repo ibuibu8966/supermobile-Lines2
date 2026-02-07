@@ -12,30 +12,33 @@ export async function GET() {
       prisma.applicationLine.count({ where: { status: "RETURNED" } }),
     ]);
 
-    // SIM inventory by usage tag
+    // SIM inventory by usage tag（N+1回→2回のクエリ）
     const usageTags = await prisma.usageTag.findMany({
       where: { isActive: true },
       orderBy: { displayOrder: "asc" },
     });
 
-    const simInventoryByUsageTag = await Promise.all(
-      usageTags.map(async (tag) => {
-        const availableCount = await prisma.sim.count({
-          where: {
-            status: "IN_STOCK",
-            NOT: {
-              consumedTagIds: { has: tag.id },
-            },
-          },
-        });
-        return {
-          usageTagId: tag.id,
-          usageTagCode: tag.code,
-          usageTagName: tag.name,
-          availableCount,
-        };
-      })
-    );
+    // IN_STOCK SIMの消費済みタグごとのカウントを1回のクエリで取得
+    const consumedCounts = await prisma.$queryRaw<
+      Array<{ tagId: number; consumedCount: bigint }>
+    >`
+      SELECT unnest("consumedTagIds") as "tagId", COUNT(*) as "consumedCount"
+      FROM "Sim"
+      WHERE status = 'IN_STOCK'
+      GROUP BY "tagId"
+    `;
+
+    const consumedCountMap = new Map<number, number>();
+    for (const row of consumedCounts) {
+      consumedCountMap.set(row.tagId, Number(row.consumedCount));
+    }
+
+    const simInventoryByUsageTag = usageTags.map((tag) => ({
+      usageTagId: tag.id,
+      usageTagCode: tag.code,
+      usageTagName: tag.name,
+      availableCount: totalInStockSims - (consumedCountMap.get(tag.id) || 0),
+    }));
 
     // Active lines by plan
     const activeLinesByPlan = await prisma.$queryRaw<

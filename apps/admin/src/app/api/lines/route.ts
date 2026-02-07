@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@repo/database";
+import { prisma, Prisma, ApplicationLineStatus } from "@repo/database";
 
 export const dynamic = "force-dynamic";
 
@@ -8,8 +8,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
 
     // Pagination
-    const page = parseInt(searchParams.get("page") || "1");
-    const pageSize = parseInt(searchParams.get("pageSize") || "50");
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1") || 1);
+    const pageSize = Math.min(200, Math.max(1, parseInt(searchParams.get("pageSize") || "50") || 50));
     const skip = (page - 1) * pageSize;
 
     // Filters
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     const includeArchived = searchParams.get("includeArchived") === "true";
 
     // Build where clause
-    const where: any = {};
+    const where: Prisma.ApplicationLineWhereInput = {};
 
     // デフォルトでアーカイブ済み申し込みの回線を除外
     if (!includeArchived) {
@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
 
     // Status filter
     if (statuses.length > 0) {
-      where.status = { in: statuses };
+      where.status = { in: statuses as ApplicationLineStatus[] };
     }
 
     // Shipped date range
