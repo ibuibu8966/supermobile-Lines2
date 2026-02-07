@@ -51,6 +51,9 @@ export async function POST(request: NextRequest) {
     const customerJson = formData.get("customer") as string;
     const agreeTerms = formData.get("agreeTerms") === "true";
     const agreePrivacy = formData.get("agreePrivacy") === "true";
+    const agreeTelecom = formData.get("agreeTelecom") === "true";
+    const agreeInitialCancellation = formData.get("agreeInitialCancellation") === "true";
+    const agreeAntiSocial = formData.get("agreeAntiSocial") === "true";
 
     // KYC書類パス（クライアントからSupabase Storageに直接アップロード済み）
     const idFrontPath = formData.get("idFrontPath") as string | null;
@@ -74,9 +77,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!agreeTerms || !agreePrivacy) {
+    if (!agreeTerms || !agreePrivacy || !agreeTelecom || !agreeInitialCancellation || !agreeAntiSocial) {
       return NextResponse.json(
-        { error: "利用規約とプライバシーポリシーに同意してください" },
+        { error: "すべての同意事項にチェックしてください" },
         { status: 400 }
       );
     }

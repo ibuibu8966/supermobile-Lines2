@@ -14,8 +14,15 @@ import {
   Input,
   Label,
   Checkbox,
+  Calendar,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  cn,
 } from "@repo/ui";
-import { ArrowLeft, ArrowRight, Check, Loader2, Upload, X, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Loader2, Upload, X, Eye, EyeOff, CalendarDays } from "lucide-react";
+import { format } from "date-fns";
+import { ja } from "date-fns/locale";
 
 interface UsageTag {
   id: number;
@@ -180,6 +187,9 @@ export default function ApplyPage() {
   const [lineCount, setLineCount] = useState(1);
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [agreePrivacy, setAgreePrivacy] = useState(false);
+  const [agreeTelecom, setAgreeTelecom] = useState(false);
+  const [agreeInitialCancellation, setAgreeInitialCancellation] = useState(false);
+  const [agreeAntiSocial, setAgreeAntiSocial] = useState(false);
 
   // パスワード
   const [password, setPassword] = useState("");
@@ -277,6 +287,9 @@ export default function ApplyPage() {
       formData.append("customer", JSON.stringify(customerData));
       formData.append("agreeTerms", agreeTerms.toString());
       formData.append("agreePrivacy", agreePrivacy.toString());
+      formData.append("agreeTelecom", agreeTelecom.toString());
+      formData.append("agreeInitialCancellation", agreeInitialCancellation.toString());
+      formData.append("agreeAntiSocial", agreeAntiSocial.toString());
 
       // KYC書類
       if (idFront) formData.append("idFront", idFront);
@@ -585,13 +598,40 @@ export default function ApplyPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="birthDate">生年月日 *</Label>
-                    <Input
-                      id="birthDate"
-                      type="date"
-                      value={customerData.birthDate}
-                      onChange={(e) => setCustomerData({ ...customerData, birthDate: e.target.value })}
-                    />
+                    <Label>生年月日 *</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !customerData.birthDate && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarDays className="mr-2 h-4 w-4" />
+                          {customerData.birthDate
+                            ? format(new Date(customerData.birthDate), "yyyy年MM月dd日", { locale: ja })
+                            : "生年月日を選択"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={customerData.birthDate ? new Date(customerData.birthDate) : undefined}
+                          onSelect={(date) =>
+                            setCustomerData({
+                              ...customerData,
+                              birthDate: date ? format(date, "yyyy-MM-dd") : "",
+                            })
+                          }
+                          defaultMonth={customerData.birthDate ? new Date(customerData.birthDate) : new Date(1990, 0)}
+                          startMonth={new Date(1920, 0)}
+                          endMonth={new Date()}
+                          captionLayout="dropdown"
+                          locale={ja}
+                        />
+                      </PopoverContent>
+                    </Popover>
                   </div>
                   <div>
                     <Label htmlFor="phone">電話番号 *</Label>
@@ -802,12 +842,35 @@ export default function ApplyPage() {
               <div className="space-y-4">
                 <h4 className="font-medium">身分証明書の有効期限</h4>
                 <div className="max-w-xs">
-                  <Input
-                    type="date"
-                    value={idExpiryDate}
-                    onChange={(e) => setIdExpiryDate(e.target.value)}
-                    required
-                  />
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !idExpiryDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarDays className="mr-2 h-4 w-4" />
+                        {idExpiryDate
+                          ? format(new Date(idExpiryDate), "yyyy年MM月dd日", { locale: ja })
+                          : "有効期限を選択"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={idExpiryDate ? new Date(idExpiryDate) : undefined}
+                        onSelect={(date) =>
+                          setIdExpiryDate(date ? format(date, "yyyy-MM-dd") : "")
+                        }
+                        startMonth={new Date()}
+                        endMonth={new Date(new Date().getFullYear() + 15, 11)}
+                        captionLayout="dropdown"
+                        locale={ja}
+                      />
+                    </PopoverContent>
+                  </Popover>
                   <p className="text-sm text-muted-foreground mt-1">
                     運転免許証等の有効期限を入力してください
                   </p>
@@ -906,77 +969,165 @@ export default function ApplyPage() {
         {currentStep === 5 && (
           <Card>
             <CardHeader>
-              <CardTitle>お申込み内容の確認</CardTitle>
+              <CardTitle>申し込み内容の確認</CardTitle>
               <CardDescription>
-                内容をご確認の上、送信してください
+                内容をご確認の上、お申込みください
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <div className="p-4 bg-gray-50 rounded-lg text-gray-900">
-                  <h4 className="font-medium mb-2">プラン</h4>
-                  <p>{selectedPlan?.name} - {lineCount}回線</p>
+              {/* 個人情報 */}
+              <div className="border border-border rounded-lg overflow-hidden">
+                <div className="px-4 py-3 border-b border-border">
+                  <div className="flex justify-between items-center">
+                    <h4 className="font-semibold text-gold">個人情報</h4>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentStep(2)}
+                      className="text-sm text-gold hover:underline"
+                    >
+                      修正する
+                    </button>
+                  </div>
                 </div>
-                <div className="p-4 bg-gray-50 rounded-lg text-gray-900">
-                  <h4 className="font-medium mb-2">
-                    {customerType === "CORPORATE" ? "法人情報" : "ご契約者情報"}
-                  </h4>
-                  {customerType === "CORPORATE" && (
-                    <p className="mb-1">{customerData.companyName}</p>
-                  )}
-                  <p>
-                    {customerData.lastName} {customerData.firstName}（{customerData.lastNameKana} {customerData.firstNameKana}）
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {customerData.email}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    〒{customerData.postalCode} {customerData.prefecture}{customerData.city}{customerData.address}
-                    {customerData.building && " " + customerData.building}
-                  </p>
-                </div>
-                <div className="p-4 bg-gray-50 rounded-lg text-gray-900">
-                  <h4 className="font-medium mb-2">本人確認書類</h4>
-                  <ul className="text-sm text-muted-foreground space-y-1">
-                    {customerType === "CORPORATE" && corporateRegistry && (
-                      <li>・登記簿謄本: {corporateRegistry.name}</li>
-                    )}
-                    {idFront && <li>・身分証明書（表）: {idFront.name}</li>}
-                    {idBack && <li>・身分証明書（裏）: {idBack.name}</li>}
-                  </ul>
-                </div>
-                <div className="p-4 bg-gray-50 rounded-lg text-gray-900">
-                  <h4 className="font-medium mb-2">月額料金</h4>
-                  <p className="text-xl font-bold">{formatPrice(totalAmount)}（税込）</p>
+                <div className="divide-y divide-border">
+                  <div className="flex px-4 py-3">
+                    <span className="w-36 text-sm text-muted-foreground shrink-0">氏名</span>
+                    <span className="text-sm">
+                      {customerData.lastName} {customerData.firstName}
+                      {" "}({customerData.lastNameKana} {customerData.firstNameKana})
+                    </span>
+                  </div>
+                  <div className="flex px-4 py-3">
+                    <span className="w-36 text-sm text-muted-foreground shrink-0">生年月日</span>
+                    <span className="text-sm">{customerData.birthDate}</span>
+                  </div>
+                  <div className="flex px-4 py-3">
+                    <span className="w-36 text-sm text-muted-foreground shrink-0">電話番号</span>
+                    <span className="text-sm">{customerData.phone}</span>
+                  </div>
+                  <div className="flex px-4 py-3">
+                    <span className="w-36 text-sm text-muted-foreground shrink-0">メールアドレス</span>
+                    <span className="text-sm">{customerData.email}</span>
+                  </div>
+                  <div className="flex px-4 py-3">
+                    <span className="w-36 text-sm text-muted-foreground shrink-0">住所</span>
+                    <span className="text-sm">
+                      〒{customerData.postalCode} {customerData.prefecture}
+                      {customerData.city}{customerData.address}
+                      {customerData.building && ` ${customerData.building}`}
+                    </span>
+                  </div>
+                  <div className="flex px-4 py-3">
+                    <span className="w-36 text-sm text-muted-foreground shrink-0">身分証有効期限</span>
+                    <span className="text-sm">{idExpiryDate}</span>
+                  </div>
                 </div>
               </div>
 
-              <div className="space-y-4">
-                <label className="flex items-start gap-2">
+              {/* プラン情報 */}
+              <div className="border border-border rounded-lg overflow-hidden">
+                <div className="px-4 py-3 border-b border-border">
+                  <div className="flex justify-between items-center">
+                    <h4 className="font-semibold text-gold">プラン情報</h4>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentStep(4)}
+                      className="text-sm text-gold hover:underline"
+                    >
+                      修正する
+                    </button>
+                  </div>
+                </div>
+                <div className="divide-y divide-border">
+                  <div className="flex px-4 py-3">
+                    <span className="w-36 text-sm text-muted-foreground shrink-0">プラン</span>
+                    <span className="text-sm">{selectedPlan?.name}</span>
+                  </div>
+                  <div className="flex px-4 py-3">
+                    <span className="w-36 text-sm text-muted-foreground shrink-0">回線数</span>
+                    <span className="text-sm">{lineCount}回線</span>
+                  </div>
+                  <div className="flex px-4 py-3">
+                    <span className="w-36 text-sm text-muted-foreground shrink-0 font-bold">合計金額</span>
+                    <span className="text-lg font-bold">{formatPrice(totalAmount)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* アップロード書類 */}
+              <div className="border border-border rounded-lg overflow-hidden">
+                <div className="px-4 py-3 border-b border-border">
+                  <div className="flex justify-between items-center">
+                    <h4 className="font-semibold text-gold">アップロード書類</h4>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentStep(3)}
+                      className="text-sm text-gold hover:underline"
+                    >
+                      修正する
+                    </button>
+                  </div>
+                </div>
+                <div className="px-4 py-3 space-y-1">
+                  {customerType === "CORPORATE" && corporateRegistry && (
+                    <p className="text-sm">・登記簿謄本: {corporateRegistry.name}</p>
+                  )}
+                  {idFront && <p className="text-sm">・身分証明書（表）: {idFront.name}</p>}
+                  {idBack && <p className="text-sm">・身分証明書（裏）: {idBack.name}</p>}
+                </div>
+              </div>
+
+              {/* チェック項目 */}
+              <div className="space-y-4 pt-2">
+                <label className="flex items-start gap-3">
                   <Checkbox
-                    id="terms"
+                    checked={agreePrivacy}
+                    onCheckedChange={(checked) => setAgreePrivacy(checked === true)}
+                  />
+                  <span className="text-sm">
+                    <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-gold underline">
+                      プライバシーポリシー
+                    </a>
+                    に同意します
+                  </span>
+                </label>
+                <label className="flex items-start gap-3">
+                  <Checkbox
                     checked={agreeTerms}
                     onCheckedChange={(checked) => setAgreeTerms(checked === true)}
                   />
                   <span className="text-sm">
-                    <a href="#" className="text-primary underline">
+                    <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-gold underline">
                       利用規約
                     </a>
                     に同意します
                   </span>
                 </label>
-                <label className="flex items-start gap-2">
+                <label className="flex items-start gap-3">
                   <Checkbox
-                    id="privacy"
-                    checked={agreePrivacy}
-                    onCheckedChange={(checked) => setAgreePrivacy(checked === true)}
+                    checked={agreeTelecom}
+                    onCheckedChange={(checked) => setAgreeTelecom(checked === true)}
                   />
                   <span className="text-sm">
-                    <a href="#" className="text-primary underline">
-                      プライバシーポリシー
+                    <a href="/legal#telecom-law" target="_blank" rel="noopener noreferrer" className="text-gold underline">
+                      電気通信事業法約款
                     </a>
                     に同意します
                   </span>
+                </label>
+                <label className="flex items-start gap-3">
+                  <Checkbox
+                    checked={agreeInitialCancellation}
+                    onCheckedChange={(checked) => setAgreeInitialCancellation(checked === true)}
+                  />
+                  <span className="text-sm">初期契約解除制度を確認しました</span>
+                </label>
+                <label className="flex items-start gap-3">
+                  <Checkbox
+                    checked={agreeAntiSocial}
+                    onCheckedChange={(checked) => setAgreeAntiSocial(checked === true)}
+                  />
+                  <span className="text-sm">反社会的勢力ではないことを表明し確約します</span>
                 </label>
               </div>
 
@@ -987,7 +1138,7 @@ export default function ApplyPage() {
                 </Button>
                 <Button
                   onClick={handleSubmit}
-                  disabled={!agreeTerms || !agreePrivacy || submitting}
+                  disabled={!agreeTerms || !agreePrivacy || !agreeTelecom || !agreeInitialCancellation || !agreeAntiSocial || submitting}
                 >
                   {submitting ? (
                     <>
@@ -995,7 +1146,7 @@ export default function ApplyPage() {
                       送信中...
                     </>
                   ) : (
-                    "申込みを送信"
+                    "申し込む"
                   )}
                 </Button>
               </div>
