@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma, getSignedUrl } from "@repo/database";
 import { z } from "zod";
+import { getAdminSession, assertServiceAccess } from "@/lib/admin-session";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,10 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const sessionResult = await getAdminSession();
+    if (sessionResult instanceof NextResponse) return sessionResult;
+    const session = sessionResult;
+
     const { id } = await params;
 
     const application = await prisma.application.findUnique({
@@ -59,6 +64,9 @@ export async function GET(
         { status: 404 }
       );
     }
+
+    const accessDenied = assertServiceAccess(session, application.serviceId);
+    if (accessDenied) return accessDenied;
 
     // 回線統計を計算
     const shippedCount = application.lines.filter(
@@ -117,6 +125,10 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const sessionResult = await getAdminSession();
+    if (sessionResult instanceof NextResponse) return sessionResult;
+    const session = sessionResult;
+
     const { id } = await params;
     const body = await request.json();
     const validated = updateApplicationSchema.parse(body);
@@ -131,6 +143,9 @@ export async function PATCH(
         { status: 404 }
       );
     }
+
+    const accessDenied = assertServiceAccess(session, existing.serviceId);
+    if (accessDenied) return accessDenied;
 
     // アーカイブ時にarchivedAtを自動設定
     const updateData: typeof validated & { archivedAt?: Date | null } = {

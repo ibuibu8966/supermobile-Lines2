@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@repo/database";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
+import { getAdminSession, assertServiceAccess } from "@/lib/admin-session";
 
 const updateUserSchema = z.object({
   email: z.string().email("有効なメールアドレスを入力してください").optional(),
@@ -17,6 +18,10 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const sessionResult = await getAdminSession();
+    if (sessionResult instanceof NextResponse) return sessionResult;
+    const session = sessionResult;
+
     const { id } = await params;
 
     const user = await prisma.user.findUnique({
@@ -42,6 +47,9 @@ export async function GET(
       );
     }
 
+    const accessDenied = assertServiceAccess(session, user.serviceId);
+    if (accessDenied) return accessDenied;
+
     // パスワードを除外
     const { password, ...sanitizedUser } = user;
 
@@ -61,6 +69,10 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const sessionResult = await getAdminSession();
+    if (sessionResult instanceof NextResponse) return sessionResult;
+    const session = sessionResult;
+
     const { id } = await params;
     const body = await request.json();
     const validated = updateUserSchema.parse(body);
@@ -75,6 +87,25 @@ export async function PATCH(
         { error: "ユーザーが見つかりません" },
         { status: 404 }
       );
+    }
+
+    const accessDenied = assertServiceAccess(session, existingUser.serviceId);
+    if (accessDenied) return accessDenied;
+
+    // ADMINはロール変更・サービス変更不可
+    if (session.scopedServiceId) {
+      if (validated.role && validated.role !== "CUSTOMER") {
+        return NextResponse.json(
+          { error: "ロールを変更する権限がありません" },
+          { status: 403 }
+        );
+      }
+      if (validated.serviceId !== undefined && validated.serviceId !== session.scopedServiceId) {
+        return NextResponse.json(
+          { error: "サービスを変更する権限がありません" },
+          { status: 403 }
+        );
+      }
     }
 
     // メールアドレスの重複チェック（自分以外）
@@ -132,6 +163,10 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const sessionResult = await getAdminSession();
+    if (sessionResult instanceof NextResponse) return sessionResult;
+    const session = sessionResult;
+
     const { id } = await params;
 
     // 関連データがあるかチェック
@@ -152,6 +187,9 @@ export async function DELETE(
         { status: 404 }
       );
     }
+
+    const accessDenied = assertServiceAccess(session, user.serviceId);
+    if (accessDenied) return accessDenied;
 
     if (user._count.customers > 0) {
       // 論理削除

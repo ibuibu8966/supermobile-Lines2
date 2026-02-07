@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@repo/database";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
+import { getAdminSession } from "@/lib/admin-session";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,10 @@ const createUserSchema = z.object({
 // 一覧取得
 export async function GET(request: NextRequest) {
   try {
+    const sessionResult = await getAdminSession();
+    if (sessionResult instanceof NextResponse) return sessionResult;
+    const session = sessionResult;
+
     const searchParams = request.nextUrl.searchParams;
     const includeInactive = searchParams.get("includeInactive") === "true";
     const role = searchParams.get("role");
@@ -25,11 +30,18 @@ export async function GET(request: NextRequest) {
     if (!includeInactive) {
       where.isActive = true;
     }
-    if (role) {
-      where.role = role;
-    }
-    if (serviceId) {
-      where.serviceId = serviceId;
+
+    // ADMINは自分のサービスのCUSTOMERのみ閲覧可能
+    if (session.scopedServiceId) {
+      where.serviceId = session.scopedServiceId;
+      where.role = "CUSTOMER";
+    } else {
+      if (role) {
+        where.role = role;
+      }
+      if (serviceId) {
+        where.serviceId = serviceId;
+      }
     }
 
     const users = await prisma.user.findMany({
@@ -61,8 +73,22 @@ export async function GET(request: NextRequest) {
 // 新規作成
 export async function POST(request: NextRequest) {
   try {
+    const sessionResult = await getAdminSession();
+    if (sessionResult instanceof NextResponse) return sessionResult;
+    const session = sessionResult;
+
     const body = await request.json();
     const validated = createUserSchema.parse(body);
+
+    // ADMINはCUSTOMERのみ作成可能、serviceIdを強制
+    if (session.scopedServiceId) {
+      if (validated.role !== "CUSTOMER") {
+        return NextResponse.json(
+          { error: "管理者ユーザーを作成する権限がありません" },
+          { status: 403 }
+        );
+      }
+    }
 
     // メールアドレスの重複チェック
     const existing = await prisma.user.findUnique({
@@ -83,7 +109,7 @@ export async function POST(request: NextRequest) {
         email: validated.email,
         password: hashedPassword,
         role: validated.role,
-        serviceId: validated.serviceId ?? null,
+        serviceId: session.scopedServiceId || validated.serviceId || null,
         isActive: validated.isActive,
       },
       include: {

@@ -36,15 +36,15 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 const menuItems = [
-  { title: "ダッシュボード", href: "/", icon: LayoutDashboard },
+  { title: "ダッシュボード", href: "/", icon: LayoutDashboard, superAdminOnly: true },
   { title: "申し込み一覧", href: "/applications", icon: FileText },
-  { title: "アーカイブ", href: "/applications/archived", icon: Archive },
-  { title: "総合回線管理", href: "/lines", icon: ListChecks },
-  { title: "SIM管理", href: "/sims", icon: Smartphone },
-  { title: "タグ管理", href: "/tags", icon: Tags },
-  { title: "販売ルール管理", href: "/rules", icon: Settings },
-  { title: "サービス・プラン管理", href: "/services", icon: Package },
-  { title: "ユーザー管理", href: "/users", icon: Users, adminOnly: true },
+  { title: "アーカイブ", href: "/applications/archived", icon: Archive, superAdminOnly: true },
+  { title: "総合回線管理", href: "/lines", icon: ListChecks, superAdminOnly: true },
+  { title: "SIM管理", href: "/sims", icon: Smartphone, superAdminOnly: true },
+  { title: "タグ管理", href: "/tags", icon: Tags, superAdminOnly: true },
+  { title: "販売ルール管理", href: "/rules", icon: Settings, superAdminOnly: true },
+  { title: "サービス・プラン管理", href: "/services", icon: Package, superAdminOnly: true },
+  { title: "ユーザー管理", href: "/users", icon: Users },
 ];
 
 export function Sidebar({ user }: SidebarProps) {
@@ -64,7 +64,7 @@ export function Sidebar({ user }: SidebarProps) {
   };
 
   const filteredMenuItems = menuItems.filter(
-    (item) => !item.adminOnly || isSuperAdmin
+    (item) => !item.superAdminOnly || isSuperAdmin
   );
 
   const sidebarContent = (

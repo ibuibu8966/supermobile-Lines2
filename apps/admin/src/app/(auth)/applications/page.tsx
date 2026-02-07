@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSession } from "next-auth/react";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@repo/ui";
 import { Search, Loader2, ExternalLink, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
@@ -80,6 +81,8 @@ const PAYMENT_STATUS_OPTIONS = [
 
 export default function ApplicationsPage() {
   const queryClient = useQueryClient();
+  const { data: sessionData } = useSession();
+  const isSuperAdmin = sessionData?.user?.role === "SUPER_ADMIN";
 
   // Services from cache (prefetched at login)
   const { data: services = [] } = useQuery<{ id: string; name: string }[]>({
@@ -294,21 +297,23 @@ export default function ApplicationsPage() {
               <Search className="h-4 w-4" />
             </button>
           </div>
-          <select
-            className="px-4 py-2 border rounded-md"
-            value={serviceFilter}
-            onChange={(e) => {
-              setServiceFilter(e.target.value);
-              setPage("1");
-            }}
-          >
-            <option value="">サービス</option>
-            {services.map((service) => (
-              <option key={service.id} value={service.id}>
-                {service.name}
-              </option>
-            ))}
-          </select>
+          {isSuperAdmin && (
+            <select
+              className="px-4 py-2 border rounded-md"
+              value={serviceFilter}
+              onChange={(e) => {
+                setServiceFilter(e.target.value);
+                setPage("1");
+              }}
+            >
+              <option value="">サービス</option>
+              {services.map((service) => (
+                <option key={service.id} value={service.id}>
+                  {service.name}
+                </option>
+              ))}
+            </select>
+          )}
           <select
             className="px-4 py-2 border rounded-md"
             value={customerTypeFilter}

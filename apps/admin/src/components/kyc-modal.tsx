@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Dialog,
@@ -15,6 +15,7 @@ interface KycModalProps {
   applicationId: string | null;
   isOpen: boolean;
   onClose: () => void;
+  initialImageType?: string;
 }
 
 interface KycImage {
@@ -75,9 +76,17 @@ const isPdfUrl = (url: string | null): boolean => {
   return pathWithoutQuery.toLowerCase().endsWith(".pdf");
 };
 
-export function KycModal({ applicationId, isOpen, onClose }: KycModalProps) {
+export function KycModal({ applicationId, isOpen, onClose, initialImageType }: KycModalProps) {
   const [selectedImageType, setSelectedImageType] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
+
+  // initialImageTypeが変更されたら選択を更新
+  useEffect(() => {
+    if (isOpen && initialImageType) {
+      setSelectedImageType(initialImageType);
+      setImageError(false);
+    }
+  }, [isOpen, initialImageType]);
 
   const { data: application, isLoading } = useQuery<ApplicationDetail>({
     queryKey: ["application-kyc", applicationId],

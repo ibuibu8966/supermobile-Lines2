@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSession } from "next-auth/react";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@repo/ui";
 import { Plus, Pencil, Trash2, Loader2, X, Eye, EyeOff, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
@@ -36,6 +37,8 @@ const ROLE_VARIANTS: Record<string, "default" | "secondary" | "success" | "warni
 
 export default function UsersPage() {
   const queryClient = useQueryClient();
+  const { data: sessionData } = useSession();
+  const isSuperAdmin = sessionData?.user?.role === "SUPER_ADMIN";
 
   // Services from cache (prefetched at login)
   const { data: services = [] } = useQuery<{ id: string; code: string; name: string }[]>({
@@ -256,28 +259,32 @@ export default function UsersPage() {
       <div className="max-w-6xl">
         <div className="flex justify-between items-center mb-6">
           <div className="flex items-center gap-4">
-            <select
-              value={filterRole}
-              onChange={(e) => setFilterRole(e.target.value)}
-              className="px-3 py-2 border rounded-md text-sm"
-            >
-              <option value="">全ロール</option>
-              <option value="SUPER_ADMIN">スーパー管理者</option>
-              <option value="ADMIN">管理者</option>
-              <option value="CUSTOMER">顧客</option>
-            </select>
-            <select
-              value={filterServiceId}
-              onChange={(e) => setFilterServiceId(e.target.value)}
-              className="px-3 py-2 border rounded-md text-sm"
-            >
-              <option value="">全サービス</option>
-              {services.map((service) => (
-                <option key={service.id} value={service.id}>
-                  {service.name}
-                </option>
-              ))}
-            </select>
+            {isSuperAdmin && (
+              <>
+                <select
+                  value={filterRole}
+                  onChange={(e) => setFilterRole(e.target.value)}
+                  className="px-3 py-2 border rounded-md text-sm"
+                >
+                  <option value="">全ロール</option>
+                  <option value="SUPER_ADMIN">スーパー管理者</option>
+                  <option value="ADMIN">管理者</option>
+                  <option value="CUSTOMER">顧客</option>
+                </select>
+                <select
+                  value={filterServiceId}
+                  onChange={(e) => setFilterServiceId(e.target.value)}
+                  className="px-3 py-2 border rounded-md text-sm"
+                >
+                  <option value="">全サービス</option>
+                  {services.map((service) => (
+                    <option key={service.id} value={service.id}>
+                      {service.name}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
             <label className="flex items-center gap-2 text-sm text-gray-600">
               <input
                 type="checkbox"
@@ -459,54 +466,58 @@ export default function UsersPage() {
                   </div>
                   <p className="text-xs text-gray-500 mt-1">8文字以上</p>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    ロール
-                  </label>
-                  <select
-                    value={formData.role}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        role: e.target.value as "CUSTOMER" | "ADMIN" | "SUPER_ADMIN",
-                      })
-                    }
-                    className="w-full px-3 py-2 border rounded-md"
-                    required
-                  >
-                    <option value="CUSTOMER">顧客</option>
-                    <option value="ADMIN">管理者</option>
-                    <option value="SUPER_ADMIN">スーパー管理者</option>
-                  </select>
-                </div>
-                {(formData.role === "ADMIN" || formData.role === "SUPER_ADMIN") && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      所属サービス
-                      {formData.role === "SUPER_ADMIN" && (
-                        <span className="text-gray-400 font-normal ml-2">
-                          （スーパー管理者は全サービス管理可）
-                        </span>
-                      )}
-                    </label>
-                    <select
-                      value={formData.serviceId || ""}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          serviceId: e.target.value || null,
-                        })
-                      }
-                      className="w-full px-3 py-2 border rounded-md"
-                    >
-                      <option value="">未設定</option>
-                      {services.map((service) => (
-                        <option key={service.id} value={service.id}>
-                          {service.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                {isSuperAdmin && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        ロール
+                      </label>
+                      <select
+                        value={formData.role}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            role: e.target.value as "CUSTOMER" | "ADMIN" | "SUPER_ADMIN",
+                          })
+                        }
+                        className="w-full px-3 py-2 border rounded-md"
+                        required
+                      >
+                        <option value="CUSTOMER">顧客</option>
+                        <option value="ADMIN">管理者</option>
+                        <option value="SUPER_ADMIN">スーパー管理者</option>
+                      </select>
+                    </div>
+                    {(formData.role === "ADMIN" || formData.role === "SUPER_ADMIN") && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          所属サービス
+                          {formData.role === "SUPER_ADMIN" && (
+                            <span className="text-gray-400 font-normal ml-2">
+                              （スーパー管理者は全サービス管理可）
+                            </span>
+                          )}
+                        </label>
+                        <select
+                          value={formData.serviceId || ""}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              serviceId: e.target.value || null,
+                            })
+                          }
+                          className="w-full px-3 py-2 border rounded-md"
+                        >
+                          <option value="">未設定</option>
+                          {services.map((service) => (
+                            <option key={service.id} value={service.id}>
+                              {service.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
               <div className="flex justify-end gap-2 px-6 py-4 border-t bg-gray-50">

@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@repo/database";
+import { getAdminSession } from "@/lib/admin-session";
 
 export const dynamic = "force-dynamic";
 
 // 全サービス統合一覧取得
 export async function GET(request: NextRequest) {
   try {
+    const sessionResult = await getAdminSession();
+    if (sessionResult instanceof NextResponse) return sessionResult;
+    const session = sessionResult;
+
     const searchParams = request.nextUrl.searchParams;
     const search = searchParams.get("search") || "";
     const status = searchParams.get("status") || "";
@@ -42,8 +47,9 @@ export async function GET(request: NextRequest) {
       where.status = status;
     }
 
-    if (serviceId) {
-      where.serviceId = serviceId;
+    const effectiveServiceId = session.scopedServiceId || serviceId;
+    if (effectiveServiceId) {
+      where.serviceId = effectiveServiceId;
     }
 
     if (customerType) {

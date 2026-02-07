@@ -4,10 +4,11 @@ import { z } from "zod";
 
 export const dynamic = "force-dynamic";
 
-// KYC画像ステータス更新スキーマ
-const updateKycStatusSchema = z.object({
-  status: z.enum(["APPROVED", "REJECTED"]),
+// KYC画像更新スキーマ
+const updateKycImageSchema = z.object({
+  status: z.enum(["APPROVED", "REJECTED"]).optional(),
   reviewNote: z.string().optional(),
+  expiryDate: z.string().optional().nullable(),
 });
 
 // KYC画像ステータスを更新
@@ -18,7 +19,7 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await request.json();
-    const validated = updateKycStatusSchema.parse(body);
+    const validated = updateKycImageSchema.parse(body);
 
     const kycImage = await prisma.kycImage.findUnique({
       where: { id },
@@ -38,19 +39,40 @@ export async function PATCH(
       );
     }
 
+    // 有効期限のみの更新
+    if (validated.expiryDate !== undefined && !validated.status) {
+      const updatedKycImage = await prisma.kycImage.update({
+        where: { id },
+        data: {
+          expiryDate: validated.expiryDate ? new Date(validated.expiryDate) : null,
+        },
+      });
+      return NextResponse.json({ kycImage: updatedKycImage });
+    }
+
+    if (!validated.status) {
+      return NextResponse.json(
+        { error: "statusまたはexpiryDateが必要です" },
+        { status: 400 }
+      );
+    }
+
     // KYC画像を更新
+    const updateData: { status: string; reviewNote: string | null; reviewedAt: Date; expiryDate?: Date | null } = {
+      status: validated.status,
+      reviewNote: validated.reviewNote || null,
+      reviewedAt: new Date(),
+    };
+    if (validated.expiryDate !== undefined) {
+      updateData.expiryDate = validated.expiryDate ? new Date(validated.expiryDate) : null;
+    }
+
     const updatedKycImage = await prisma.kycImage.update({
       where: { id },
-      data: {
-        status: validated.status,
-        reviewNote: validated.reviewNote || null,
-        reviewedAt: new Date(),
-      },
+      data: updateData,
     });
 
     // 申込のkycStatusを更新
-    // すべてのKYC画像がAPPROVEDの場合、kycStatusをCOMPLETEDに
-    // 1つでもREJECTEDの場合、kycStatusをDEFICIENTに
     const allKycImages = kycImage.application.kycImages.map((img) =>
       img.id === id ? { ...img, status: validated.status } : img
     );

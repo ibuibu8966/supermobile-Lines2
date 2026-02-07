@@ -15,21 +15,17 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-  Textarea,
 } from "@repo/ui";
 import {
   Loader2,
   ScanLine,
   ExternalLink,
-  ZoomIn,
-  ChevronLeft,
-  ChevronRight,
-  Check,
-  X,
   Archive,
   ArchiveRestore,
 } from "lucide-react";
 import { IccidScanModal } from "./iccid-scan-modal";
+import { KycModal } from "@/components/kyc-modal";
+import { toast } from "sonner";
 
 interface Customer {
   id: string;
@@ -131,6 +127,8 @@ interface Application {
   id: string;
   applicationNumber: string;
   status: string;
+  kycStatus: "PENDING" | "DEFICIENT" | "RESUBMIT" | "COMPLETED";
+  paymentStatus: "BEFORE_INVOICE" | "INVOICED" | "PAID";
   lineCount: number;
   unitPrice: number;
   totalAmount: number;
@@ -187,6 +185,19 @@ const KYC_TYPE_LABELS: Record<string, string> = {
   CORPORATE_REGISTRY: "登記簿謄本",
 };
 
+const KYC_STATUS_OPTIONS = [
+  { value: "PENDING", label: "未確認" },
+  { value: "DEFICIENT", label: "不備" },
+  { value: "RESUBMIT", label: "再提出" },
+  { value: "COMPLETED", label: "完了" },
+];
+
+const PAYMENT_STATUS_OPTIONS = [
+  { value: "BEFORE_INVOICE", label: "請求書発行前" },
+  { value: "INVOICED", label: "請求書発行済み" },
+  { value: "PAID", label: "入金済み" },
+];
+
 export default function ApplicationDetailPage() {
   const params = useParams();
   const id = params.id as string;
@@ -199,12 +210,13 @@ export default function ApplicationDetailPage() {
   const [showScanModal, setShowScanModal] = useState(false);
   const [selectedLines, setSelectedLines] = useState<Set<string>>(new Set());
 
-  // KYC画像関連の状態
-  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
-  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
-  const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
-  const [rejectNote, setRejectNote] = useState("");
-  const [kycProcessing, setKycProcessing] = useState(false);
+  // KycModal関連の状態
+  const [isKycModalOpen, setIsKycModalOpen] = useState(false);
+  const [kycModalInitialType, setKycModalInitialType] = useState<string | undefined>(undefined);
+
+  // 身分証有効期限編集の状態
+  const [isEditingExpiry, setIsEditingExpiry] = useState(false);
+  const [editExpiryValue, setEditExpiryValue] = useState("");
 
   // アーカイブ関連の状態
   const [isArchiveConfirmOpen, setIsArchiveConfirmOpen] = useState(false);
@@ -260,60 +272,54 @@ export default function ApplicationDetailPage() {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
   };
 
-  // KYC画像のステータスBadge
-  const getKycStatusBadge = (status: string) => {
-    switch (status) {
-      case "PENDING":
-        return <Badge variant="secondary">未確認</Badge>;
-      case "APPROVED":
-        return <Badge variant="success">OK</Badge>;
-      case "REJECTED":
-        return <Badge variant="destructive">NG</Badge>;
-      default:
-        return <Badge variant="secondary">{status}</Badge>;
+  // ステータス更新
+  const updateApplicationField = async (field: string, value: unknown) => {
+    if (!application) return;
+    // 楽観的更新
+    setApplication({ ...application, [field]: value });
+    try {
+      const res = await fetch(`/api/applications/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [field]: value }),
+      });
+      if (res.ok) {
+        toast.success("更新しました");
+      } else {
+        throw new Error("更新に失敗しました");
+      }
+    } catch {
+      toast.error("更新に失敗しました");
+      fetchApplication();
     }
   };
 
-  // KYC画像を承認
-  const handleApproveKyc = async (imageId: string) => {
-    setKycProcessing(true);
+  // 有効期限更新
+  const handleSaveExpiry = async () => {
+    if (!application) return;
+    // 全てのKYC画像のexpiryDateを更新
     try {
-      const response = await fetch(`/api/kyc-images/${imageId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "APPROVED" }),
-      });
-
-      if (response.ok) {
-        await fetchApplication();
-      }
-    } catch (error) {
-      console.error("KYC承認エラー:", error);
-    } finally {
-      setKycProcessing(false);
+      await Promise.all(
+        application.kycImages.map((img) =>
+          fetch(`/api/kyc-images/${img.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ expiryDate: editExpiryValue || null }),
+          })
+        )
+      );
+      toast.success("有効期限を更新しました");
+      setIsEditingExpiry(false);
+      fetchApplication();
+    } catch {
+      toast.error("有効期限の更新に失敗しました");
     }
   };
 
-  // KYC画像を不備として処理
-  const handleRejectKyc = async (imageId: string) => {
-    setKycProcessing(true);
-    try {
-      const response = await fetch(`/api/kyc-images/${imageId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "REJECTED", reviewNote: rejectNote }),
-      });
-
-      if (response.ok) {
-        setIsRejectModalOpen(false);
-        setRejectNote("");
-        await fetchApplication();
-      }
-    } catch (error) {
-      console.error("KYC不備処理エラー:", error);
-    } finally {
-      setKycProcessing(false);
-    }
+  // KycModal表示
+  const openKycModal = (imageType?: string) => {
+    setKycModalInitialType(imageType);
+    setIsKycModalOpen(true);
   };
 
   // アーカイブ操作
