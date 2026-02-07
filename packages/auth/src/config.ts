@@ -97,7 +97,7 @@ export function createAuthConfig(prisma: PrismaClient): NextAuthConfig {
 }
 
 export async function hashPassword(password: string): Promise<string> {
-  return bcrypt.hash(password, 12);
+  return bcrypt.hash(password, 10);
 }
 
 export async function verifyPassword(
