@@ -350,7 +350,7 @@ export default function ApplyPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 text-gray-900">
       <header className="bg-white border-b">
         <div className="max-w-3xl mx-auto px-4 py-4">
           <div className="flex items-center gap-4">
@@ -839,7 +839,7 @@ export default function ApplyPage() {
             <CardContent className="space-y-6">
               {/* 料金テーブル */}
               {selectedPlan && selectedPlan.pricings.length > 1 && (
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-blue-900">
                   <h4 className="font-medium text-blue-900 mb-2">回線数別料金（まとめてお得！）</h4>
                   <div className="space-y-1">
                     {[...selectedPlan.pricings]
@@ -854,7 +854,7 @@ export default function ApplyPage() {
                           <div
                             key={i}
                             className={`flex justify-between text-sm py-1 px-2 rounded ${
-                              isCurrentTier ? "bg-blue-100 font-medium" : ""
+                              isCurrentTier ? "bg-blue-100 font-medium text-blue-900" : ""
                             }`}
                           >
                             <span>{rangeText}</span>
@@ -878,7 +878,7 @@ export default function ApplyPage() {
                 />
               </div>
 
-              <div className="p-4 bg-gray-50 rounded-lg space-y-2">
+              <div className="p-4 bg-gray-50 rounded-lg space-y-2 text-gray-900">
                 <div className="flex justify-between">
                   <span>{selectedPlan?.name} × {lineCount}回線</span>
                   <span>{formatPrice(unitPrice)} × {lineCount}</span>
@@ -913,11 +913,11 @@ export default function ApplyPage() {
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-4">
-                <div className="p-4 bg-gray-50 rounded-lg">
+                <div className="p-4 bg-gray-50 rounded-lg text-gray-900">
                   <h4 className="font-medium mb-2">プラン</h4>
                   <p>{selectedPlan?.name} - {lineCount}回線</p>
                 </div>
-                <div className="p-4 bg-gray-50 rounded-lg">
+                <div className="p-4 bg-gray-50 rounded-lg text-gray-900">
                   <h4 className="font-medium mb-2">
                     {customerType === "CORPORATE" ? "法人情報" : "ご契約者情報"}
                   </h4>
@@ -935,7 +935,7 @@ export default function ApplyPage() {
                     {customerData.building && " " + customerData.building}
                   </p>
                 </div>
-                <div className="p-4 bg-gray-50 rounded-lg">
+                <div className="p-4 bg-gray-50 rounded-lg text-gray-900">
                   <h4 className="font-medium mb-2">本人確認書類</h4>
                   <ul className="text-sm text-muted-foreground space-y-1">
                     {customerType === "CORPORATE" && corporateRegistry && (
@@ -945,7 +945,7 @@ export default function ApplyPage() {
                     {idBack && <li>・身分証明書（裏）: {idBack.name}</li>}
                   </ul>
                 </div>
-                <div className="p-4 bg-gray-50 rounded-lg">
+                <div className="p-4 bg-gray-50 rounded-lg text-gray-900">
                   <h4 className="font-medium mb-2">月額料金</h4>
                   <p className="text-xl font-bold">{formatPrice(totalAmount)}（税込）</p>
                 </div>

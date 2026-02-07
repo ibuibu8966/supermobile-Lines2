@@ -10,28 +10,28 @@ async function main() {
   const services = await Promise.all([
     prisma.service.upsert({
       where: { code: "buppan" },
-      update: {},
+      update: { name: "BUPPAN MOBILE" },
       create: {
         code: "buppan",
-        name: "物販サービス",
+        name: "BUPPAN MOBILE",
         isActive: true,
       },
     }),
     prisma.service.upsert({
       where: { code: "versus" },
-      update: {},
+      update: { name: "VERSUS MOBILE" },
       create: {
         code: "versus",
-        name: "バーサス",
+        name: "VERSUS MOBILE",
         isActive: true,
       },
     }),
     prisma.service.upsert({
       where: { code: "avaris" },
-      update: {},
+      update: { name: "Avaris Mobile" },
       create: {
         code: "avaris",
-        name: "Avaris",
+        name: "Avaris Mobile",
         isActive: true,
       },
     }),
@@ -134,261 +134,326 @@ async function main() {
         displayOrder: 4,
       },
     }),
+    prisma.usageTag.upsert({
+      where: { code: "auth" },
+      update: {},
+      create: {
+        code: "auth",
+        name: "認証用",
+        category: "認証系",
+        description: "SMS認証用途",
+        displayOrder: 5,
+      },
+    }),
   ]);
   console.log(`Created ${usageTags.length} usage tags`);
 
-  // 4. プランマスタ（物販サービス用）
+  // サービス参照
   const buppanService = services.find((s) => s.code === "buppan")!;
+  const versusService = services.find((s) => s.code === "versus")!;
+  const avarisService = services.find((s) => s.code === "avaris")!;
   const machinegunService = services.find((s) => s.code === "machinegun")!;
   const maedaService = services.find((s) => s.code === "maeda")!;
-  const pokekaTag = usageTags.find((t) => t.code === "pokeka")!;
-  const adaafiTag = usageTags.find((t) => t.code === "adaafi")!;
 
+  // 古いプランを無効化（正しいプランコード以外を非アクティブに）
+  await Promise.all([
+    prisma.plan.updateMany({
+      where: { serviceId: buppanService.id, code: { notIn: ["buppan-3month"] } },
+      data: { isActive: false },
+    }),
+    prisma.plan.updateMany({
+      where: { serviceId: versusService.id, code: { notIn: ["versus-auth"] } },
+      data: { isActive: false },
+    }),
+    prisma.plan.updateMany({
+      where: { serviceId: avarisService.id, code: { notIn: ["avaris-auth"] } },
+      data: { isActive: false },
+    }),
+    prisma.plan.updateMany({
+      where: { serviceId: machinegunService.id, code: { notIn: ["machinegun-pokeka", "machinegun-mnp"] } },
+      data: { isActive: false },
+    }),
+    prisma.plan.updateMany({
+      where: { serviceId: maedaService.id, code: { notIn: ["maeda-auth"] } },
+      data: { isActive: false },
+    }),
+  ]);
+  console.log("Deactivated old plans");
+
+  // タグ参照
+  const pokekaTag = usageTags.find((t) => t.code === "pokeka")!;
+  const mnpTag = usageTags.find((t) => t.code === "mnp")!;
+  const authTag = usageTags.find((t) => t.code === "auth")!;
+
+  // 4. プランマスタ
   const plans = await Promise.all([
-    // Buppan プラン
+    // ===== BUPPAN プラン =====
     prisma.plan.upsert({
-      where: { serviceId_code: { serviceId: buppanService.id, code: "pokeka-basic" } },
-      update: {},
+      where: { serviceId_code: { serviceId: buppanService.id, code: "buppan-3month" } },
+      update: { name: "3ヶ月パック", description: "SIM登録・個別配送込み" },
       create: {
         serviceId: buppanService.id,
-        code: "pokeka-basic",
-        name: "ポケカ認証プラン",
+        code: "buppan-3month",
+        name: "3ヶ月パック",
+        description: "SIM登録・個別配送込み",
         isActive: true,
       },
     }),
+
+    // ===== VERSUS プラン =====
     prisma.plan.upsert({
-      where: { serviceId_code: { serviceId: buppanService.id, code: "adaafi-basic" } },
-      update: {},
+      where: { serviceId_code: { serviceId: versusService.id, code: "versus-auth" } },
+      update: { name: "認証用SIMプラン", description: "SMS・音声・データ対応、当月末自動解約" },
       create: {
-        serviceId: buppanService.id,
-        code: "adaafi-basic",
-        name: "アドアフィプラン",
+        serviceId: versusService.id,
+        code: "versus-auth",
+        name: "認証用SIMプラン",
+        description: "SMS・音声・データ対応、当月末自動解約",
         isActive: true,
       },
     }),
-    // Machinegun プラン
+
+    // ===== AVARIS プラン =====
+    prisma.plan.upsert({
+      where: { serviceId_code: { serviceId: avarisService.id, code: "avaris-auth" } },
+      update: { name: "認証用SIM", description: "事務手数料込み・翌月末自動解約" },
+      create: {
+        serviceId: avarisService.id,
+        code: "avaris-auth",
+        name: "認証用SIM",
+        description: "事務手数料込み・翌月末自動解約",
+        isActive: true,
+      },
+    }),
+
+    // ===== MACHINEGUN プラン =====
     prisma.plan.upsert({
       where: { serviceId_code: { serviceId: machinegunService.id, code: "machinegun-pokeka" } },
-      update: {},
+      update: { name: "ポケカ認証専用SIM", description: "10回線単位、MNP転出不可" },
       create: {
         serviceId: machinegunService.id,
         code: "machinegun-pokeka",
-        name: "ポケカ認証プラン",
+        name: "ポケカ認証専用SIM",
+        description: "10回線単位、MNP転出不可",
         isActive: true,
       },
     }),
     prisma.plan.upsert({
-      where: { serviceId_code: { serviceId: machinegunService.id, code: "machinegun-adaafi" } },
-      update: {},
+      where: { serviceId_code: { serviceId: machinegunService.id, code: "machinegun-mnp" } },
+      update: { name: "MNP乗り換えSIM専用プラン", description: "MNP予約番号発行対応" },
       create: {
         serviceId: machinegunService.id,
-        code: "machinegun-adaafi",
-        name: "アドアフィプラン",
+        code: "machinegun-mnp",
+        name: "MNP乗り換えSIM専用プラン",
+        description: "MNP予約番号発行対応",
         isActive: true,
       },
     }),
-    // Maeda プラン
+
+    // ===== MAEDA プラン =====
     prisma.plan.upsert({
-      where: { serviceId_code: { serviceId: maedaService.id, code: "maeda-pokeka" } },
-      update: {},
+      where: { serviceId_code: { serviceId: maedaService.id, code: "maeda-auth" } },
+      update: { name: "認証用SIMプラン", description: "SMS・音声・データ対応" },
       create: {
         serviceId: maedaService.id,
-        code: "maeda-pokeka",
-        name: "ポケカ認証プラン",
-        isActive: true,
-      },
-    }),
-    prisma.plan.upsert({
-      where: { serviceId_code: { serviceId: maedaService.id, code: "maeda-adaafi" } },
-      update: {},
-      create: {
-        serviceId: maedaService.id,
-        code: "maeda-adaafi",
-        name: "アドアフィプラン",
+        code: "maeda-auth",
+        name: "認証用SIMプラン",
+        description: "SMS・音声・データ対応",
         isActive: true,
       },
     }),
   ]);
   console.log(`Created ${plans.length} plans`);
 
-  // 5. プラン-用途タグ紐付け
-  const pokekaplan = plans.find((p) => p.code === "pokeka-basic")!;
-  const adaafiPlan = plans.find((p) => p.code === "adaafi-basic")!;
+  // プラン参照
+  const buppan3monthPlan = plans.find((p) => p.code === "buppan-3month")!;
+  const versusAuthPlan = plans.find((p) => p.code === "versus-auth")!;
+  const avarisAuthPlan = plans.find((p) => p.code === "avaris-auth")!;
   const machinegunPokekaPlan = plans.find((p) => p.code === "machinegun-pokeka")!;
-  const machinegunAdaafiPlan = plans.find((p) => p.code === "machinegun-adaafi")!;
-  const maedaPokekaPlan = plans.find((p) => p.code === "maeda-pokeka")!;
-  const maedaAdaafiPlan = plans.find((p) => p.code === "maeda-adaafi")!;
+  const machinegunMnpPlan = plans.find((p) => p.code === "machinegun-mnp")!;
+  const maedaAuthPlan = plans.find((p) => p.code === "maeda-auth")!;
 
+  // 5. プラン-用途タグ紐付け
   await Promise.all([
-    // Buppan
+    // BUPPAN
     prisma.planUsageTag.upsert({
-      where: { planId_usageTagId: { planId: pokekaplan.id, usageTagId: pokekaTag.id } },
+      where: { planId_usageTagId: { planId: buppan3monthPlan.id, usageTagId: authTag.id } },
       update: {},
-      create: {
-        planId: pokekaplan.id,
-        usageTagId: pokekaTag.id,
-      },
+      create: { planId: buppan3monthPlan.id, usageTagId: authTag.id },
     }),
+    // VERSUS
     prisma.planUsageTag.upsert({
-      where: { planId_usageTagId: { planId: adaafiPlan.id, usageTagId: adaafiTag.id } },
+      where: { planId_usageTagId: { planId: versusAuthPlan.id, usageTagId: authTag.id } },
       update: {},
-      create: {
-        planId: adaafiPlan.id,
-        usageTagId: adaafiTag.id,
-      },
+      create: { planId: versusAuthPlan.id, usageTagId: authTag.id },
     }),
-    // Machinegun
+    // AVARIS
+    prisma.planUsageTag.upsert({
+      where: { planId_usageTagId: { planId: avarisAuthPlan.id, usageTagId: authTag.id } },
+      update: {},
+      create: { planId: avarisAuthPlan.id, usageTagId: authTag.id },
+    }),
+    // MACHINEGUN
     prisma.planUsageTag.upsert({
       where: { planId_usageTagId: { planId: machinegunPokekaPlan.id, usageTagId: pokekaTag.id } },
       update: {},
-      create: {
-        planId: machinegunPokekaPlan.id,
-        usageTagId: pokekaTag.id,
-      },
+      create: { planId: machinegunPokekaPlan.id, usageTagId: pokekaTag.id },
     }),
     prisma.planUsageTag.upsert({
-      where: { planId_usageTagId: { planId: machinegunAdaafiPlan.id, usageTagId: adaafiTag.id } },
+      where: { planId_usageTagId: { planId: machinegunMnpPlan.id, usageTagId: mnpTag.id } },
       update: {},
-      create: {
-        planId: machinegunAdaafiPlan.id,
-        usageTagId: adaafiTag.id,
-      },
+      create: { planId: machinegunMnpPlan.id, usageTagId: mnpTag.id },
     }),
-    // Maeda
+    // MAEDA
     prisma.planUsageTag.upsert({
-      where: { planId_usageTagId: { planId: maedaPokekaPlan.id, usageTagId: pokekaTag.id } },
+      where: { planId_usageTagId: { planId: maedaAuthPlan.id, usageTagId: authTag.id } },
       update: {},
-      create: {
-        planId: maedaPokekaPlan.id,
-        usageTagId: pokekaTag.id,
-      },
-    }),
-    prisma.planUsageTag.upsert({
-      where: { planId_usageTagId: { planId: maedaAdaafiPlan.id, usageTagId: adaafiTag.id } },
-      update: {},
-      create: {
-        planId: maedaAdaafiPlan.id,
-        usageTagId: adaafiTag.id,
-      },
+      create: { planId: maedaAuthPlan.id, usageTagId: authTag.id },
     }),
   ]);
   console.log("Created plan-usage tag relations");
 
-  // 6. プラン料金テーブル（回線数ベースの階層料金）
+  // 6. プラン料金テーブル
   await Promise.all([
-    // Buppan ポケカプラン - 通常料金
+    // ===== BUPPAN 3ヶ月パック =====
+    // 50回線未満: ¥4,600
     prisma.planPricing.upsert({
-      where: { id: "pokeka-tier-1" },
-      update: {},
+      where: { id: "buppan-3month-tier-1" },
+      update: { unitPrice: 4600, description: "50回線未満" },
       create: {
-        id: "pokeka-tier-1",
-        planId: pokekaplan.id,
+        id: "buppan-3month-tier-1",
+        planId: buppan3monthPlan.id,
         minQuantity: 1,
         maxQuantity: 49,
-        unitPrice: 3980,
-        description: "1〜49回線",
+        unitPrice: 4600,
+        description: "50回線未満",
       },
     }),
-    // Buppan ポケカプラン - 大量割引
+    // 50回線以上: ¥4,200
     prisma.planPricing.upsert({
-      where: { id: "pokeka-tier-2" },
-      update: {},
+      where: { id: "buppan-3month-tier-2" },
+      update: { unitPrice: 4200, description: "50回線以上" },
       create: {
-        id: "pokeka-tier-2",
-        planId: pokekaplan.id,
+        id: "buppan-3month-tier-2",
+        planId: buppan3monthPlan.id,
         minQuantity: 50,
         maxQuantity: null,
-        unitPrice: 3480,
-        description: "50回線以上（割引）",
+        unitPrice: 4200,
+        description: "50回線以上",
       },
     }),
-    // Buppan アドアフィプラン - 通常料金
+
+    // ===== VERSUS 認証用SIMプラン =====
+    // 50回線未満: ¥3,600
     prisma.planPricing.upsert({
-      where: { id: "adaafi-tier-1" },
-      update: {},
+      where: { id: "versus-auth-tier-1" },
+      update: { unitPrice: 3600, description: "50回線未満" },
       create: {
-        id: "adaafi-tier-1",
-        planId: adaafiPlan.id,
+        id: "versus-auth-tier-1",
+        planId: versusAuthPlan.id,
         minQuantity: 1,
-        maxQuantity: null,
-        unitPrice: 4980,
-        description: "回線数無制限",
+        maxQuantity: 49,
+        unitPrice: 3600,
+        description: "50回線未満",
       },
     }),
-    // Machinegun ポケカプラン
+    // 50回線以上: ¥3,300
+    prisma.planPricing.upsert({
+      where: { id: "versus-auth-tier-2" },
+      update: { unitPrice: 3300, description: "50回線以上" },
+      create: {
+        id: "versus-auth-tier-2",
+        planId: versusAuthPlan.id,
+        minQuantity: 50,
+        maxQuantity: null,
+        unitPrice: 3300,
+        description: "50回線以上",
+      },
+    }),
+
+    // ===== AVARIS 認証用SIM =====
+    // 100回線未満: ¥3,200
+    prisma.planPricing.upsert({
+      where: { id: "avaris-auth-tier-1" },
+      update: { unitPrice: 3200, description: "100回線未満" },
+      create: {
+        id: "avaris-auth-tier-1",
+        planId: avarisAuthPlan.id,
+        minQuantity: 1,
+        maxQuantity: 99,
+        unitPrice: 3200,
+        description: "100回線未満",
+      },
+    }),
+    // 100回線以上: ¥3,100
+    prisma.planPricing.upsert({
+      where: { id: "avaris-auth-tier-2" },
+      update: { unitPrice: 3100, description: "100回線以上" },
+      create: {
+        id: "avaris-auth-tier-2",
+        planId: avarisAuthPlan.id,
+        minQuantity: 100,
+        maxQuantity: null,
+        unitPrice: 3100,
+        description: "100回線以上",
+      },
+    }),
+
+    // ===== MACHINEGUN ポケカ認証専用SIM =====
+    // 単一料金: ¥3,300（10回線単位）
     prisma.planPricing.upsert({
       where: { id: "machinegun-pokeka-tier-1" },
-      update: {},
+      update: { unitPrice: 3300, minQuantity: 10, maxQuantity: null, description: "10回線単位" },
       create: {
         id: "machinegun-pokeka-tier-1",
         planId: machinegunPokekaPlan.id,
-        minQuantity: 1,
-        maxQuantity: 49,
-        unitPrice: 3980,
-        description: "1〜49回線",
+        minQuantity: 10,
+        maxQuantity: null,
+        unitPrice: 3300,
+        description: "10回線単位",
       },
     }),
+
+    // ===== MACHINEGUN MNP乗り換えSIM =====
+    // 単一料金: ¥2,980
     prisma.planPricing.upsert({
-      where: { id: "machinegun-pokeka-tier-2" },
-      update: {},
+      where: { id: "machinegun-mnp-tier-1" },
+      update: { unitPrice: 2980, description: "回線数無制限" },
       create: {
-        id: "machinegun-pokeka-tier-2",
-        planId: machinegunPokekaPlan.id,
-        minQuantity: 50,
-        maxQuantity: null,
-        unitPrice: 3480,
-        description: "50回線以上（割引）",
-      },
-    }),
-    // Machinegun アドアフィプラン
-    prisma.planPricing.upsert({
-      where: { id: "machinegun-adaafi-tier-1" },
-      update: {},
-      create: {
-        id: "machinegun-adaafi-tier-1",
-        planId: machinegunAdaafiPlan.id,
+        id: "machinegun-mnp-tier-1",
+        planId: machinegunMnpPlan.id,
         minQuantity: 1,
         maxQuantity: null,
-        unitPrice: 4980,
+        unitPrice: 2980,
         description: "回線数無制限",
       },
     }),
-    // Maeda ポケカプラン
+
+    // ===== MAEDA 認証用SIMプラン =====
+    // 50回線未満: ¥3,600
     prisma.planPricing.upsert({
-      where: { id: "maeda-pokeka-tier-1" },
-      update: {},
+      where: { id: "maeda-auth-tier-1" },
+      update: { unitPrice: 3600, description: "50回線未満" },
       create: {
-        id: "maeda-pokeka-tier-1",
-        planId: maedaPokekaPlan.id,
+        id: "maeda-auth-tier-1",
+        planId: maedaAuthPlan.id,
         minQuantity: 1,
         maxQuantity: 49,
-        unitPrice: 3980,
-        description: "1〜49回線",
+        unitPrice: 3600,
+        description: "50回線未満",
       },
     }),
+    // 50回線以上: ¥3,300
     prisma.planPricing.upsert({
-      where: { id: "maeda-pokeka-tier-2" },
-      update: {},
+      where: { id: "maeda-auth-tier-2" },
+      update: { unitPrice: 3300, description: "50回線以上" },
       create: {
-        id: "maeda-pokeka-tier-2",
-        planId: maedaPokekaPlan.id,
+        id: "maeda-auth-tier-2",
+        planId: maedaAuthPlan.id,
         minQuantity: 50,
         maxQuantity: null,
-        unitPrice: 3480,
-        description: "50回線以上（割引）",
-      },
-    }),
-    // Maeda アドアフィプラン
-    prisma.planPricing.upsert({
-      where: { id: "maeda-adaafi-tier-1" },
-      update: {},
-      create: {
-        id: "maeda-adaafi-tier-1",
-        planId: maedaAdaafiPlan.id,
-        minQuantity: 1,
-        maxQuantity: null,
-        unitPrice: 4980,
-        description: "回線数無制限",
+        unitPrice: 3300,
+        description: "50回線以上",
       },
     }),
   ]);
@@ -416,6 +481,30 @@ async function main() {
       password: hashedPassword,
       role: "ADMIN",
       serviceId: buppanService.id,
+      isActive: true,
+    },
+  });
+
+  await prisma.user.upsert({
+    where: { email: "versus-admin@example.com" },
+    update: {},
+    create: {
+      email: "versus-admin@example.com",
+      password: hashedPassword,
+      role: "ADMIN",
+      serviceId: versusService.id,
+      isActive: true,
+    },
+  });
+
+  await prisma.user.upsert({
+    where: { email: "avaris-admin@example.com" },
+    update: {},
+    create: {
+      email: "avaris-admin@example.com",
+      password: hashedPassword,
+      role: "ADMIN",
+      serviceId: avarisService.id,
       isActive: true,
     },
   });

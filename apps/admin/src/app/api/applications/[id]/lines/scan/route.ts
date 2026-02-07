@@ -127,11 +127,11 @@ export async function POST(
         const line = notActivatedLines[i];
         const sim = simMap.get(iccid);
 
-        // 回線にSIMを割当（SIMが存在しない場合もICCIDは登録）
+        // 回線にSIMを割当（SIMが存在する場合のみsimIdを設定）
         const updatedLine = await tx.applicationLine.update({
           where: { id: line.id },
           data: {
-            simId: iccid,
+            simId: sim ? iccid : null,
             msisdn: sim?.msisdn || null,
             status: "ACTIVATED",
             contractMonth: validated.contractMonth,
@@ -177,8 +177,9 @@ export async function POST(
       );
     }
     console.error("ICCID一括割当エラー:", error);
+    const errorMessage = error instanceof Error ? error.message : "不明なエラー";
     return NextResponse.json(
-      { error: "ICCID一括割当に失敗しました" },
+      { error: "ICCID一括割当に失敗しました", details: errorMessage },
       { status: 500 }
     );
   }
