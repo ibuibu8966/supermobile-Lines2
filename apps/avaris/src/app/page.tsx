@@ -7,6 +7,8 @@ import { Header } from "./components/Header";
 import { Footer } from "./components/Footer";
 import { FAQ } from "./components/FAQ";
 
+export const revalidate = 60;
+
 async function getPlansWithPricing() {
   const service = await prisma.service.findUnique({
     where: { code: "avaris" },
