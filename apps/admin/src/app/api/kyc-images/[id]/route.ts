@@ -58,18 +58,16 @@ export async function PATCH(
     }
 
     // KYC画像を更新
-    const updateData: { status: string; reviewNote: string | null; reviewedAt: Date; expiryDate?: Date | null } = {
-      status: validated.status,
-      reviewNote: validated.reviewNote || null,
-      reviewedAt: new Date(),
-    };
-    if (validated.expiryDate !== undefined) {
-      updateData.expiryDate = validated.expiryDate ? new Date(validated.expiryDate) : null;
-    }
-
     const updatedKycImage = await prisma.kycImage.update({
       where: { id },
-      data: updateData,
+      data: {
+        status: validated.status,
+        reviewNote: validated.reviewNote || null,
+        reviewedAt: new Date(),
+        ...(validated.expiryDate !== undefined && {
+          expiryDate: validated.expiryDate ? new Date(validated.expiryDate) : null,
+        }),
+      },
     });
 
     // 申込のkycStatusを更新

@@ -734,168 +734,116 @@ export default function ApplicationDetailPage() {
           </CardContent>
         </Card>
 
-        {/* KYC画像 */}
-        <Card id="kyc">
+        {/* ステータス */}
+        <Card>
           <CardHeader>
-            <CardTitle className="text-base">本人確認書類</CardTitle>
+            <CardTitle className="text-base">ステータス</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">本人確認</label>
+                <select
+                  className="px-3 py-2 border rounded-md text-sm w-full"
+                  value={application.kycStatus}
+                  onChange={(e) => updateApplicationField("kycStatus", e.target.value)}
+                >
+                  {KYC_STATUS_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">決済確認</label>
+                <select
+                  className={`px-3 py-2 border rounded-md text-sm w-full ${
+                    application.paymentStatus === "PAID" ? "bg-green-50 border-green-300" : ""
+                  }`}
+                  value={application.paymentStatus}
+                  onChange={(e) => updateApplicationField("paymentStatus", e.target.value)}
+                >
+                  {PAYMENT_STATUS_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* アップロード画像 */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">アップロード画像</CardTitle>
           </CardHeader>
           <CardContent>
             {application.kycImages.length === 0 ? (
-              <p className="text-gray-500">書類がありません</p>
+              <p className="text-gray-500">画像がありません</p>
             ) : (
-              <div className="grid lg:grid-cols-2 gap-6">
-                {/* 左側: 画像プレビュー */}
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <p className="text-sm font-medium">
-                      {KYC_TYPE_LABELS[application.kycImages[selectedImageIndex]?.type] || application.kycImages[selectedImageIndex]?.type}
+              <div className="flex gap-8">
+                {application.kycImages.map((img) => (
+                  <div key={img.id}>
+                    <p className="text-sm font-medium text-gray-700 mb-1">
+                      {KYC_TYPE_LABELS[img.type] || img.type}
                     </p>
-                    {getKycStatusBadge(application.kycImages[selectedImageIndex]?.status)}
-                  </div>
-                  <div
-                    className="relative aspect-[4/3] bg-gray-100 rounded-lg overflow-hidden cursor-pointer"
-                    onClick={() => setIsImageModalOpen(true)}
-                  >
-                    {application.kycImages[selectedImageIndex]?.signedUrl ? (
-                      <img
-                        src={application.kycImages[selectedImageIndex].signedUrl}
-                        alt="KYC画像"
-                        className="w-full h-full object-contain"
-                      />
-                    ) : (
-                      <div className="flex items-center justify-center h-full text-gray-400">
-                        画像を読み込めません
-                      </div>
-                    )}
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      className="absolute bottom-2 right-2"
+                    <button
+                      onClick={() => openKycModal(img.type)}
+                      className="text-blue-600 hover:underline text-sm"
                     >
-                      <ZoomIn className="h-4 w-4 mr-1" />
-                      拡大
-                    </Button>
+                      表示
+                    </button>
                   </div>
-                  {application.kycImages[selectedImageIndex]?.expiryDate && (
-                    <div className="text-xs text-gray-500 mt-2">
-                      有効期限: {formatDate(application.kycImages[selectedImageIndex].expiryDate)}
-                    </div>
-                  )}
-                  {application.kycImages.length > 1 && (
-                    <div className="flex justify-center gap-2 mt-3">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={selectedImageIndex === 0}
-                        onClick={() => setSelectedImageIndex((i) => i - 1)}
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                      </Button>
-                      <span className="text-sm py-2">
-                        {selectedImageIndex + 1} / {application.kycImages.length}
-                      </span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={selectedImageIndex === application.kycImages.length - 1}
-                        onClick={() => setSelectedImageIndex((i) => i + 1)}
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  )}
-                  {/* 承認/不備ボタン */}
-                  {application.kycImages[selectedImageIndex]?.status === "PENDING" && (
-                    <div className="flex gap-2 mt-4">
-                      <Button
-                        className="flex-1"
-                        onClick={() => handleApproveKyc(application.kycImages[selectedImageIndex].id)}
-                        disabled={kycProcessing}
-                      >
-                        <Check className="h-4 w-4 mr-1" />
-                        承認
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        className="flex-1"
-                        onClick={() => setIsRejectModalOpen(true)}
-                        disabled={kycProcessing}
-                      >
-                        <X className="h-4 w-4 mr-1" />
-                        不備
-                      </Button>
-                    </div>
-                  )}
-                  {application.kycImages[selectedImageIndex]?.reviewNote && (
-                    <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
-                      <p className="text-sm font-medium text-red-700">不備理由:</p>
-                      <p className="text-sm text-red-600">{application.kycImages[selectedImageIndex].reviewNote}</p>
-                    </div>
-                  )}
-                </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-                {/* 右側: 顧客情報パネル */}
-                <div>
-                  <h4 className="font-medium text-sm mb-3">顧客情報</h4>
-                  <dl className="space-y-2 text-sm">
-                    <div className="flex">
-                      <dt className="text-gray-500 w-24 shrink-0">氏名</dt>
-                      <dd>{getCustomerName(application.customer)}</dd>
-                    </div>
-                    <div className="flex">
-                      <dt className="text-gray-500 w-24 shrink-0">種別</dt>
-                      <dd>
-                        <Badge variant={application.customer.type === "CORPORATE" ? "default" : "secondary"}>
-                          {application.customer.type === "CORPORATE" ? "法人" : "個人"}
-                        </Badge>
-                      </dd>
-                    </div>
-                    <div className="flex">
-                      <dt className="text-gray-500 w-24 shrink-0">メール</dt>
-                      <dd className="truncate">
-                        <a href={`mailto:${application.customer.email}`} className="text-blue-600 hover:underline">
-                          {application.customer.email}
-                        </a>
-                      </dd>
-                    </div>
-                    <div className="flex">
-                      <dt className="text-gray-500 w-24 shrink-0">電話番号</dt>
-                      <dd>{application.customer.phone}</dd>
-                    </div>
-                    <div className="flex">
-                      <dt className="text-gray-500 w-24 shrink-0">住所</dt>
-                      <dd>
-                        〒{application.customer.postalCode}<br />
-                        {application.customer.prefecture}
-                        {application.customer.city}
-                        {application.customer.address}
-                        {application.customer.building && (
-                          <>
-                            <br />
-                            {application.customer.building}
-                          </>
-                        )}
-                      </dd>
-                    </div>
-                    {application.customer.type === "CORPORATE" && application.customer.companyPostalCode && (
-                      <div className="flex">
-                        <dt className="text-gray-500 w-24 shrink-0">法人住所</dt>
-                        <dd>
-                          〒{application.customer.companyPostalCode}<br />
-                          {application.customer.companyPrefecture}
-                          {application.customer.companyCity}
-                          {application.customer.companyAddress}
-                          {application.customer.companyBuilding && (
-                            <>
-                              <br />
-                              {application.customer.companyBuilding}
-                            </>
-                          )}
-                        </dd>
-                      </div>
-                    )}
-                  </dl>
-                </div>
+        {/* 身分証有効期限 */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">身分証有効期限</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isEditingExpiry ? (
+              <div className="flex items-center gap-3">
+                <input
+                  type="date"
+                  className="px-3 py-2 border rounded-md text-sm"
+                  value={editExpiryValue}
+                  onChange={(e) => setEditExpiryValue(e.target.value)}
+                />
+                <Button size="sm" onClick={handleSaveExpiry}>
+                  保存
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setIsEditingExpiry(false)}>
+                  キャンセル
+                </Button>
+              </div>
+            ) : (
+              <div>
+                <p className="text-sm mb-2">
+                  {application.latestExpiryDate
+                    ? formatDate(application.latestExpiryDate)
+                    : "未設定"}
+                </p>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setEditExpiryValue(
+                      application.latestExpiryDate
+                        ? new Date(application.latestExpiryDate).toISOString().split("T")[0]
+                        : ""
+                    );
+                    setIsEditingExpiry(true);
+                  }}
+                >
+                  編集
+                </Button>
               </div>
             )}
           </CardContent>
@@ -1322,61 +1270,16 @@ export default function ApplicationDetailPage() {
         />
       )}
 
-      {/* KYC画像拡大モーダル */}
-      <Dialog open={isImageModalOpen} onOpenChange={setIsImageModalOpen}>
-        <DialogContent className="max-w-4xl">
-          <DialogHeader>
-            <DialogTitle>
-              {application?.kycImages[selectedImageIndex]?.type &&
-                KYC_TYPE_LABELS[application.kycImages[selectedImageIndex].type]}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="relative aspect-[4/3] bg-gray-100 rounded-lg overflow-hidden">
-            {application?.kycImages[selectedImageIndex]?.signedUrl && (
-              <img
-                src={application.kycImages[selectedImageIndex].signedUrl}
-                alt="KYC画像"
-                className="w-full h-full object-contain"
-              />
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* 不備理由入力モーダル */}
-      <Dialog open={isRejectModalOpen} onOpenChange={setIsRejectModalOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>不備の理由を入力</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <Textarea
-              placeholder="不備の理由を入力してください..."
-              value={rejectNote}
-              onChange={(e) => setRejectNote(e.target.value)}
-              rows={4}
-            />
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsRejectModalOpen(false)}
-            >
-              キャンセル
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() =>
-                application &&
-                handleRejectKyc(application.kycImages[selectedImageIndex].id)
-              }
-              disabled={kycProcessing}
-            >
-              不備として登録
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* KycModal */}
+      <KycModal
+        applicationId={application?.id || null}
+        isOpen={isKycModalOpen}
+        onClose={() => {
+          setIsKycModalOpen(false);
+          setKycModalInitialType(undefined);
+        }}
+        initialImageType={kycModalInitialType}
+      />
 
       {/* アーカイブ確認ダイアログ */}
       <Dialog open={isArchiveConfirmOpen} onOpenChange={setIsArchiveConfirmOpen}>
