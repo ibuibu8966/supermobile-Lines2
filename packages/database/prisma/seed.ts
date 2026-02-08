@@ -95,7 +95,7 @@ async function main() {
       update: {},
       create: {
         code: "pokeka",
-        name: "ポケカ認証",
+        name: "SMS認証",
         category: "認証系",
         description: "ポケモンカード関連の認証用途",
         displayOrder: 1,
@@ -232,11 +232,11 @@ async function main() {
     // ===== MACHINEGUN プラン =====
     prisma.plan.upsert({
       where: { serviceId_code: { serviceId: machinegunService.id, code: "machinegun-pokeka" } },
-      update: { name: "ポケカ認証専用SIM", description: "10回線単位、MNP転出不可", features: ["音声通話付き", "最短翌営業日発送", "法人契約対応"] },
+      update: { name: "SMS認証専用SIM", description: "10回線単位、MNP転出不可", features: ["音声通話付き", "最短翌営業日発送", "法人契約対応"] },
       create: {
         serviceId: machinegunService.id,
         code: "machinegun-pokeka",
-        name: "ポケカ認証専用SIM",
+        name: "SMS認証専用SIM",
         description: "10回線単位、MNP転出不可",
         features: ["音声通話付き", "最短翌営業日発送", "法人契約対応"],
         isActive: true,
@@ -405,7 +405,7 @@ async function main() {
       },
     }),
 
-    // ===== MACHINEGUN ポケカ認証専用SIM =====
+    // ===== MACHINEGUN SMS認証専用SIM =====
     // 単一料金: ¥3,300（10回線単位）
     prisma.planPricing.upsert({
       where: { id: "machinegun-pokeka-tier-1" },

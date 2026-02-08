@@ -25,7 +25,7 @@ export function Footer() {
               <span className="text-xl font-bold text-amber-900">前田</span>
             </div>
             <p className="text-amber-800/70 text-sm mb-4">
-              法人向けモバイル回線サービス
+              モバイル回線レンタルサービス
             </p>
             <p className="text-amber-800/70 text-sm">
               運営: 合同会社ピーチ

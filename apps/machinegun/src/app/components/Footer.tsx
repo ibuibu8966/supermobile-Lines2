@@ -25,7 +25,7 @@ export function Footer() {
               <span className="text-xl font-bold text-gold">MOBILE</span>
             </div>
             <p className="text-muted-foreground text-sm mb-4">
-              法人向けモバイル回線サービス
+              モバイル回線レンタルサービス
             </p>
             <p className="text-muted-foreground text-sm">
               運営: 合同会社ピーチ

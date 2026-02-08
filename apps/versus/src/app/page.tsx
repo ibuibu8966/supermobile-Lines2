@@ -65,7 +65,7 @@ export default async function LandingPage() {
               <span className="text-neon neon-text">相棒。</span>
             </h1>
             <p className="text-xl text-gray-300 mb-8">
-              認証用SIMレンタルサービス。アダルトアフィリエイト・ポケカ認証など、
+              認証用SIMレンタルサービス。アダルトアフィリエイト・SMS認証など、
               各種認証に対応したSIMをレンタル。
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -129,7 +129,7 @@ export default async function LandingPage() {
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground">
-                  docomo、au、SoftBank、楽天モバイル。用途に合わせてキャリアを選択できます。
+                  docomo・楽天モバイル回線をご用意。用途に合わせたSIMをご提供します。
                 </p>
               </CardContent>
             </Card>

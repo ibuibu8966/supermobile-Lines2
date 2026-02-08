@@ -6,8 +6,8 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "モバイル前田 - 法人向けモバイル回線",
-  description: "モバイル前田 - 法人向けモバイル回線サービス",
+  title: "モバイル前田 - モバイル回線レンタル",
+  description: "モバイル前田 - モバイル回線レンタルサービス",
 };
 
 export default function RootLayout({

@@ -61,7 +61,7 @@ export default async function LandingPage() {
               <span className="text-gold">相棒。</span>
             </h1>
             <p className="text-xl text-gray-300 mb-8">
-              法人向けモバイル回線サービス。音声通話付きSIMを業界最安値でご提供。
+              音声通話付きSIMを業界最安値でご提供。
               物販ビジネスに必要な回線を、シンプルな料金体系でお届けします。
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
@@ -122,7 +122,7 @@ export default async function LandingPage() {
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground">
-                  docomo、au、SoftBank、楽天モバイル。ビジネスニーズに合わせてキャリアを選択できます。
+                  docomo・楽天モバイル回線をご用意。ビジネスニーズに合わせたSIMをご提供します。
                 </p>
               </CardContent>
             </Card>
