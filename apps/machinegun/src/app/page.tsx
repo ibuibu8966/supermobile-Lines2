@@ -156,7 +156,7 @@ export default async function LandingPage() {
           </p>
 
           {plans.length > 0 ? (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-5xl mx-auto">
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-5xl mx-auto justify-items-center">
               {plans.map((plan, index) => {
                 const lowestPrice = plan.pricings[0]?.unitPrice;
                 const isPopular = index === 0;

@@ -50,7 +50,7 @@ export default function AdditionalApplyPage() {
 
   // フォームデータ
   const [selectedPlanId, setSelectedPlanId] = useState<string>("");
-  const [lineCount, setLineCount] = useState<number>(1);
+  const [lineCount, setLineCount] = useState<number>(10);
   const [agreements, setAgreements] = useState({
     terms: false,
     privacy: false,
@@ -101,7 +101,7 @@ export default function AdditionalApplyPage() {
   };
 
   const canProceedStep1 = () => {
-    return selectedPlanId !== "" && lineCount >= 1;
+    return selectedPlanId !== "" && lineCount >= 10 && lineCount % 10 === 0;
   };
 
   const canSubmit = () => {
@@ -291,11 +291,13 @@ export default function AdditionalApplyPage() {
                 <Input
                   id="lineCount"
                   type="number"
-                  min="1"
+                  min="10"
+                  step="10"
                   value={lineCount}
-                  onChange={(e) =>
-                    setLineCount(parseInt(e.target.value) || 1)
-                  }
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value) || 10;
+                    setLineCount(Math.max(10, Math.round(val / 10) * 10));
+                  }}
                   className="w-32 mt-2"
                 />
               </div>

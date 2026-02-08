@@ -76,6 +76,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (lineCount < 10 || lineCount % 10 !== 0) {
+      return NextResponse.json(
+        { error: "回線数は10回線単位で入力してください" },
+        { status: 400 }
+      );
+    }
+
     if (password.length < 8) {
       return NextResponse.json(
         { error: "パスワードは8文字以上で入力してください" },

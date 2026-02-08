@@ -184,7 +184,7 @@ export default function ApplyPage() {
   // フォームデータ
   const [selectedPlanId, setSelectedPlanId] = useState<string>("");
   const [customerType, setCustomerType] = useState<"INDIVIDUAL" | "CORPORATE">("INDIVIDUAL");
-  const [lineCount, setLineCount] = useState(1);
+  const [lineCount, setLineCount] = useState(10);
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [agreePrivacy, setAgreePrivacy] = useState(false);
   const [agreeTelecom, setAgreeTelecom] = useState(false);
@@ -934,9 +934,13 @@ export default function ApplyPage() {
                 <Input
                   id="lineCount"
                   type="number"
-                  min="1"
+                  min="10"
+                  step="10"
                   value={lineCount}
-                  onChange={(e) => setLineCount(parseInt(e.target.value) || 1)}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value) || 10;
+                    setLineCount(Math.max(10, Math.round(val / 10) * 10));
+                  }}
                   className="w-32"
                 />
               </div>

@@ -17,9 +17,9 @@ export async function POST(request: NextRequest) {
     const { planId, lineCount } = body;
 
     // バリデーション
-    if (!planId || !lineCount || lineCount < 1) {
+    if (!planId || !lineCount || lineCount < 10 || lineCount % 10 !== 0) {
       return NextResponse.json(
-        { error: "プランと回線数を指定してください" },
+        { error: "回線数は10回線単位で指定してください" },
         { status: 400 }
       );
     }
