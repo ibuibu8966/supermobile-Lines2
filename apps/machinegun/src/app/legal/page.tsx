@@ -279,7 +279,10 @@ export default function LegalPage() {
               <h2 className="text-lg font-semibold text-gold mb-2">
                 使用ネットワーク
               </h2>
-              <p className="text-muted-foreground">NTTドコモ網系MVNO</p>
+              <ul className="list-disc list-inside text-muted-foreground space-y-1">
+                <li>NTTドコモ網系MVNO</li>
+                <li>楽天回線</li>
+              </ul>
             </section>
 
             <section>
