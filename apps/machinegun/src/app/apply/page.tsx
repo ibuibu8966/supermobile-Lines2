@@ -124,7 +124,7 @@ function FileUpload({
         className="hidden"
       />
       {file && preview ? (
-        <div className="relative border rounded-lg p-2 bg-gray-50">
+        <div className="relative border rounded-lg p-2 bg-muted">
           <div className="flex items-center gap-3">
             {file.type.startsWith("image/") ? (
               <Image
@@ -135,22 +135,22 @@ function FileUpload({
                 className="object-cover rounded"
               />
             ) : (
-              <div className="w-20 h-20 bg-gray-200 rounded flex items-center justify-center text-xs text-gray-500">
+              <div className="w-20 h-20 bg-muted rounded flex items-center justify-center text-xs text-muted-foreground">
                 PDF
               </div>
             )}
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate">{file.name}</p>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 {(file.size / 1024 / 1024).toFixed(2)} MB
               </p>
             </div>
             <button
               type="button"
               onClick={handleRemove}
-              className="p-1 hover:bg-gray-200 rounded"
+              className="p-1 hover:bg-muted rounded"
             >
-              <X className="h-5 w-5 text-gray-500" />
+              <X className="h-5 w-5 text-muted-foreground" />
             </button>
           </div>
         </div>
@@ -158,9 +158,9 @@ function FileUpload({
         <button
           type="button"
           onClick={handleClick}
-          className="w-full border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-primary hover:bg-gray-50 transition-colors"
+          className="w-full border-2 border-dashed border-border rounded-lg p-6 hover:border-primary hover:bg-muted transition-colors"
         >
-          <div className="flex flex-col items-center gap-2 text-gray-500">
+          <div className="flex flex-col items-center gap-2 text-muted-foreground">
             <Upload className="h-8 w-8" />
             <span className="text-sm">クリックしてファイルを選択</span>
             <span className="text-xs">
@@ -363,11 +363,11 @@ export default function ApplyPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900">
-      <header className="bg-white border-b">
+    <div className="min-h-screen bg-background text-foreground">
+      <header className="bg-card border-b">
         <div className="max-w-3xl mx-auto px-4 py-4">
           <div className="flex items-center gap-4">
-            <Link href="/" className="text-gray-500 hover:text-gray-700">
+            <Link href="/" className="text-muted-foreground hover:text-foreground">
               <ArrowLeft className="h-5 w-5" />
             </Link>
             <h1 className="text-xl font-bold">お申込み</h1>
@@ -386,7 +386,7 @@ export default function ApplyPage() {
                       ? "bg-primary text-white"
                       : currentStep === step.id
                         ? "bg-primary text-white"
-                        : "bg-gray-200 text-gray-500")}
+                        : "bg-muted text-muted-foreground")}
                 >
                   {currentStep > step.id ? (
                     <Check className="h-4 w-4" />
@@ -397,15 +397,15 @@ export default function ApplyPage() {
                 <span
                   className={"ml-2 text-sm hidden sm:inline " +
                     (currentStep >= step.id
-                      ? "text-gray-900"
-                      : "text-gray-500")}
+                      ? "text-foreground"
+                      : "text-muted-foreground")}
                 >
                   {step.name}
                 </span>
                 {index < steps.length - 1 && (
                   <div
                     className={"w-8 sm:w-12 h-0.5 mx-2 sm:mx-4 " +
-                      (currentStep > step.id ? "bg-primary" : "bg-gray-200")}
+                      (currentStep > step.id ? "bg-primary" : "bg-muted")}
                   />
                 )}
               </div>
@@ -430,10 +430,10 @@ export default function ApplyPage() {
             <CardContent className="space-y-4">
               {loadingPlans ? (
                 <div className="flex justify-center py-8">
-                  <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
               ) : plans.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
+                <div className="text-center py-8 text-muted-foreground">
                   現在お申込み可能なプランがありません
                 </div>
               ) : (
@@ -443,7 +443,7 @@ export default function ApplyPage() {
                     return (
                       <label
                         key={plan.id}
-                        className={"flex items-start gap-4 p-4 border rounded-lg cursor-pointer hover:bg-gray-50 " +
+                        className={"flex items-start gap-4 p-4 border rounded-lg cursor-pointer hover:bg-muted " +
                           (selectedPlanId === plan.id ? "border-primary bg-primary/5" : "")}
                       >
                         <input
@@ -457,7 +457,7 @@ export default function ApplyPage() {
                         <div className="flex-1">
                           <p className="font-medium">{plan.name}</p>
                           {plan.description && (
-                            <p className="text-sm text-gray-600 mt-1 whitespace-pre-wrap">
+                            <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">
                               {plan.description}
                             </p>
                           )}
@@ -470,7 +470,7 @@ export default function ApplyPage() {
                                 ? `${pricing.minQuantity}〜${pricing.maxQuantity}回線`
                                 : `${pricing.minQuantity}回線以上`;
                               return (
-                                <div key={i} className="text-xs text-gray-500">
+                                <div key={i} className="text-xs text-muted-foreground">
                                   {rangeText}: <span className="font-medium">{formatPrice(pricing.unitPrice)}</span>/回線
                                 </div>
                               );
@@ -525,7 +525,7 @@ export default function ApplyPage() {
               </div>
 
               {customerType === "CORPORATE" && (
-                <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
+                <div className="space-y-4 p-4 bg-muted rounded-lg">
                   <h4 className="font-medium">法人情報</h4>
                   <div className="grid gap-4">
                     <div className="grid grid-cols-2 gap-4">
@@ -671,7 +671,7 @@ export default function ApplyPage() {
                     <Label htmlFor="prefecture">都道府県 *</Label>
                     <select
                       id="prefecture"
-                      className="w-full h-10 px-3 border rounded-md"
+                      className="w-full h-10 px-3 border rounded-md bg-background text-foreground border-border"
                       value={customerData.prefecture}
                       onChange={(e) => setCustomerData({ ...customerData, prefecture: e.target.value })}
                     >
@@ -730,7 +730,7 @@ export default function ApplyPage() {
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                     >
                       {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                     </button>
@@ -750,7 +750,7 @@ export default function ApplyPage() {
                     <button
                       type="button"
                       onClick={() => setShowPasswordConfirm(!showPasswordConfirm)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                     >
                       {showPasswordConfirm ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                     </button>
@@ -950,7 +950,7 @@ export default function ApplyPage() {
                 />
               </div>
 
-              <div className="p-4 bg-gray-50 rounded-lg space-y-2 text-gray-900">
+              <div className="p-4 bg-muted rounded-lg space-y-2 text-foreground">
                 <div className="flex justify-between">
                   <span>{selectedPlan?.name} × {lineCount}回線</span>
                   <span>{formatPrice(unitPrice)} × {lineCount}</span>

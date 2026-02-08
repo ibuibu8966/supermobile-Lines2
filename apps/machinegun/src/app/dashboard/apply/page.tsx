@@ -148,7 +148,7 @@ export default function AdditionalApplyPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
@@ -162,7 +162,7 @@ export default function AdditionalApplyPage() {
       <div className="mb-6">
         <Link
           href="/dashboard"
-          className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700"
+          className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
         >
           <ChevronLeft className="h-4 w-4 mr-1" />
           ダッシュボードに戻る
@@ -185,7 +185,7 @@ export default function AdditionalApplyPage() {
                       "flex items-center justify-center w-8 h-8 rounded-full border-2",
                       step >= s.id
                         ? "border-primary bg-primary text-primary-foreground"
-                        : "border-gray-300 text-gray-300"
+                        : "border-muted-foreground text-muted-foreground"
                     )}
                   >
                     {step > s.id ? (
@@ -197,7 +197,7 @@ export default function AdditionalApplyPage() {
                   <span
                     className={cn(
                       "ml-2 text-sm font-medium",
-                      step >= s.id ? "text-primary" : "text-gray-400"
+                      step >= s.id ? "text-primary" : "text-muted-foreground"
                     )}
                   >
                     {s.name}
@@ -206,7 +206,7 @@ export default function AdditionalApplyPage() {
                     <div
                       className={cn(
                         "w-16 h-0.5 mx-4",
-                        step > s.id ? "bg-primary" : "bg-gray-200"
+                        step > s.id ? "bg-primary" : "bg-muted"
                       )}
                     />
                   )}
@@ -240,7 +240,7 @@ export default function AdditionalApplyPage() {
                           "relative flex items-start p-4 border rounded-lg cursor-pointer hover:border-primary transition-colors",
                           selectedPlanId === plan.id
                             ? "border-primary bg-primary/5"
-                            : "border-gray-200"
+                            : "border-border"
                         )}
                         onClick={() => setSelectedPlanId(plan.id)}
                       >
@@ -249,7 +249,7 @@ export default function AdditionalApplyPage() {
                             "w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5",
                             selectedPlanId === plan.id
                               ? "border-primary bg-primary"
-                              : "border-gray-300"
+                              : "border-muted-foreground"
                           )}
                         >
                           {selectedPlanId === plan.id && (
@@ -266,7 +266,7 @@ export default function AdditionalApplyPage() {
                               return (
                                 <div
                                   key={i}
-                                  className="text-xs text-gray-500"
+                                  className="text-xs text-muted-foreground"
                                 >
                                   {rangeText}:{" "}
                                   <strong>
@@ -345,7 +345,7 @@ export default function AdditionalApplyPage() {
               )}
 
               {selectedPlan && (
-                <div className="p-4 bg-gray-50 rounded-lg text-gray-900">
+                <div className="p-4 bg-muted rounded-lg text-foreground">
                   <h4 className="font-medium mb-2">お見積り</h4>
                   <div className="space-y-1 text-sm">
                     <div className="flex justify-between">
@@ -371,22 +371,22 @@ export default function AdditionalApplyPage() {
           {/* Step 2: 確認・同意 */}
           {step === 2 && selectedPlan && (
             <div className="space-y-6">
-              <div className="p-4 bg-gray-50 rounded-lg text-gray-900">
+              <div className="p-4 bg-muted rounded-lg text-foreground">
                 <h4 className="font-medium mb-3 flex items-center gap-2">
                   <Package className="h-4 w-4" />
                   申込内容
                 </h4>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-gray-500">プラン</span>
+                    <span className="text-muted-foreground">プラン</span>
                     <span className="font-medium">{selectedPlan.name}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">回線数</span>
+                    <span className="text-muted-foreground">回線数</span>
                     <span className="font-medium">{lineCount}回線</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">単価</span>
+                    <span className="text-muted-foreground">単価</span>
                     <span className="font-medium">
                       {formatCurrency(selectedPlanPrice)}
                     </span>
