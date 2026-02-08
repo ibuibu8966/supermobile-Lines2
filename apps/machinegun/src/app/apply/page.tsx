@@ -941,6 +941,11 @@ export default function ApplyPage() {
                     const val = parseInt(e.target.value) || 10;
                     setLineCount(Math.max(10, Math.round(val / 10) * 10));
                   }}
+                  onKeyDown={(e) => {
+                    if (e.key !== "ArrowUp" && e.key !== "ArrowDown") {
+                      e.preventDefault();
+                    }
+                  }}
                   className="w-32"
                 />
               </div>
