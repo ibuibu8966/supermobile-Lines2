@@ -6,8 +6,8 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Machinegun Mobile - SIM認証レンタル",
-  description: "Machinegun Mobile - 認証用SIMレンタルサービス",
+  title: "Machinegun Mobile - SIM認証",
+  description: "Machinegun Mobile - 認証用SIMサービス",
 };
 
 export default function RootLayout({

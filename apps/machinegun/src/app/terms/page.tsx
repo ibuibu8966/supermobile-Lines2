@@ -57,7 +57,7 @@ export default function TermsPage() {
                 第3条（サービス内容）
               </h2>
               <p className="text-muted-foreground">
-                本サービスは、モバイル回線（SIMカード）のレンタルサービスです。
+                本サービスは、モバイル回線（SIMカード）サービスです。
                 お客様は、当社が提供するSIMカードを利用して、音声通話およびデータ通信を行うことができます。
               </p>
             </section>

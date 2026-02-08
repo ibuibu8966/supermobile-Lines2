@@ -24,9 +24,6 @@ export function Footer() {
               <span className="text-xl font-bold text-white">MACHINEGUN</span>
               <span className="text-xl font-bold text-gold">MOBILE</span>
             </div>
-            <p className="text-muted-foreground text-sm mb-4">
-              モバイル回線レンタルサービス
-            </p>
             <p className="text-muted-foreground text-sm">
               運営: 合同会社ピーチ
             </p>
