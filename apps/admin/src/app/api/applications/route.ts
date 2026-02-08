@@ -88,6 +88,9 @@ export async function GET(request: NextRequest) {
               companyNameKana: true,
               email: true,
               phone: true,
+              _count: {
+                select: { applications: true },
+              },
             },
           },
           service: {

@@ -33,6 +33,7 @@ interface Application {
     companyNameKana: string | null;
     email: string | null;
     phone: string | null;
+    _count: { applications: number };
   };
   service: {
     id: string;
@@ -386,6 +387,7 @@ export default function ApplicationsPage() {
                   <tr className="border-b bg-gray-50">
                     <th className="text-left py-2 px-2 whitespace-nowrap min-w-[60px]">詳細</th>
                     <th className="text-left py-2 px-2 whitespace-nowrap min-w-[70px]">個人/法人</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap min-w-[50px]">申込</th>
                     <th className="text-left py-2 px-2 whitespace-nowrap min-w-[120px]">名前/会社名</th>
                     <th className="text-left py-2 px-2 whitespace-nowrap min-w-[120px]">カナ</th>
                     <th className="text-left py-2 px-2 whitespace-nowrap min-w-[110px]">電話番号</th>
@@ -431,6 +433,17 @@ export default function ApplicationsPage() {
                         <Badge variant={app.customer.type === "CORPORATE" ? "default" : "secondary"}>
                           {app.customer.type === "CORPORATE" ? "法人" : "個人"}
                         </Badge>
+                      </td>
+                      <td className="py-2 px-2">
+                        {app.customer._count.applications === 1 ? (
+                          <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                            初回
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-xs bg-orange-50 text-orange-700 border-orange-200">
+                            {app.customer._count.applications}回目
+                          </Badge>
+                        )}
                       </td>
                       <td className="py-2 px-2 whitespace-nowrap">
                         {getCustomerName(app.customer)}
