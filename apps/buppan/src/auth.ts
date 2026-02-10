@@ -32,7 +32,7 @@ const buppanAuthConfig: NextAuthConfig = {
       );
 
       // API Routes（認証不要のもの）
-      const publicApiPaths = ["/api/plans", "/api/applications", "/api/upload-url"];
+      const publicApiPaths = ["/api/plans", "/api/applications", "/api/upload-url", "/api/coupon"];
       const isPublicApi = publicApiPaths.some((path) =>
         pathname.startsWith(path)
       );
