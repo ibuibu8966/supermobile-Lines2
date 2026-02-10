@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -64,6 +64,14 @@ export default function SimImportPage() {
   const [selectedSupplier, setSelectedSupplier] = useState<string | null>(null);
   const [selectedSimType, setSelectedSimType] = useState<SimTypeOption | null>(null);
   const [contractEndDate, setContractEndDate] = useState<string>("");
+  const [carrierType, setCarrierType] = useState<string>("");
+  const [isMnpEligible, setIsMnpEligible] = useState(false);
+  const [isAutoCancel, setIsAutoCancel] = useState(false);
+  const [autoCancelDate, setAutoCancelDate] = useState<string>("");
+  const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
+
+  // 用途タグ一覧
+  const [usageTags, setUsageTags] = useState<Array<{ id: number; name: string; code: string }>>([]);
 
   // ファイル・データ
   const [file, setFile] = useState<File | null>(null);
@@ -76,6 +84,13 @@ export default function SimImportPage() {
   const [dragOver, setDragOver] = useState(false);
 
   const selectedConfig = selectedSupplier ? SUPPLIER_CONFIGS[selectedSupplier] : null;
+
+  useEffect(() => {
+    fetch("/api/usage-tags")
+      .then((res) => res.json())
+      .then((data) => setUsageTags(data))
+      .catch(() => {});
+  }, []);
 
   const handleSupplierSelect = (supplierCode: string) => {
     setSelectedSupplier(supplierCode);
@@ -109,6 +124,11 @@ export default function SimImportPage() {
           supplier: selectedSupplier,
           simType: selectedSimType,
           supplierContractEnd: contractEndDate || undefined,
+          carrierType: carrierType || undefined,
+          isMnpEligible: isMnpEligible || undefined,
+          isAutoCancel: isAutoCancel || undefined,
+          autoCancelDate: autoCancelDate || undefined,
+          eligibleTagIds: selectedTagIds.length > 0 ? selectedTagIds : undefined,
         });
         if (result.data.length === 0 && result.errors.length === 0) {
           result.errors.push({
@@ -127,7 +147,7 @@ export default function SimImportPage() {
         setParsing(false);
       }
     },
-    [selectedSupplier, selectedSimType, contractEndDate]
+    [selectedSupplier, selectedSimType, contractEndDate, carrierType, isMnpEligible, isAutoCancel, autoCancelDate, selectedTagIds]
   );
 
   const handleDrop = useCallback(
@@ -187,6 +207,11 @@ export default function SimImportPage() {
     setSelectedSupplier(null);
     setSelectedSimType(null);
     setContractEndDate("");
+    setCarrierType("");
+    setIsMnpEligible(false);
+    setIsAutoCancel(false);
+    setAutoCancelDate("");
+    setSelectedTagIds([]);
     setFile(null);
     setParseResult(null);
     setImportResult(null);
@@ -307,6 +332,99 @@ export default function SimImportPage() {
                 </div>
               )}
 
+              {/* キャリア種別 */}
+              {selectedConfig && (
+                <div className="space-y-2">
+                  <Label htmlFor="carrierType">キャリア種別（任意）</Label>
+                  <select
+                    id="carrierType"
+                    value={carrierType}
+                    onChange={(e) => setCarrierType(e.target.value)}
+                    className="px-3 py-2 border rounded-md text-sm max-w-xs w-full"
+                  >
+                    <option value="">未設定</option>
+                    <option value="DOCOMO">DOCOMO</option>
+                    <option value="AU">AU</option>
+                    <option value="SOFTBANK">SOFTBANK</option>
+                    <option value="RAKUTEN">RAKUTEN</option>
+                  </select>
+                </div>
+              )}
+
+              {/* MNP転出可否 */}
+              {selectedConfig && (
+                <div className="space-y-2">
+                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={isMnpEligible}
+                      onChange={(e) => setIsMnpEligible(e.target.checked)}
+                      className="h-4 w-4 text-blue-600 rounded"
+                    />
+                    <span className="text-sm font-medium">MNP転出可</span>
+                  </label>
+                </div>
+              )}
+
+              {/* 自動解約 */}
+              {selectedConfig && (
+                <div className="space-y-2">
+                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={isAutoCancel}
+                      onChange={(e) => {
+                        setIsAutoCancel(e.target.checked);
+                        if (!e.target.checked) setAutoCancelDate("");
+                      }}
+                      className="h-4 w-4 text-blue-600 rounded"
+                    />
+                    <span className="text-sm font-medium">自動解約</span>
+                  </label>
+                  {isAutoCancel && (
+                    <div className="ml-6">
+                      <Label htmlFor="autoCancelDate">自動解約日</Label>
+                      <Input
+                        id="autoCancelDate"
+                        type="date"
+                        value={autoCancelDate}
+                        onChange={(e) => setAutoCancelDate(e.target.value)}
+                        className="max-w-xs mt-1"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 利用可能用途タグ */}
+              {selectedConfig && usageTags.length > 0 && (
+                <div className="space-y-2">
+                  <Label>利用可能な用途タグ（任意）</Label>
+                  <div className="space-y-2 max-h-40 overflow-y-auto border rounded-md p-3">
+                    {usageTags.map((tag) => (
+                      <label key={tag.id} className="flex items-center space-x-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={selectedTagIds.includes(tag.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedTagIds((prev) => [...prev, tag.id]);
+                            } else {
+                              setSelectedTagIds((prev) => prev.filter((id) => id !== tag.id));
+                            }
+                          }}
+                          className="h-4 w-4 text-blue-600 rounded"
+                        />
+                        <span className="text-sm">{tag.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    選択した用途タグが全SIMに設定されます
+                  </p>
+                </div>
+              )}
+
               <div className="flex justify-end gap-2">
                 <Link href="/sims">
                   <Button variant="outline">キャンセル</Button>
@@ -351,6 +469,37 @@ export default function SimImportPage() {
                     <div>
                       <span className="text-gray-500">解約日:</span>{" "}
                       <span className="font-medium">{contractEndDate}</span>
+                    </div>
+                  )}
+                  {carrierType && (
+                    <div>
+                      <span className="text-gray-500">キャリア:</span>{" "}
+                      <span className="font-medium">{carrierType}</span>
+                    </div>
+                  )}
+                  {isMnpEligible && (
+                    <div>
+                      <span className="text-gray-500">MNP転出:</span>{" "}
+                      <span className="font-medium">可</span>
+                    </div>
+                  )}
+                  {isAutoCancel && (
+                    <div>
+                      <span className="text-gray-500">自動解約:</span>{" "}
+                      <span className="font-medium">
+                        ON{autoCancelDate ? ` (${autoCancelDate})` : ""}
+                      </span>
+                    </div>
+                  )}
+                  {selectedTagIds.length > 0 && (
+                    <div className="col-span-2">
+                      <span className="text-gray-500">用途タグ:</span>{" "}
+                      <span className="font-medium">
+                        {selectedTagIds
+                          .map((id) => usageTags.find((t) => t.id === id)?.name)
+                          .filter(Boolean)
+                          .join(", ")}
+                      </span>
                     </div>
                   )}
                 </div>

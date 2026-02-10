@@ -144,7 +144,9 @@ model Sim {
   status            SimStatus @default(IN_STOCK)
 
   // 消費済み用途タグ（高速検索用）
-  consumedTagIds Int[] @default([])
+  consumedTagIds  Int[] @default([])
+  // 利用可能な用途タグ
+  eligibleTagIds  Int[] @default([])
 
   // SIMの場所
   simLocationTagId Int?

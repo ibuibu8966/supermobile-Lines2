@@ -20,8 +20,10 @@ export const simImportRowSchema = z.object({
   plan: z.string().optional(),
   isMnpEligible: z.coerce.boolean().default(false),
   isAutoCancel: z.coerce.boolean().default(false),
+  autoCancelDate: z.coerce.date().optional(),
   supplierContractStart: z.coerce.date().optional(),
   supplierContractEnd: z.coerce.date().optional(),
+  eligibleTagIds: z.array(z.number().int()).optional(),
 })
 
 // SIM作成スキーマ

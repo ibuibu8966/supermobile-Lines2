@@ -14,8 +14,10 @@ interface ImportRow {
   plan?: string;
   isMnpEligible?: boolean | string;
   isAutoCancel?: boolean | string;
+  autoCancelDate?: string;
   supplierContractStart?: string;
   supplierContractEnd?: string;
+  eligibleTagIds?: number[];
 }
 
 interface ImportResult {
@@ -34,8 +36,10 @@ interface ValidatedRow {
   plan: string | null;
   isMnpEligible: boolean;
   isAutoCancel: boolean;
+  autoCancelDate: Date | null;
   supplierContractStart: Date | null;
   supplierContractEnd: Date | null;
+  eligibleTagIds: number[];
 }
 
 const BATCH_SIZE = 500;
@@ -112,8 +116,10 @@ export async function POST(request: NextRequest) {
           plan: validated.plan ?? null,
           isMnpEligible: validated.isMnpEligible,
           isAutoCancel: validated.isAutoCancel,
+          autoCancelDate: validated.autoCancelDate ? new Date(validated.autoCancelDate) : null,
           supplierContractStart: validated.supplierContractStart ? new Date(validated.supplierContractStart) : null,
           supplierContractEnd: validated.supplierContractEnd ? new Date(validated.supplierContractEnd) : null,
+          eligibleTagIds: validated.eligibleTagIds ?? [],
         });
       } catch (error) {
         result.failed++;
@@ -155,8 +161,10 @@ export async function POST(request: NextRequest) {
             ${row.plan},
             ${row.isMnpEligible},
             ${row.isAutoCancel},
+            ${row.autoCancelDate},
             ${row.supplierContractStart},
             ${row.supplierContractEnd},
+            ${row.eligibleTagIds},
             NOW(),
             NOW()
           )`
@@ -172,8 +180,10 @@ export async function POST(request: NextRequest) {
             "plan",
             "isMnpEligible",
             "isAutoCancel",
+            "autoCancelDate",
             "supplierContractStart",
             "supplierContractEnd",
+            "eligibleTagIds",
             "createdAt",
             "updatedAt"
           )
@@ -186,8 +196,10 @@ export async function POST(request: NextRequest) {
             "plan" = EXCLUDED."plan",
             "isMnpEligible" = EXCLUDED."isMnpEligible",
             "isAutoCancel" = EXCLUDED."isAutoCancel",
+            "autoCancelDate" = EXCLUDED."autoCancelDate",
             "supplierContractStart" = EXCLUDED."supplierContractStart",
             "supplierContractEnd" = EXCLUDED."supplierContractEnd",
+            "eligibleTagIds" = EXCLUDED."eligibleTagIds",
             "updatedAt" = NOW()
         `;
 
@@ -206,8 +218,10 @@ export async function POST(request: NextRequest) {
                 plan: row.plan,
                 isMnpEligible: row.isMnpEligible,
                 isAutoCancel: row.isAutoCancel,
+                autoCancelDate: row.autoCancelDate,
                 supplierContractStart: row.supplierContractStart,
                 supplierContractEnd: row.supplierContractEnd,
+                eligibleTagIds: row.eligibleTagIds,
               },
               create: {
                 iccid: row.iccid,
@@ -218,8 +232,10 @@ export async function POST(request: NextRequest) {
                 plan: row.plan,
                 isMnpEligible: row.isMnpEligible,
                 isAutoCancel: row.isAutoCancel,
+                autoCancelDate: row.autoCancelDate,
                 supplierContractStart: row.supplierContractStart,
                 supplierContractEnd: row.supplierContractEnd,
+                eligibleTagIds: row.eligibleTagIds,
               },
             });
             result.success++;

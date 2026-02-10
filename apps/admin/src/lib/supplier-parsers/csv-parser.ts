@@ -44,6 +44,23 @@ function mapRow(
     result.supplierContractEnd = options.supplierContractEnd;
   }
 
+  // UI入力の追加設定を反映
+  if (options.carrierType) {
+    result.carrierType = options.carrierType;
+  }
+  if (options.isMnpEligible) {
+    result.isMnpEligible = options.isMnpEligible;
+  }
+  if (options.isAutoCancel) {
+    result.isAutoCancel = options.isAutoCancel;
+  }
+  if (options.autoCancelDate) {
+    result.autoCancelDate = options.autoCancelDate;
+  }
+  if (options.eligibleTagIds && options.eligibleTagIds.length > 0) {
+    result.eligibleTagIds = options.eligibleTagIds;
+  }
+
   return result as ParsedSimRow;
 }
 

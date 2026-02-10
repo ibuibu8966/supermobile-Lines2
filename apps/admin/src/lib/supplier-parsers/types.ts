@@ -25,8 +25,10 @@ export interface ParsedSimRow {
   plan?: string;
   isMnpEligible?: boolean;
   isAutoCancel?: boolean;
+  autoCancelDate?: string;
   supplierContractStart?: string;
   supplierContractEnd?: string;
+  eligibleTagIds?: number[];
 }
 
 export interface ParseResult {
@@ -41,4 +43,9 @@ export interface ImportOptions {
   supplier: string;
   simType: SimTypeOption;
   supplierContractEnd?: string; // 解約日（UI入力）
+  carrierType?: string;
+  isMnpEligible?: boolean;
+  isAutoCancel?: boolean;
+  autoCancelDate?: string;
+  eligibleTagIds?: number[];
 }
