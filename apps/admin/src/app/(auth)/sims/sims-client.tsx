@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge, Tabs, TabsList, TabsTrigger, TabsContent } from "@repo/ui";
-import { Plus, Upload, ChevronDown, ChevronRight, Search, Loader2, AlertCircle, Smartphone, Building2 } from "lucide-react";
+import { Upload, ChevronDown, ChevronRight, Search, Loader2, AlertCircle, Smartphone, Building2 } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryState } from "nuqs";
 import { queryKeys } from "@/lib/query-keys";
@@ -348,10 +348,6 @@ export function SimsClient() {
                   CSVインポート
                 </Button>
               </Link>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                新規登録
-              </Button>
             </div>
           </div>
 
