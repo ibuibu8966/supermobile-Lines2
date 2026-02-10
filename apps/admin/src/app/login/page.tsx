@@ -21,7 +21,9 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [isPrefetching, setIsPrefetching] = useState(false);
   const [error, setError] = useState<string | null>(
-    errorParam === "CredentialsSignin" ? "メールアドレスまたはパスワードが正しくありません" : null
+    errorParam === "CredentialsSignin" ? "メールアドレスまたはパスワードが正しくありません"
+    : errorParam === "AccessDenied" ? "あなたの権限ではログインできません"
+    : null
   );
 
   const handleSubmit = async (e: React.FormEvent) => {
