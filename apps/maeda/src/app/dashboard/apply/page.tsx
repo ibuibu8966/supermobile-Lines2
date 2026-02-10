@@ -50,12 +50,20 @@ export default function AdditionalApplyPage() {
 
   // フォームデータ
   const [selectedPlanId, setSelectedPlanId] = useState<string>("");
-  const [lineCount, setLineCount] = useState<number>(1);
+  const [lineCount, setLineCount] = useState<number>(10);
   const [agreements, setAgreements] = useState({
     terms: false,
     privacy: false,
     cancellation: false,
   });
+
+  // クーポン
+  const [couponCode, setCouponCode] = useState("");
+  const [couponApplied, setCouponApplied] = useState(false);
+  const [couponUnitPrice, setCouponUnitPrice] = useState<number | null>(null);
+  const [couponDescription, setCouponDescription] = useState<string | null>(null);
+  const [couponValidating, setCouponValidating] = useState(false);
+  const [couponError, setCouponError] = useState<string | null>(null);
 
   const steps = [
     { id: 1, name: "プラン選択" },
@@ -80,6 +88,45 @@ export default function AdditionalApplyPage() {
     }
   };
 
+  const validateCoupon = async () => {
+    if (!couponCode.trim()) return;
+    setCouponValidating(true);
+    setCouponError(null);
+
+    try {
+      const res = await fetch("/api/coupon/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: couponCode.trim(), planId: selectedPlanId }),
+      });
+      const data = await res.json();
+
+      if (data.valid) {
+        setCouponApplied(true);
+        setCouponUnitPrice(data.unitPrice);
+        setCouponDescription(data.description);
+        setCouponError(null);
+      } else {
+        setCouponApplied(false);
+        setCouponUnitPrice(null);
+        setCouponDescription(null);
+        setCouponError(data.error || "クーポンの適用に失敗しました");
+      }
+    } catch {
+      setCouponError("クーポンの検証に失敗しました");
+    } finally {
+      setCouponValidating(false);
+    }
+  };
+
+  const clearCoupon = () => {
+    setCouponCode("");
+    setCouponApplied(false);
+    setCouponUnitPrice(null);
+    setCouponDescription(null);
+    setCouponError(null);
+  };
+
   const selectedPlan = plans.find((p) => p.id === selectedPlanId);
 
   // 回線数に応じた単価を取得（階層料金対応）
@@ -101,7 +148,7 @@ export default function AdditionalApplyPage() {
   };
 
   const canProceedStep1 = () => {
-    return selectedPlanId !== "" && lineCount >= 1;
+    return selectedPlanId !== "" && lineCount >= 10 && lineCount % 10 === 0;
   };
 
   const canSubmit = () => {
@@ -121,6 +168,7 @@ export default function AdditionalApplyPage() {
         body: JSON.stringify({
           planId: selectedPlanId,
           lineCount,
+          ...(couponApplied && couponCode ? { couponCode } : {}),
         }),
       });
 
@@ -153,9 +201,10 @@ export default function AdditionalApplyPage() {
     );
   }
 
-  const selectedPlanPrice = selectedPlan
+  const baseUnitPrice = selectedPlan
     ? getUnitPrice(selectedPlan, lineCount)
     : 0;
+  const selectedPlanPrice = couponApplied && couponUnitPrice !== null ? couponUnitPrice : baseUnitPrice;
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -291,11 +340,18 @@ export default function AdditionalApplyPage() {
                 <Input
                   id="lineCount"
                   type="number"
-                  min="1"
+                  min="10"
+                  step="10"
                   value={lineCount}
-                  onChange={(e) =>
-                    setLineCount(parseInt(e.target.value) || 1)
-                  }
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value) || 10;
+                    setLineCount(Math.max(10, Math.round(val / 10) * 10));
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key !== "ArrowUp" && e.key !== "ArrowDown") {
+                      e.preventDefault();
+                    }
+                  }}
                   className="w-32 mt-2"
                 />
               </div>
@@ -334,6 +390,47 @@ export default function AdditionalApplyPage() {
                         );
                       })}
                   </div>
+                </div>
+              )}
+
+              {/* クーポンコード */}
+              {selectedPlan && (
+                <div>
+                  <Label className="text-base font-medium">クーポンコード（お持ちの方）</Label>
+                  <div className="flex gap-2 mt-2">
+                    <Input
+                      value={couponCode}
+                      onChange={(e) => {
+                        setCouponCode(e.target.value.toUpperCase());
+                        if (couponApplied) clearCoupon();
+                      }}
+                      placeholder="クーポンコードを入力"
+                      className="w-48 font-mono"
+                      disabled={couponApplied}
+                    />
+                    {couponApplied ? (
+                      <Button type="button" variant="outline" onClick={clearCoupon}>
+                        取消
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={validateCoupon}
+                        disabled={!couponCode.trim() || couponValidating}
+                      >
+                        {couponValidating ? <Loader2 className="h-4 w-4 animate-spin" /> : "適用"}
+                      </Button>
+                    )}
+                  </div>
+                  {couponApplied && (
+                    <p className="text-sm text-green-600 mt-1">
+                      クーポン適用済み{couponDescription ? `（${couponDescription}）` : ""}
+                    </p>
+                  )}
+                  {couponError && (
+                    <p className="text-sm text-red-500 mt-1">{couponError}</p>
+                  )}
                 </div>
               )}
 
@@ -378,6 +475,12 @@ export default function AdditionalApplyPage() {
                     <span className="text-gray-500">回線数</span>
                     <span className="font-medium">{lineCount}回線</span>
                   </div>
+                  {couponApplied && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">クーポン</span>
+                      <span className="font-medium text-green-600">{couponCode}（適用済み）</span>
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <span className="text-gray-500">単価</span>
                     <span className="font-medium">

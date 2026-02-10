@@ -8,6 +8,7 @@ export const queryKeys = {
   lineTags: ["lineTags"] as const,
   users: ["users"] as const,
   rules: ["rules"] as const,
+  coupons: ["coupons"] as const,
   suppliers: ["suppliers"] as const,
   sims: (filters?: Record<string, string>) => ["sims", filters] as const,
   applications: (filters?: Record<string, string>) => ["applications", filters] as const,

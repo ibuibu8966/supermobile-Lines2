@@ -14,12 +14,12 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { planId, lineCount } = body;
+    const { planId, lineCount, couponCode } = body;
 
     // バリデーション
-    if (!planId || !lineCount || lineCount < 1) {
+    if (!planId || !lineCount || lineCount < 10 || lineCount % 10 !== 0) {
       return NextResponse.json(
-        { error: "プランと回線数を指定してください" },
+        { error: "プランと回線数を指定してください（回線数は10回線単位）" },
         { status: 400 }
       );
     }
@@ -73,6 +73,28 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // クーポン処理
+    let couponId: string | null = null;
+    let appliedCouponCode: string | null = null;
+    if (couponCode) {
+      const coupon = await prisma.coupon.findFirst({
+        where: { code: couponCode, isActive: true },
+      });
+      if (coupon) {
+        const now = new Date();
+        if (
+          coupon.planId === planId &&
+          now >= coupon.validFrom &&
+          now <= coupon.validUntil &&
+          (coupon.maxUsages === null || coupon.usageCount < coupon.maxUsages)
+        ) {
+          unitPrice = coupon.unitPrice;
+          couponId = coupon.id;
+          appliedCouponCode = coupon.code;
+        }
+      }
+    }
+
     // 申込番号生成
     const now = new Date();
     const dateStr = now
@@ -99,6 +121,8 @@ export async function POST(request: NextRequest) {
           lineCount,
           unitPrice,
           totalAmount,
+          couponId,
+          couponCode: appliedCouponCode,
           status: "SUBMITTED",
           kycStatus: "COMPLETED", // 追加申込は本人確認済み
         },
@@ -112,6 +136,14 @@ export async function POST(request: NextRequest) {
             lineNumber: i,
             status: "NOT_ACTIVATED",
           },
+        });
+      }
+
+      // クーポン利用回数を更新
+      if (couponId) {
+        await tx.coupon.update({
+          where: { id: couponId },
+          data: { usageCount: { increment: 1 } },
         });
       }
 

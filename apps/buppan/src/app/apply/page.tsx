@@ -184,12 +184,12 @@ function FileUpload({
         className="hidden"
       />
       {uploading ? (
-        <div className="flex items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-6">
-          <Loader2 className="h-6 w-6 animate-spin text-gray-400 mr-2" />
-          <span className="text-sm text-gray-500">アップロード中...</span>
+        <div className="flex items-center justify-center border-2 border-dashed border-border rounded-lg p-6">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground mr-2" />
+          <span className="text-sm text-muted-foreground">アップロード中...</span>
         </div>
       ) : uploadedFile && preview ? (
-        <div className="relative border rounded-lg p-2 bg-gray-50">
+        <div className="relative border rounded-lg p-2 bg-muted">
           <div className="flex items-center gap-3">
             {uploadedFile.file.type.startsWith("image/") ? (
               <Image
@@ -200,22 +200,22 @@ function FileUpload({
                 className="object-cover rounded"
               />
             ) : (
-              <div className="w-20 h-20 bg-gray-200 rounded flex items-center justify-center text-xs text-gray-500">
+              <div className="w-20 h-20 bg-muted rounded flex items-center justify-center text-xs text-muted-foreground">
                 PDF
               </div>
             )}
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate">{uploadedFile.file.name}</p>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 {(uploadedFile.file.size / 1024 / 1024).toFixed(2)} MB
               </p>
             </div>
             <button
               type="button"
               onClick={handleRemove}
-              className="p-1 hover:bg-gray-200 rounded"
+              className="p-1 hover:bg-muted rounded"
             >
-              <X className="h-5 w-5 text-gray-500" />
+              <X className="h-5 w-5 text-muted-foreground" />
             </button>
           </div>
         </div>
@@ -223,9 +223,9 @@ function FileUpload({
         <button
           type="button"
           onClick={handleClick}
-          className="w-full border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-primary hover:bg-gray-50 transition-colors"
+          className="w-full border-2 border-dashed border-border rounded-lg p-6 hover:border-primary hover:bg-muted transition-colors"
         >
-          <div className="flex flex-col items-center gap-2 text-gray-500">
+          <div className="flex flex-col items-center gap-2 text-muted-foreground">
             <Upload className="h-8 w-8" />
             <span className="text-sm">クリックしてファイルを選択</span>
             <span className="text-xs">
@@ -252,7 +252,7 @@ export default function ApplyPage() {
   // フォームデータ
   const [selectedPlanId, setSelectedPlanId] = useState<string>("");
   const [customerType, setCustomerType] = useState<"INDIVIDUAL" | "CORPORATE">("INDIVIDUAL");
-  const [lineCount, setLineCount] = useState(1);
+  const [lineCount, setLineCount] = useState(10);
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [agreePrivacy, setAgreePrivacy] = useState(false);
   const [agreeTelecom, setAgreeTelecom] = useState(false);
@@ -270,6 +270,14 @@ export default function ApplyPage() {
   const [idBack, setIdBack] = useState<UploadedFile | null>(null);
   const [corporateRegistry, setCorporateRegistry] = useState<UploadedFile | null>(null);
   const [idExpiryDate, setIdExpiryDate] = useState("");
+
+  // クーポン
+  const [couponCode, setCouponCode] = useState("");
+  const [couponApplied, setCouponApplied] = useState(false);
+  const [couponUnitPrice, setCouponUnitPrice] = useState<number | null>(null);
+  const [couponDescription, setCouponDescription] = useState<string | null>(null);
+  const [couponValidating, setCouponValidating] = useState(false);
+  const [couponError, setCouponError] = useState<string | null>(null);
 
   // 顧客情報
   const [customerData, setCustomerData] = useState({
@@ -315,6 +323,45 @@ export default function ApplyPage() {
     }
   };
 
+  const validateCoupon = async () => {
+    if (!couponCode.trim()) return;
+    setCouponValidating(true);
+    setCouponError(null);
+
+    try {
+      const res = await fetch("/api/coupon/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: couponCode.trim(), planId: selectedPlanId }),
+      });
+      const data = await res.json();
+
+      if (data.valid) {
+        setCouponApplied(true);
+        setCouponUnitPrice(data.unitPrice);
+        setCouponDescription(data.description);
+        setCouponError(null);
+      } else {
+        setCouponApplied(false);
+        setCouponUnitPrice(null);
+        setCouponDescription(null);
+        setCouponError(data.error || "クーポンの適用に失敗しました");
+      }
+    } catch {
+      setCouponError("クーポンの検証に失敗しました");
+    } finally {
+      setCouponValidating(false);
+    }
+  };
+
+  const clearCoupon = () => {
+    setCouponCode("");
+    setCouponApplied(false);
+    setCouponUnitPrice(null);
+    setCouponDescription(null);
+    setCouponError(null);
+  };
+
   const selectedPlan = plans.find((p) => p.id === selectedPlanId);
 
   const getUnitPrice = (): number => {
@@ -335,7 +382,8 @@ export default function ApplyPage() {
     return unitPrice;
   };
 
-  const unitPrice = getUnitPrice();
+  const baseUnitPrice = getUnitPrice();
+  const unitPrice = couponApplied && couponUnitPrice !== null ? couponUnitPrice : baseUnitPrice;
   const totalAmount = unitPrice * lineCount;
 
   const formatPrice = (price: number) => {
@@ -364,6 +412,7 @@ export default function ApplyPage() {
       if (idBack) formData.append("idBackPath", idBack.storagePath);
       if (corporateRegistry) formData.append("corporateRegistryPath", corporateRegistry.storagePath);
       if (idExpiryDate) formData.append("idExpiryDate", idExpiryDate);
+      if (couponApplied && couponCode) formData.append("couponCode", couponCode);
 
       const res = await fetch("/api/applications", {
         method: "POST",
@@ -431,11 +480,11 @@ export default function ApplyPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900">
+    <div className="min-h-screen bg-background text-foreground">
       <header className="bg-white border-b">
         <div className="max-w-3xl mx-auto px-4 py-4">
           <div className="flex items-center gap-4">
-            <Link href="/" className="text-gray-500 hover:text-gray-700">
+            <Link href="/" className="text-muted-foreground hover:text-foreground">
               <ArrowLeft className="h-5 w-5" />
             </Link>
             <h1 className="text-xl font-bold">お申込み</h1>
@@ -454,7 +503,7 @@ export default function ApplyPage() {
                       ? "bg-primary text-white"
                       : currentStep === step.id
                         ? "bg-primary text-white"
-                        : "bg-gray-200 text-gray-500")}
+                        : "bg-muted text-muted-foreground")}
                 >
                   {currentStep > step.id ? (
                     <Check className="h-4 w-4" />
@@ -465,15 +514,15 @@ export default function ApplyPage() {
                 <span
                   className={"ml-2 text-sm hidden sm:inline " +
                     (currentStep >= step.id
-                      ? "text-gray-900"
-                      : "text-gray-500")}
+                      ? "text-foreground"
+                      : "text-muted-foreground")}
                 >
                   {step.name}
                 </span>
                 {index < steps.length - 1 && (
                   <div
                     className={"w-8 sm:w-12 h-0.5 mx-2 sm:mx-4 " +
-                      (currentStep > step.id ? "bg-primary" : "bg-gray-200")}
+                      (currentStep > step.id ? "bg-primary" : "bg-muted")}
                   />
                 )}
               </div>
@@ -498,10 +547,10 @@ export default function ApplyPage() {
             <CardContent className="space-y-4">
               {loadingPlans ? (
                 <div className="flex justify-center py-8">
-                  <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
               ) : plans.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
+                <div className="text-center py-8 text-muted-foreground">
                   現在お申込み可能なプランがありません
                 </div>
               ) : (
@@ -511,7 +560,7 @@ export default function ApplyPage() {
                     return (
                       <label
                         key={plan.id}
-                        className={"flex items-start gap-4 p-4 border rounded-lg cursor-pointer hover:bg-gray-50 " +
+                        className={"flex items-start gap-4 p-4 border rounded-lg cursor-pointer hover:bg-muted " +
                           (selectedPlanId === plan.id ? "border-primary bg-primary/5" : "")}
                       >
                         <input
@@ -525,7 +574,7 @@ export default function ApplyPage() {
                         <div className="flex-1">
                           <p className="font-medium">{plan.name}</p>
                           {plan.description && (
-                            <p className="text-sm text-gray-600 mt-1 whitespace-pre-wrap">
+                            <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">
                               {plan.description}
                             </p>
                           )}
@@ -538,7 +587,7 @@ export default function ApplyPage() {
                                 ? `${pricing.minQuantity}〜${pricing.maxQuantity}回線`
                                 : `${pricing.minQuantity}回線以上`;
                               return (
-                                <div key={i} className="text-xs text-gray-500">
+                                <div key={i} className="text-xs text-muted-foreground">
                                   {rangeText}: <span className="font-medium">{formatPrice(pricing.unitPrice)}</span>/回線
                                 </div>
                               );
@@ -593,7 +642,7 @@ export default function ApplyPage() {
               </div>
 
               {customerType === "CORPORATE" && (
-                <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
+                <div className="space-y-4 p-4 bg-muted rounded-lg">
                   <h4 className="font-medium">法人情報</h4>
                   <div className="grid gap-4">
                     <div className="grid grid-cols-2 gap-4">
@@ -798,7 +847,7 @@ export default function ApplyPage() {
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                     >
                       {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                     </button>
@@ -818,7 +867,7 @@ export default function ApplyPage() {
                     <button
                       type="button"
                       onClick={() => setShowPasswordConfirm(!showPasswordConfirm)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                     >
                       {showPasswordConfirm ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                     </button>
@@ -1007,14 +1056,62 @@ export default function ApplyPage() {
                 <Input
                   id="lineCount"
                   type="number"
-                  min="1"
+                  min="10"
+                  step="10"
                   value={lineCount}
-                  onChange={(e) => setLineCount(parseInt(e.target.value) || 1)}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value) || 10;
+                    setLineCount(Math.max(10, Math.round(val / 10) * 10));
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key !== "ArrowUp" && e.key !== "ArrowDown") {
+                      e.preventDefault();
+                    }
+                  }}
                   className="w-32"
                 />
               </div>
 
-              <div className="p-4 bg-gray-50 rounded-lg space-y-2 text-gray-900">
+              {/* クーポンコード */}
+              <div>
+                <Label>クーポンコード（お持ちの方）</Label>
+                <div className="flex gap-2 mt-1">
+                  <Input
+                    value={couponCode}
+                    onChange={(e) => {
+                      setCouponCode(e.target.value.toUpperCase());
+                      if (couponApplied) clearCoupon();
+                    }}
+                    placeholder="クーポンコードを入力"
+                    className="w-48 font-mono"
+                    disabled={couponApplied}
+                  />
+                  {couponApplied ? (
+                    <Button type="button" variant="outline" onClick={clearCoupon}>
+                      取消
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={validateCoupon}
+                      disabled={!couponCode.trim() || couponValidating}
+                    >
+                      {couponValidating ? <Loader2 className="h-4 w-4 animate-spin" /> : "適用"}
+                    </Button>
+                  )}
+                </div>
+                {couponApplied && (
+                  <p className="text-sm text-green-600 mt-1">
+                    クーポン適用済み{couponDescription ? `（${couponDescription}）` : ""}
+                  </p>
+                )}
+                {couponError && (
+                  <p className="text-sm text-red-500 mt-1">{couponError}</p>
+                )}
+              </div>
+
+              <div className="p-4 bg-muted rounded-lg space-y-2 text-foreground">
                 <div className="flex justify-between">
                   <span>{selectedPlan?.name} × {lineCount}回線</span>
                   <span>{formatPrice(unitPrice)} × {lineCount}</span>
@@ -1120,6 +1217,12 @@ export default function ApplyPage() {
                     <span className="w-36 text-sm text-muted-foreground shrink-0">回線数</span>
                     <span className="text-sm">{lineCount}回線</span>
                   </div>
+                  {couponApplied && (
+                    <div className="flex px-4 py-3">
+                      <span className="w-36 text-sm text-muted-foreground shrink-0">クーポン</span>
+                      <span className="text-sm text-green-600">{couponCode}（適用済み）</span>
+                    </div>
+                  )}
                   <div className="flex px-4 py-3">
                     <span className="w-36 text-sm text-muted-foreground shrink-0 font-bold">合計金額</span>
                     <span className="text-lg font-bold">{formatPrice(totalAmount)}</span>

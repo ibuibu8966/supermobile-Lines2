@@ -61,11 +61,19 @@ export async function POST(request: NextRequest) {
     const corporateRegistryPath = formData.get("corporateRegistryPath") as string | null;
     const idExpiryDateStr = formData.get("idExpiryDate") as string | null;
     const idExpiryDate = idExpiryDateStr ? new Date(idExpiryDateStr) : null;
+    const couponCode = formData.get("couponCode") as string | null;
 
     // バリデーション
     if (!planId || !lineCount || !customerType || !password || !customerJson) {
       return NextResponse.json(
         { error: "必須項目が入力されていません" },
+        { status: 400 }
+      );
+    }
+
+    if (lineCount < 10 || lineCount % 10 !== 0) {
+      return NextResponse.json(
+        { error: "回線数は10回線単位で指定してください" },
         { status: 400 }
       );
     }
@@ -185,6 +193,28 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // クーポン処理
+    let couponId: string | null = null;
+    let appliedCouponCode: string | null = null;
+    if (couponCode) {
+      const coupon = await prisma.coupon.findFirst({
+        where: { code: couponCode, isActive: true },
+      });
+      if (coupon) {
+        const now = new Date();
+        if (
+          coupon.planId === planId &&
+          now >= coupon.validFrom &&
+          now <= coupon.validUntil &&
+          (coupon.maxUsages === null || coupon.usageCount < coupon.maxUsages)
+        ) {
+          unitPrice = coupon.unitPrice;
+          couponId = coupon.id;
+          appliedCouponCode = coupon.code;
+        }
+      }
+    }
+
     const totalAmount = unitPrice * lineCount;
 
     // メールアドレスの重複チェック（ユーザー・顧客）
@@ -269,6 +299,8 @@ export async function POST(request: NextRequest) {
           lineCount,
           unitPrice,
           totalAmount,
+          couponId,
+          couponCode: appliedCouponCode,
           status: "SUBMITTED",
         },
         include: {
@@ -287,6 +319,14 @@ export async function POST(request: NextRequest) {
       await tx.applicationLine.createMany({
         data: linesData,
       });
+
+      // クーポン利用回数を更新
+      if (couponId) {
+        await tx.coupon.update({
+          where: { id: couponId },
+          data: { usageCount: { increment: 1 } },
+        });
+      }
 
       return { application, applicationNumber };
     });

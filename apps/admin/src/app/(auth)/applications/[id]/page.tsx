@@ -132,6 +132,8 @@ interface Application {
   lineCount: number;
   unitPrice: number;
   totalAmount: number;
+  couponCode: string | null;
+  couponId: string | null;
   comment1: string | null;
   comment2: string | null;
   note: string | null;
@@ -673,6 +675,14 @@ export default function ApplicationDetailPage() {
                 <span className="text-gray-500">合計:</span>
                 <span className="ml-2 font-bold">{application.totalAmount.toLocaleString()}円</span>
               </div>
+              {application.couponCode && (
+                <div>
+                  <span className="text-gray-500">クーポン:</span>
+                  <span className="ml-2">
+                    <Badge variant="outline" className="font-mono">{application.couponCode}</Badge>
+                  </span>
+                </div>
+              )}
               <div>
                 <span className="text-gray-500">申込日:</span>
                 <span className="ml-2">{formatDate(application.createdAt)}</span>

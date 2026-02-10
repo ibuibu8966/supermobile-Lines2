@@ -393,6 +393,7 @@ model Plan {
   usageTags    PlanUsageTag[]
   pricings     PlanPricing[]
   applications Application[]
+  coupons      Coupon[]
 
   @@unique([serviceId, code])
   @@index([serviceId])
@@ -448,6 +449,10 @@ model Application {
   isArchived Boolean   @default(false)
   archivedAt DateTime?
 
+  // クーポン
+  couponId   String?
+  couponCode String? @db.VarChar(50)
+
   // 管理用コメント
   comment1 String? @db.Text
   comment2 String? @db.Text
@@ -458,15 +463,39 @@ model Application {
   customer  Customer          @relation(fields: [customerId], references: [id])
   service   Service           @relation(fields: [serviceId], references: [id])
   plan      Plan              @relation(fields: [planId], references: [id])
+  coupon    Coupon?           @relation(fields: [couponId], references: [id])
   lines     ApplicationLine[]
   kycImages KycImage[]
 
   @@index([customerId])
   @@index([serviceId])
   @@index([planId])
+  @@index([couponId])
   @@index([status])
   @@index([createdAt])
   @@index([isArchived])
+}
+
+model Coupon {
+  id          String   @id @default(cuid())
+  code        String   @unique @db.VarChar(50)
+  planId      String
+  unitPrice   Int
+  description String?  @db.VarChar(200)
+  maxUsages   Int?
+  usageCount  Int      @default(0)
+  validFrom   DateTime
+  validUntil  DateTime
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  plan         Plan          @relation(fields: [planId], references: [id])
+  applications Application[]
+
+  @@index([code])
+  @@index([planId])
+  @@index([isActive])
 }
 
 model ApplicationLine {

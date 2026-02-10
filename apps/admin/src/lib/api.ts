@@ -9,6 +9,7 @@ export const api = {
   getUsers: () => fetch("/api/users").then((r) => r.json()),
   getRules: () => fetch("/api/usage-rules").then((r) => r.json()),
   getSuppliers: () => fetch("/api/suppliers").then((r) => r.json()),
+  getCoupons: () => fetch("/api/coupons").then((r) => r.json()),
   getSims: (params?: URLSearchParams) =>
     fetch(`/api/sims?${params?.toString() || "page=1"}`).then((r) => r.json()),
   getApplications: (params?: URLSearchParams) =>

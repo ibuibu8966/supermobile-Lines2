@@ -184,7 +184,7 @@ export default function ApplyPage() {
   // フォームデータ
   const [selectedPlanId, setSelectedPlanId] = useState<string>("");
   const [customerType, setCustomerType] = useState<"INDIVIDUAL" | "CORPORATE">("INDIVIDUAL");
-  const [lineCount, setLineCount] = useState(1);
+  const [lineCount, setLineCount] = useState(10);
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [agreePrivacy, setAgreePrivacy] = useState(false);
   const [agreeTelecom, setAgreeTelecom] = useState(false);
@@ -202,6 +202,14 @@ export default function ApplyPage() {
   const [idBack, setIdBack] = useState<File | null>(null);
   const [corporateRegistry, setCorporateRegistry] = useState<File | null>(null);
   const [idExpiryDate, setIdExpiryDate] = useState("");
+
+  // クーポン
+  const [couponCode, setCouponCode] = useState("");
+  const [couponApplied, setCouponApplied] = useState(false);
+  const [couponUnitPrice, setCouponUnitPrice] = useState<number | null>(null);
+  const [couponDescription, setCouponDescription] = useState<string | null>(null);
+  const [couponValidating, setCouponValidating] = useState(false);
+  const [couponError, setCouponError] = useState<string | null>(null);
 
   // 顧客情報
   const [customerData, setCustomerData] = useState({
@@ -247,6 +255,45 @@ export default function ApplyPage() {
     }
   };
 
+  const validateCoupon = async () => {
+    if (!couponCode.trim()) return;
+    setCouponValidating(true);
+    setCouponError(null);
+
+    try {
+      const res = await fetch("/api/coupon/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: couponCode.trim(), planId: selectedPlanId }),
+      });
+      const data = await res.json();
+
+      if (data.valid) {
+        setCouponApplied(true);
+        setCouponUnitPrice(data.unitPrice);
+        setCouponDescription(data.description);
+        setCouponError(null);
+      } else {
+        setCouponApplied(false);
+        setCouponUnitPrice(null);
+        setCouponDescription(null);
+        setCouponError(data.error || "クーポンの適用に失敗しました");
+      }
+    } catch {
+      setCouponError("クーポンの検証に失敗しました");
+    } finally {
+      setCouponValidating(false);
+    }
+  };
+
+  const clearCoupon = () => {
+    setCouponCode("");
+    setCouponApplied(false);
+    setCouponUnitPrice(null);
+    setCouponDescription(null);
+    setCouponError(null);
+  };
+
   const selectedPlan = plans.find((p) => p.id === selectedPlanId);
 
   const getUnitPrice = (): number => {
@@ -267,7 +314,8 @@ export default function ApplyPage() {
     return unitPrice;
   };
 
-  const unitPrice = getUnitPrice();
+  const baseUnitPrice = getUnitPrice();
+  const unitPrice = couponApplied && couponUnitPrice !== null ? couponUnitPrice : baseUnitPrice;
   const totalAmount = unitPrice * lineCount;
 
   const formatPrice = (price: number) => {
@@ -296,6 +344,7 @@ export default function ApplyPage() {
       if (idBack) formData.append("idBack", idBack);
       if (corporateRegistry) formData.append("corporateRegistry", corporateRegistry);
       if (idExpiryDate) formData.append("idExpiryDate", idExpiryDate);
+      if (couponApplied && couponCode) formData.append("couponCode", couponCode);
 
       const res = await fetch("/api/applications", {
         method: "POST",
@@ -934,11 +983,59 @@ export default function ApplyPage() {
                 <Input
                   id="lineCount"
                   type="number"
-                  min="1"
+                  min="10"
+                  step="10"
                   value={lineCount}
-                  onChange={(e) => setLineCount(parseInt(e.target.value) || 1)}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value) || 10;
+                    setLineCount(Math.max(10, Math.round(val / 10) * 10));
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key !== "ArrowUp" && e.key !== "ArrowDown") {
+                      e.preventDefault();
+                    }
+                  }}
                   className="w-32"
                 />
+              </div>
+
+              {/* クーポンコード */}
+              <div>
+                <Label>クーポンコード（お持ちの方）</Label>
+                <div className="flex gap-2 mt-1">
+                  <Input
+                    value={couponCode}
+                    onChange={(e) => {
+                      setCouponCode(e.target.value.toUpperCase());
+                      if (couponApplied) clearCoupon();
+                    }}
+                    placeholder="クーポンコードを入力"
+                    className="w-48 font-mono"
+                    disabled={couponApplied}
+                  />
+                  {couponApplied ? (
+                    <Button type="button" variant="outline" onClick={clearCoupon}>
+                      取消
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={validateCoupon}
+                      disabled={!couponCode.trim() || couponValidating}
+                    >
+                      {couponValidating ? <Loader2 className="h-4 w-4 animate-spin" /> : "適用"}
+                    </Button>
+                  )}
+                </div>
+                {couponApplied && (
+                  <p className="text-sm text-green-600 mt-1">
+                    クーポン適用済み{couponDescription ? `（${couponDescription}）` : ""}
+                  </p>
+                )}
+                {couponError && (
+                  <p className="text-sm text-red-500 mt-1">{couponError}</p>
+                )}
               </div>
 
               <div className="p-4 bg-gray-50 rounded-lg space-y-2 text-gray-900">
@@ -1047,6 +1144,12 @@ export default function ApplyPage() {
                     <span className="w-36 text-sm text-muted-foreground shrink-0">回線数</span>
                     <span className="text-sm">{lineCount}回線</span>
                   </div>
+                  {couponApplied && (
+                    <div className="flex px-4 py-3">
+                      <span className="w-36 text-sm text-muted-foreground shrink-0">クーポン</span>
+                      <span className="text-sm text-green-600">{couponCode}（適用済み）</span>
+                    </div>
+                  )}
                   <div className="flex px-4 py-3">
                     <span className="w-36 text-sm text-muted-foreground shrink-0 font-bold">合計金額</span>
                     <span className="text-lg font-bold">{formatPrice(totalAmount)}</span>

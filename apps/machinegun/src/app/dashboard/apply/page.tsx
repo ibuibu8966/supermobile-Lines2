@@ -57,6 +57,14 @@ export default function AdditionalApplyPage() {
     cancellation: false,
   });
 
+  // クーポン
+  const [couponCode, setCouponCode] = useState("");
+  const [couponApplied, setCouponApplied] = useState(false);
+  const [couponUnitPrice, setCouponUnitPrice] = useState<number | null>(null);
+  const [couponDescription, setCouponDescription] = useState<string | null>(null);
+  const [couponValidating, setCouponValidating] = useState(false);
+  const [couponError, setCouponError] = useState<string | null>(null);
+
   const steps = [
     { id: 1, name: "プラン選択" },
     { id: 2, name: "確認・同意" },
@@ -78,6 +86,45 @@ export default function AdditionalApplyPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const validateCoupon = async () => {
+    if (!couponCode.trim()) return;
+    setCouponValidating(true);
+    setCouponError(null);
+
+    try {
+      const res = await fetch("/api/coupon/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: couponCode.trim(), planId: selectedPlanId }),
+      });
+      const data = await res.json();
+
+      if (data.valid) {
+        setCouponApplied(true);
+        setCouponUnitPrice(data.unitPrice);
+        setCouponDescription(data.description);
+        setCouponError(null);
+      } else {
+        setCouponApplied(false);
+        setCouponUnitPrice(null);
+        setCouponDescription(null);
+        setCouponError(data.error || "クーポンの適用に失敗しました");
+      }
+    } catch {
+      setCouponError("クーポンの検証に失敗しました");
+    } finally {
+      setCouponValidating(false);
+    }
+  };
+
+  const clearCoupon = () => {
+    setCouponCode("");
+    setCouponApplied(false);
+    setCouponUnitPrice(null);
+    setCouponDescription(null);
+    setCouponError(null);
   };
 
   const selectedPlan = plans.find((p) => p.id === selectedPlanId);
@@ -121,6 +168,7 @@ export default function AdditionalApplyPage() {
         body: JSON.stringify({
           planId: selectedPlanId,
           lineCount,
+          ...(couponApplied && couponCode ? { couponCode } : {}),
         }),
       });
 
@@ -153,9 +201,10 @@ export default function AdditionalApplyPage() {
     );
   }
 
-  const selectedPlanPrice = selectedPlan
+  const baseUnitPrice = selectedPlan
     ? getUnitPrice(selectedPlan, lineCount)
     : 0;
+  const selectedPlanPrice = couponApplied && couponUnitPrice !== null ? couponUnitPrice : baseUnitPrice;
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -344,6 +393,47 @@ export default function AdditionalApplyPage() {
                 </div>
               )}
 
+              {/* クーポンコード */}
+              {selectedPlan && (
+                <div>
+                  <Label className="text-base font-medium">クーポンコード（お持ちの方）</Label>
+                  <div className="flex gap-2 mt-2">
+                    <Input
+                      value={couponCode}
+                      onChange={(e) => {
+                        setCouponCode(e.target.value.toUpperCase());
+                        if (couponApplied) clearCoupon();
+                      }}
+                      placeholder="クーポンコードを入力"
+                      className="w-48 font-mono"
+                      disabled={couponApplied}
+                    />
+                    {couponApplied ? (
+                      <Button type="button" variant="outline" onClick={clearCoupon}>
+                        取消
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={validateCoupon}
+                        disabled={!couponCode.trim() || couponValidating}
+                      >
+                        {couponValidating ? <Loader2 className="h-4 w-4 animate-spin" /> : "適用"}
+                      </Button>
+                    )}
+                  </div>
+                  {couponApplied && (
+                    <p className="text-sm text-green-600 mt-1">
+                      クーポン適用済み{couponDescription ? `（${couponDescription}）` : ""}
+                    </p>
+                  )}
+                  {couponError && (
+                    <p className="text-sm text-red-500 mt-1">{couponError}</p>
+                  )}
+                </div>
+              )}
+
               {selectedPlan && (
                 <div className="p-4 bg-muted rounded-lg text-foreground">
                   <h4 className="font-medium mb-2">お見積り</h4>
@@ -385,6 +475,12 @@ export default function AdditionalApplyPage() {
                     <span className="text-muted-foreground">回線数</span>
                     <span className="font-medium">{lineCount}回線</span>
                   </div>
+                  {couponApplied && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">クーポン</span>
+                      <span className="font-medium text-green-600">{couponCode}（適用済み）</span>
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">単価</span>
                     <span className="font-medium">
