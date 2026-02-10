@@ -23,6 +23,7 @@ interface Application {
   isArchived: boolean;
   archivedAt: string | null;
   latestExpiryDate: string | null;
+  applicationOrdinal: number;
   customer: {
     type: string;
     lastName: string;
@@ -33,7 +34,6 @@ interface Application {
     companyNameKana: string | null;
     email: string | null;
     phone: string | null;
-    _count: { applications: number };
   };
   service: {
     id: string;
@@ -435,13 +435,13 @@ export default function ApplicationsPage() {
                         </Badge>
                       </td>
                       <td className="py-2 px-2">
-                        {app.customer._count.applications === 1 ? (
+                        {app.applicationOrdinal === 1 ? (
                           <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
                             初回
                           </Badge>
                         ) : (
                           <Badge variant="outline" className="text-xs bg-orange-50 text-orange-700 border-orange-200">
-                            {app.customer._count.applications}回目
+                            {app.applicationOrdinal}回目
                           </Badge>
                         )}
                       </td>

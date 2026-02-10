@@ -88,9 +88,6 @@ export async function GET(request: NextRequest) {
               companyNameKana: true,
               email: true,
               phone: true,
-              _count: {
-                select: { applications: true },
-              },
             },
           },
           service: {
@@ -131,6 +128,28 @@ export async function GET(request: NextRequest) {
       prisma.application.count({ where }),
     ]);
 
+    // 申し込み順番を計算（顧客ごとに時系列で何回目か）
+    const customerIds = [...new Set(applications.map((app) => app.customer.id))];
+    const customerApplications = await prisma.application.findMany({
+      where: { customerId: { in: customerIds } },
+      select: { id: true, customerId: true, createdAt: true },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    });
+
+    const applicationOrdinalMap = new Map<string, number>();
+    const customerAppGroups = new Map<string, typeof customerApplications>();
+    for (const ca of customerApplications) {
+      if (!customerAppGroups.has(ca.customerId)) {
+        customerAppGroups.set(ca.customerId, []);
+      }
+      customerAppGroups.get(ca.customerId)!.push(ca);
+    }
+    for (const [, apps] of customerAppGroups) {
+      apps.forEach((app, index) => {
+        applicationOrdinalMap.set(app.id, index + 1);
+      });
+    }
+
     // 回線統計を計算
     const applicationsWithStats = applications.map((app) => {
       const shippedCount = app.lines.filter(
@@ -156,6 +175,7 @@ export async function GET(request: NextRequest) {
 
       return {
         ...appWithoutLines,
+        applicationOrdinal: applicationOrdinalMap.get(app.id) || 1,
         stats: {
           lineCount: app.lineCount,
           shippedCount,
