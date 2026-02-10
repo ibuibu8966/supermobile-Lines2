@@ -68,6 +68,7 @@ export async function GET(request: NextRequest) {
           status: true,
           kycStatus: true,
           paymentStatus: true,
+          addressStatus: true,
           lineCount: true,
           unitPrice: true,
           totalAmount: true,

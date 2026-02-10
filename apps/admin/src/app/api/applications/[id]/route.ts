@@ -16,6 +16,7 @@ const updateApplicationSchema = z.object({
   ]).optional(),
   kycStatus: z.enum(["PENDING", "DEFICIENT", "RESUBMIT", "COMPLETED"]).optional(),
   paymentStatus: z.enum(["BEFORE_INVOICE", "INVOICED", "PAID"]).optional(),
+  addressStatus: z.enum(["PENDING", "DEFICIENT", "RESUBMIT", "COMPLETED"]).optional(),
   comment1: z.string().max(1000).optional().nullable(),
   comment2: z.string().max(1000).optional().nullable(),
   note: z.string().optional().nullable(),

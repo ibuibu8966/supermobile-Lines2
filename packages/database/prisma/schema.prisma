@@ -444,6 +444,7 @@ model Application {
   // 独立した確認ステータス
   kycStatus     KycVerificationStatus @default(PENDING)
   paymentStatus PaymentStatus         @default(BEFORE_INVOICE)
+  addressStatus KycVerificationStatus @default(PENDING)
 
   // アーカイブ
   isArchived Boolean   @default(false)

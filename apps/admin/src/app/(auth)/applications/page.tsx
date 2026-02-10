@@ -18,6 +18,7 @@ interface Application {
   status: string;
   kycStatus: "PENDING" | "DEFICIENT" | "RESUBMIT" | "COMPLETED";
   paymentStatus: "BEFORE_INVOICE" | "INVOICED" | "PAID";
+  addressStatus: "PENDING" | "DEFICIENT" | "RESUBMIT" | "COMPLETED";
   comment1: string | null;
   comment2: string | null;
   isArchived: boolean;
@@ -68,6 +69,13 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const KYC_STATUS_OPTIONS = [
+  { value: "PENDING", label: "確認待ち" },
+  { value: "DEFICIENT", label: "不備" },
+  { value: "RESUBMIT", label: "再提出" },
+  { value: "COMPLETED", label: "完了" },
+];
+
+const ADDRESS_STATUS_OPTIONS = [
   { value: "PENDING", label: "確認待ち" },
   { value: "DEFICIENT", label: "不備" },
   { value: "RESUBMIT", label: "再提出" },
@@ -401,6 +409,7 @@ export default function ApplicationsPage() {
                     <th className="text-left py-2 px-2 whitespace-nowrap min-w-[90px]">有効期限</th>
                     <th className="text-left py-2 px-2 whitespace-nowrap min-w-[100px]">本人確認</th>
                     <th className="text-left py-2 px-2 whitespace-nowrap min-w-[120px]">決済確認</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap min-w-[100px]">住所確認</th>
                     <th className="text-left py-2 px-2 whitespace-nowrap min-w-[100px]">コメント1</th>
                     <th className="text-left py-2 px-2 whitespace-nowrap min-w-[100px]">コメント2</th>
                   </tr>
@@ -510,6 +519,25 @@ export default function ApplicationsPage() {
                             </option>
                           ))}
                         </select>
+                      </td>
+                      <td className="py-2 px-2">
+                        {app.applicationOrdinal === 1 ? (
+                          <select
+                            className="px-2 py-1 border rounded text-xs"
+                            value={app.addressStatus}
+                            onChange={(e) => {
+                              updateApplicationField(app.id, "addressStatus", e.target.value);
+                            }}
+                          >
+                            {ADDRESS_STATUS_OPTIONS.map((opt) => (
+                              <option key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
                       </td>
                       <td className="py-2 px-2">
                         <input
