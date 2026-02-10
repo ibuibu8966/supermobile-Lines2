@@ -129,15 +129,12 @@ export async function POST(request: NextRequest) {
       });
 
       // 回線作成
-      for (let i = 1; i <= lineCount; i++) {
-        await tx.applicationLine.create({
-          data: {
-            applicationId: newApplication.id,
-            lineNumber: i,
-            status: "NOT_ACTIVATED",
-          },
-        });
-      }
+      const linesData = Array.from({ length: lineCount }, (_, i) => ({
+        applicationId: newApplication.id,
+        lineNumber: i + 1,
+        status: "NOT_ACTIVATED" as const,
+      }));
+      await tx.applicationLine.createMany({ data: linesData });
 
       // クーポン利用回数を更新
       if (couponId) {
