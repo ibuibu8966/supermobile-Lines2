@@ -10,7 +10,7 @@ export default function PrivacyPage() {
       <main className="pt-24 pb-16">
         <div className="max-w-4xl mx-auto px-4">
           <h1 className="text-3xl font-bold mb-8">
-            <span className="text-white">プライバシー</span>
+            <span className="text-foreground">プライバシー</span>
             <span className="text-gold">ポリシー</span>
           </h1>
 

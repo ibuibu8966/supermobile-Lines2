@@ -10,7 +10,7 @@ export default function LegalPage() {
       <main className="pt-24 pb-16">
         <div className="max-w-4xl mx-auto px-4">
           <h1 className="text-3xl font-bold mb-8">
-            <span className="text-white">特定商取引法に基づく</span>
+            <span className="text-foreground">特定商取引法に基づく</span>
             <span className="text-gold">表記</span>
           </h1>
 
@@ -147,7 +147,7 @@ export default function LegalPage() {
             id="telecom-law"
             className="text-2xl font-bold mt-12 mb-6 scroll-mt-24"
           >
-            <span className="text-white">電気通信事業法に基づく</span>
+            <span className="text-foreground">電気通信事業法に基づく</span>
             <span className="text-gold">表示</span>
           </h2>
 
