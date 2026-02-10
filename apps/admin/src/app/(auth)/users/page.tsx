@@ -488,7 +488,7 @@ export default function UsersPage() {
                         <option value="SUPER_ADMIN">スーパー管理者</option>
                       </select>
                     </div>
-                    {(formData.role === "ADMIN" || formData.role === "SUPER_ADMIN") && (
+                    {(formData.role === "CUSTOMER" || formData.role === "ADMIN" || formData.role === "SUPER_ADMIN") && (
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           所属サービス
