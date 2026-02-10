@@ -68,22 +68,69 @@ const prefectures = [
   "熊本県", "大分県", "宮崎県", "鹿児島県", "沖縄県",
 ];
 
+// Supabase Storageへ直接アップロード
+async function uploadToSupabase(
+  file: File,
+  fileType: string
+): Promise<string> {
+  const timestamp = Date.now();
+  const tempId = crypto.randomUUID();
+  const path = `kyc/${tempId}/${fileType}_${timestamp}`;
+
+  // 署名付きアップロードURLを取得
+  const urlRes = await fetch("/api/upload-url", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ bucket: "kyc", path }),
+  });
+
+  if (!urlRes.ok) {
+    throw new Error("アップロードURLの取得に失敗しました");
+  }
+
+  const { signedUrl } = await urlRes.json();
+
+  // Supabase Storageに直接アップロード
+  const uploadRes = await fetch(signedUrl, {
+    method: "PUT",
+    headers: { "Content-Type": file.type },
+    body: file,
+  });
+
+  if (!uploadRes.ok) {
+    throw new Error("ファイルのアップロードに失敗しました");
+  }
+
+  return path;
+}
+
+interface UploadedFile {
+  file: File;
+  storagePath: string;
+}
+
 // ファイルアップロードコンポーネント
 function FileUpload({
   label,
-  file,
+  uploadedFile,
   onFileChange,
+  fileType,
   accept = "image/*",
   required = false,
 }: {
   label: string;
-  file: File | null;
-  onFileChange: (file: File | null) => void;
+  uploadedFile: UploadedFile | null;
+  onFileChange: (uploaded: UploadedFile | null) => void;
+  fileType: string;
   accept?: string;
   required?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  const file = uploadedFile?.file || null;
 
   useEffect(() => {
     if (file) {
@@ -99,13 +146,26 @@ function FileUpload({
     inputRef.current?.click();
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0] || null;
-    onFileChange(selectedFile);
+    if (!selectedFile) return;
+
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const storagePath = await uploadToSupabase(selectedFile, fileType);
+      onFileChange({ file: selectedFile, storagePath });
+    } catch {
+      setUploadError("アップロードに失敗しました。再度お試しください。");
+      onFileChange(null);
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleRemove = () => {
     onFileChange(null);
+    setUploadError(null);
     if (inputRef.current) {
       inputRef.current.value = "";
     }
@@ -123,7 +183,14 @@ function FileUpload({
         onChange={handleChange}
         className="hidden"
       />
-      {file && preview ? (
+      {uploading ? (
+        <div className="w-full border-2 border-dashed border-border rounded-lg p-6">
+          <div className="flex flex-col items-center gap-2 text-muted-foreground">
+            <Loader2 className="h-8 w-8 animate-spin" />
+            <span className="text-sm">アップロード中...</span>
+          </div>
+        </div>
+      ) : file && preview ? (
         <div className="relative border rounded-lg p-2 bg-muted">
           <div className="flex items-center gap-3">
             {file.type.startsWith("image/") ? (
@@ -169,6 +236,9 @@ function FileUpload({
           </div>
         </button>
       )}
+      {uploadError && (
+        <p className="text-sm text-red-500">{uploadError}</p>
+      )}
     </div>
   );
 }
@@ -198,9 +268,9 @@ export default function ApplyPage() {
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
 
   // KYC書類
-  const [idFront, setIdFront] = useState<File | null>(null);
-  const [idBack, setIdBack] = useState<File | null>(null);
-  const [corporateRegistry, setCorporateRegistry] = useState<File | null>(null);
+  const [idFront, setIdFront] = useState<UploadedFile | null>(null);
+  const [idBack, setIdBack] = useState<UploadedFile | null>(null);
+  const [corporateRegistry, setCorporateRegistry] = useState<UploadedFile | null>(null);
   const [idExpiryDate, setIdExpiryDate] = useState("");
 
   // クーポン
@@ -339,10 +409,10 @@ export default function ApplyPage() {
       formData.append("agreeInitialCancellation", agreeInitialCancellation.toString());
       formData.append("agreeAntiSocial", agreeAntiSocial.toString());
 
-      // KYC書類
-      if (idFront) formData.append("idFront", idFront);
-      if (idBack) formData.append("idBack", idBack);
-      if (corporateRegistry) formData.append("corporateRegistry", corporateRegistry);
+      // KYC書類（Supabase Storageのパスを送信）
+      if (idFront) formData.append("idFrontPath", idFront.storagePath);
+      if (idBack) formData.append("idBackPath", idBack.storagePath);
+      if (corporateRegistry) formData.append("corporateRegistryPath", corporateRegistry.storagePath);
       if (idExpiryDate) formData.append("idExpiryDate", idExpiryDate);
       if (couponApplied && couponCode) formData.append("couponCode", couponCode);
 
@@ -841,14 +911,16 @@ export default function ApplyPage() {
                   <div className="grid gap-4 sm:grid-cols-2">
                     <FileUpload
                       label="免許証（表面）"
-                      file={idFront}
+                      uploadedFile={idFront}
                       onFileChange={setIdFront}
+                      fileType="id_front"
                       required
                     />
                     <FileUpload
                       label="免許証（裏面）"
-                      file={idBack}
+                      uploadedFile={idBack}
                       onFileChange={setIdBack}
+                      fileType="id_back"
                       required
                     />
                   </div>
@@ -859,8 +931,9 @@ export default function ApplyPage() {
                     <h4 className="font-medium">法人確認書類</h4>
                     <FileUpload
                       label="登記簿謄本（履歴事項全部証明書）"
-                      file={corporateRegistry}
+                      uploadedFile={corporateRegistry}
                       onFileChange={setCorporateRegistry}
+                      fileType="corporate_registry"
                       accept="image/*,.pdf"
                       required
                     />
@@ -873,14 +946,16 @@ export default function ApplyPage() {
                     <div className="grid gap-4 sm:grid-cols-2">
                       <FileUpload
                         label="身分証明書（表面）"
-                        file={idFront}
+                        uploadedFile={idFront}
                         onFileChange={setIdFront}
+                        fileType="id_front"
                         required
                       />
                       <FileUpload
                         label="身分証明書（裏面）"
-                        file={idBack}
+                        uploadedFile={idBack}
                         onFileChange={setIdBack}
+                        fileType="id_back"
                         required
                       />
                     </div>
@@ -1173,10 +1248,10 @@ export default function ApplyPage() {
                 </div>
                 <div className="px-4 py-3 space-y-1">
                   {customerType === "CORPORATE" && corporateRegistry && (
-                    <p className="text-sm">・登記簿謄本: {corporateRegistry.name}</p>
+                    <p className="text-sm">・登記簿謄本: {corporateRegistry.file.name}</p>
                   )}
-                  {idFront && <p className="text-sm">・身分証明書（表）: {idFront.name}</p>}
-                  {idBack && <p className="text-sm">・身分証明書（裏）: {idBack.name}</p>}
+                  {idFront && <p className="text-sm">・身分証明書（表）: {idFront.file.name}</p>}
+                  {idBack && <p className="text-sm">・身分証明書（裏）: {idBack.file.name}</p>}
                 </div>
               </div>
 
