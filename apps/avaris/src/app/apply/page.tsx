@@ -720,7 +720,7 @@ export default function ApplyPage() {
                     <Label htmlFor="prefecture">都道府県 *</Label>
                     <select
                       id="prefecture"
-                      className="w-full h-10 px-3 border rounded-md"
+                      className="w-full h-10 px-3 border rounded-md bg-background text-foreground"
                       value={customerData.prefecture}
                       onChange={(e) => setCustomerData({ ...customerData, prefecture: e.target.value })}
                     >
