@@ -81,7 +81,7 @@ export default async function HistoryPage() {
         );
       case "CANCELLED":
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">
             <XCircle className="h-3 w-3" />
             キャンセル
           </span>
@@ -95,7 +95,7 @@ export default async function HistoryPage() {
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">
             {status}
           </span>
         );
@@ -112,8 +112,8 @@ export default async function HistoryPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">申し込み履歴</h1>
-        <p className="text-gray-600">過去の申し込み状況を確認できます</p>
+        <h1 className="text-2xl font-bold text-foreground">申し込み履歴</h1>
+        <p className="text-muted-foreground">過去の申し込み状況を確認できます</p>
       </div>
 
       <Card>
@@ -128,7 +128,7 @@ export default async function HistoryPage() {
         </CardHeader>
         <CardContent>
           {applications.length === 0 ? (
-            <p className="text-gray-500 text-center py-8">
+            <p className="text-muted-foreground text-center py-8">
               申し込み履歴がありません
             </p>
           ) : (
@@ -150,7 +150,7 @@ export default async function HistoryPage() {
                       <TableCell className="font-medium">
                         {app.applicationNumber}
                       </TableCell>
-                      <TableCell className="text-gray-500">
+                      <TableCell className="text-muted-foreground">
                         {new Date(app.createdAt).toLocaleDateString("ja-JP")}
                       </TableCell>
                       <TableCell>{app.plan.name}</TableCell>
@@ -182,7 +182,7 @@ export default async function HistoryPage() {
                 <Clock className="h-3 w-3" />
                 本人確認中
               </span>
-              <span className="text-sm text-gray-600">
+              <span className="text-sm text-muted-foreground">
                 本人確認書類を審査中です
               </span>
             </div>
@@ -191,7 +191,7 @@ export default async function HistoryPage() {
                 <CheckCircle className="h-3 w-3" />
                 承認済み
               </span>
-              <span className="text-sm text-gray-600">
+              <span className="text-sm text-muted-foreground">
                 審査が完了し、発送準備中です
               </span>
             </div>
@@ -200,7 +200,7 @@ export default async function HistoryPage() {
                 <Package className="h-3 w-3" />
                 発送済み
               </span>
-              <span className="text-sm text-gray-600">
+              <span className="text-sm text-muted-foreground">
                 SIMカードを発送しました
               </span>
             </div>
@@ -209,7 +209,7 @@ export default async function HistoryPage() {
                 <CheckCircle className="h-3 w-3" />
                 完了
               </span>
-              <span className="text-sm text-gray-600">
+              <span className="text-sm text-muted-foreground">
                 開通手続きが完了しました
               </span>
             </div>

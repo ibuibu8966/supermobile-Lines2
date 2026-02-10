@@ -13,10 +13,10 @@ export default function ApplyCompletePage() {
             </div>
           </div>
 
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
+          <h1 className="text-2xl font-bold text-foreground mb-2">
             申込が完了しました
           </h1>
-          <p className="text-gray-600 mb-6">
+          <p className="text-muted-foreground mb-6">
             追加回線の申込を受け付けました。
             <br />
             審査完了後、SIMカードを発送いたします。

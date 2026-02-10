@@ -156,7 +156,7 @@ export default async function LandingPage() {
           </p>
 
           {plans.length > 0 ? (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-5xl mx-auto">
+            <div className="flex flex-wrap justify-center gap-8 max-w-5xl mx-auto">
               {plans.map((plan, index) => {
                 const lowestPrice = plan.pricings[0]?.unitPrice;
                 const isPopular = index === 0;
@@ -164,7 +164,7 @@ export default async function LandingPage() {
                 return (
                   <Card
                     key={plan.id}
-                    className={`bg-card border-2 ${
+                    className={`bg-card border-2 w-full max-w-sm ${
                       isPopular ? "border-gold" : "border-border"
                     } relative overflow-hidden`}
                   >

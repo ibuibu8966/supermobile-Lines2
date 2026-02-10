@@ -18,7 +18,7 @@ function CompleteContent() {
   const applicationNumber = searchParams.get("number") || "";
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+    <div className="min-h-screen bg-background flex items-center justify-center">
       <Card className="max-w-md mx-4">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
@@ -30,7 +30,7 @@ function CompleteContent() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="p-4 bg-gray-50 rounded-lg text-center">
+          <div className="p-4 bg-muted rounded-lg text-center">
             <p className="text-sm text-muted-foreground mb-1">申込番号</p>
             <p className="text-2xl font-bold font-mono">{applicationNumber}</p>
           </div>
@@ -68,8 +68,8 @@ function CompleteContent() {
 export default function CompletePage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-gray-500">読み込み中...</div>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-muted-foreground">読み込み中...</div>
       </div>
     }>
       <CompleteContent />

@@ -120,7 +120,7 @@ export default function LinesPage() {
       case "CANCELLED":
       case "RETURNED":
         return (
-          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">
             解約済み
           </span>
         );
@@ -132,7 +132,7 @@ export default function LinesPage() {
         );
       default:
         return (
-          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">
             {status}
           </span>
         );
@@ -155,7 +155,7 @@ export default function LinesPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
@@ -163,8 +163,8 @@ export default function LinesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">契約回線一覧</h1>
-        <p className="text-gray-600">ご契約中の回線を確認できます</p>
+        <h1 className="text-2xl font-bold text-foreground">契約回線一覧</h1>
+        <p className="text-muted-foreground">ご契約中の回線を確認できます</p>
       </div>
 
       <Card>
@@ -187,7 +187,7 @@ export default function LinesPage() {
 
             <TabsContent value={activeTab}>
               {filteredLines.length === 0 ? (
-                <p className="text-gray-500 text-center py-8">
+                <p className="text-muted-foreground text-center py-8">
                   該当する回線がありません
                 </p>
               ) : (
@@ -210,10 +210,10 @@ export default function LinesPage() {
                             {line.msisdn || "-"}
                           </TableCell>
                           <TableCell>{line.application.plan.name}</TableCell>
-                          <TableCell className="text-gray-500">
+                          <TableCell className="text-muted-foreground">
                             {line.application.applicationNumber}
                           </TableCell>
-                          <TableCell className="text-gray-500">
+                          <TableCell className="text-muted-foreground">
                             {line.shippedAt
                               ? new Date(line.shippedAt).toLocaleDateString(
                                   "ja-JP"
@@ -255,14 +255,14 @@ export default function LinesPage() {
                                     </DialogDescription>
                                   </DialogHeader>
                                   <div className="space-y-4 py-4">
-                                    <div className="p-4 bg-gray-50 rounded-lg">
-                                      <p className="text-sm text-gray-500">
+                                    <div className="p-4 bg-muted rounded-lg">
+                                      <p className="text-sm text-muted-foreground">
                                         電話番号
                                       </p>
                                       <p className="font-medium">
                                         {line.msisdn || "-"}
                                       </p>
-                                      <p className="text-sm text-gray-500 mt-2">
+                                      <p className="text-sm text-muted-foreground mt-2">
                                         プラン
                                       </p>
                                       <p className="font-medium">
