@@ -42,6 +42,7 @@ export function IccidScanModal({
   const [lineTagId, setLineTagId] = useState<string>("");
   const [lineReserveTagId, setLineReserveTagId] = useState<string>("");
   const [autoEnter, setAutoEnter] = useState(true);
+  const [autoEnterLength, setAutoEnterLength] = useState(19);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -59,8 +60,8 @@ export function IccidScanModal({
     setCurrentInput(value);
     setError(null);
 
-    // 自動送信モードの場合、15桁になったら自動追加
-    if (autoEnter && value.length === 15) {
+    // 自動送信モードの場合、指定桁数になったら自動追加
+    if (autoEnter && value.length === autoEnterLength) {
       addIccid(value);
     }
   };
@@ -74,7 +75,7 @@ export function IccidScanModal({
 
   const addIccid = (iccid: string) => {
     if (!validateIccid(iccid)) {
-      setError("ICCIDは15桁の英数字です");
+      setError("ICCIDは15〜20桁の英数字です");
       return;
     }
 
@@ -167,8 +168,17 @@ export function IccidScanModal({
               />
               バーコードリーダー自動送信
             </label>
+            <select
+              className="px-2 py-1 border rounded text-sm"
+              value={autoEnterLength}
+              onChange={(e) => setAutoEnterLength(Number(e.target.value))}
+              disabled={!autoEnter}
+            >
+              <option value={15}>15桁</option>
+              <option value={19}>19桁</option>
+            </select>
             <span className="text-xs text-gray-500">
-              （15桁入力時に自動追加）
+              （{autoEnterLength}桁入力時に自動追加）
             </span>
           </div>
 

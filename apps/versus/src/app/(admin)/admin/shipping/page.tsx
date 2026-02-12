@@ -203,7 +203,7 @@ export default function ShippingManagementPage() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" && iccidInput.length >= 19) {
+    if (e.key === "Enter" && iccidInput.length >= 15) {
       handleScan();
     }
   };
@@ -448,7 +448,7 @@ export default function ShippingManagementPage() {
                               disabled={
                                 scanning ||
                                 !iccidInput ||
-                                iccidInput.length < 19
+                                iccidInput.length < 15
                               }
                             >
                               {scanning ? "処理中..." : "割当"}
