@@ -118,7 +118,7 @@ export async function POST(
       }
     }
 
-    // トランザクションで一括更新
+    // トランザクションで一括更新（大量件数対応のためタイムアウトを30秒に設定）
     const results = await prisma.$transaction(async (tx) => {
       const updatedLines = [];
 
@@ -161,7 +161,7 @@ export async function POST(
       }
 
       return updatedLines;
-    });
+    }, { timeout: 30000 });
 
     return NextResponse.json({
       message: `${results.length}件の回線にICCIDを割り当てました`,
