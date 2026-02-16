@@ -4,7 +4,7 @@ const path = require("path");
 const nextConfig = {
   transpilePackages: ["@repo/ui", "@repo/auth", "@repo/validation"],
   output: "standalone",
-  serverExternalPackages: ["@prisma/client", "prisma"],
+  serverExternalPackages: ["@prisma/client", "prisma", "@repo/shared"],
   outputFileTracingRoot: path.join(__dirname, "../../"),
 };
 
