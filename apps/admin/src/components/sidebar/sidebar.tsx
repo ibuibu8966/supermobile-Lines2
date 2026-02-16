@@ -19,6 +19,7 @@ import {
   ListChecks,
   Archive,
   Ticket,
+  ShoppingCart,
 } from "lucide-react";
 import { useSidebar } from "@/contexts/sidebar-context";
 import { SidebarItem } from "./sidebar-item";
@@ -42,6 +43,7 @@ const menuItems = [
   { title: "アーカイブ", href: "/applications/archived", icon: Archive, superAdminOnly: true },
   { title: "総合回線管理", href: "/lines", icon: ListChecks, superAdminOnly: true },
   { title: "SIM管理", href: "/sims", icon: Smartphone, superAdminOnly: true },
+  { title: "仕入れ管理", href: "/procurement", icon: ShoppingCart, superAdminOnly: true },
   { title: "タグ管理", href: "/tags", icon: Tags, superAdminOnly: true },
   { title: "販売ルール管理", href: "/rules", icon: Settings, superAdminOnly: true },
   { title: "サービス・プラン管理", href: "/services", icon: Package, superAdminOnly: true },

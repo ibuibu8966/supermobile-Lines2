@@ -3,23 +3,19 @@
 import { useState, Suspense } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useQueryClient } from "@tanstack/react-query";
 import { Button, Card, CardContent, CardHeader, CardTitle } from "@repo/ui";
 import { Loader2, Eye, EyeOff, AlertCircle } from "lucide-react";
-import { prefetchAdminData } from "@/lib/prefetch-admin-data";
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") || "/";
   const errorParam = searchParams.get("error");
-  const queryClient = useQueryClient();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [isPrefetching, setIsPrefetching] = useState(false);
   const [error, setError] = useState<string | null>(
     errorParam === "CredentialsSignin" ? "メールアドレスまたはパスワードが正しくありません"
     : errorParam === "AccessDenied" ? "あなたの権限ではログインできません"
@@ -41,12 +37,7 @@ function LoginForm() {
       if (result?.error) {
         setError("メールアドレスまたはパスワードが正しくありません");
       } else {
-        // 全データ読み込み（5秒タイムアウト）
-        setIsPrefetching(true);
-        await Promise.race([
-          prefetchAdminData(queryClient),
-          new Promise((resolve) => setTimeout(resolve, 5000)),
-        ]);
+        // ログイン成功、ダッシュボードへリダイレクト
         router.push(callbackUrl);
         router.refresh();
       }
@@ -122,14 +113,9 @@ function LoginForm() {
             <Button
               type="submit"
               className="w-full"
-              disabled={loading || isPrefetching}
+              disabled={loading}
             >
-              {isPrefetching ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  データ読み込み中...
-                </>
-              ) : loading ? (
+              {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   ログイン中...

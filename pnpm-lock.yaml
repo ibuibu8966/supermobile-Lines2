@@ -491,6 +491,15 @@ importers:
         specifier: ^5.3.3
         version: 5.9.3
 
+  packages/shared:
+    devDependencies:
+      '@repo/config':
+        specifier: workspace:*
+        version: link:../config
+      typescript:
+        specifier: ^5.3.3
+        version: 5.9.3
+
   packages/ui:
     dependencies:
       '@radix-ui/react-accordion':

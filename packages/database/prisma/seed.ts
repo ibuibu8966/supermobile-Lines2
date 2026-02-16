@@ -505,6 +505,438 @@ async function main() {
   });
   console.log("Created test admin users");
 
+  // 8. タグマスタ（SimLocationTag, LineTag, LineReserveTag）
+  const simLocationTags = await Promise.all([
+    prisma.simLocationTag.upsert({
+      where: { code: "tokyo-office" },
+      update: {},
+      create: { code: "tokyo-office", name: "東京オフィス", displayOrder: 1 },
+    }),
+    prisma.simLocationTag.upsert({
+      where: { code: "osaka-office" },
+      update: {},
+      create: { code: "osaka-office", name: "大阪オフィス", displayOrder: 2 },
+    }),
+    prisma.simLocationTag.upsert({
+      where: { code: "warehouse" },
+      update: {},
+      create: { code: "warehouse", name: "倉庫", displayOrder: 3 },
+    }),
+  ]);
+  console.log(`Created ${simLocationTags.length} SIM location tags`);
+
+  const lineTags = await Promise.all([
+    prisma.lineTag.upsert({
+      where: { code: "priority" },
+      update: {},
+      create: { code: "priority", name: "優先配送", displayOrder: 1 },
+    }),
+    prisma.lineTag.upsert({
+      where: { code: "urgent" },
+      update: {},
+      create: { code: "urgent", name: "至急", displayOrder: 2 },
+    }),
+    prisma.lineTag.upsert({
+      where: { code: "normal" },
+      update: {},
+      create: { code: "normal", name: "通常", displayOrder: 3 },
+    }),
+  ]);
+  console.log(`Created ${lineTags.length} line tags`);
+
+  const lineReserveTags = await Promise.all([
+    prisma.lineReserveTag.upsert({
+      where: { code: "reserved-vip" },
+      update: {},
+      create: { code: "reserved-vip", name: "VIP予約", displayOrder: 1 },
+    }),
+    prisma.lineReserveTag.upsert({
+      where: { code: "reserved-corporate" },
+      update: {},
+      create: { code: "reserved-corporate", name: "法人予約", displayOrder: 2 },
+    }),
+  ]);
+  console.log(`Created ${lineReserveTags.length} line reserve tags`);
+
+  // 9. SIMデータ
+  const artsSupplier = suppliers.find((s) => s.code === "arts")!;
+  const linklifeSupplier = suppliers.find((s) => s.code === "linklife")!;
+  const tokyoLocation = simLocationTags.find((t) => t.code === "tokyo-office")!;
+  const osakaLocation = simLocationTags.find((t) => t.code === "osaka-office")!;
+
+  const sims = [];
+  for (let i = 1; i <= 50; i++) {
+    const iccid = `8981100000000${String(i).padStart(5, "0")}`;
+    const msisdn = `090${String(8000 + i).padStart(8, "0")}`;
+    const sim = await prisma.sim.upsert({
+      where: { iccid },
+      update: {},
+      create: {
+        iccid,
+        msisdn,
+        supplierId: i % 2 === 0 ? artsSupplier.id : linklifeSupplier.id,
+        simType: i % 5 === 0 ? "CORPORATE" : "INDIVIDUAL",
+        carrierType: ["DOCOMO", "AU", "SOFTBANK", "RAKUTEN"][i % 4] as any,
+        plan: "標準プラン",
+        status: i <= 30 ? "IN_STOCK" : i <= 40 ? "ACTIVE" : "RETURNING",
+        isMnpEligible: i % 3 === 0,
+        simLocationTagId: i % 2 === 0 ? tokyoLocation.id : osakaLocation.id,
+        eligibleTagIds: [authTag.id, pokekaTag.id],
+      },
+    });
+    sims.push(sim);
+  }
+  console.log(`Created ${sims.length} SIMs`);
+
+  // 10. テスト用顧客データ
+  const testCustomerPassword = await bcrypt.hash("customer123", 12);
+
+  const testUsers = await Promise.all([
+    prisma.user.upsert({
+      where: { email: "customer1@example.com" },
+      update: {},
+      create: {
+        email: "customer1@example.com",
+        password: testCustomerPassword,
+        role: "CUSTOMER",
+        serviceId: buppanService.id,
+        isActive: true,
+      },
+    }),
+    prisma.user.upsert({
+      where: { email: "customer2@example.com" },
+      update: {},
+      create: {
+        email: "customer2@example.com",
+        password: testCustomerPassword,
+        role: "CUSTOMER",
+        serviceId: versusService.id,
+        isActive: true,
+      },
+    }),
+    prisma.user.upsert({
+      where: { email: "customer3@example.com" },
+      update: {},
+      create: {
+        email: "customer3@example.com",
+        password: testCustomerPassword,
+        role: "CUSTOMER",
+        serviceId: avarisService.id,
+        isActive: true,
+      },
+    }),
+  ]);
+
+  const customers = await Promise.all([
+    prisma.customer.upsert({
+      where: { email: "customer1@example.com" },
+      update: {},
+      create: {
+        userId: testUsers[0].id,
+        type: "INDIVIDUAL",
+        email: "customer1@example.com",
+        phone: "09012345678",
+        lastName: "山田",
+        firstName: "太郎",
+        lastNameKana: "ヤマダ",
+        firstNameKana: "タロウ",
+        birthDate: new Date("1990-01-15"),
+        postalCode: "1000001",
+        prefecture: "東京都",
+        city: "千代田区",
+        address: "千代田1-1-1",
+        building: "サンプルビル101",
+        status: "ACTIVE",
+      },
+    }),
+    prisma.customer.upsert({
+      where: { email: "customer2@example.com" },
+      update: {},
+      create: {
+        userId: testUsers[1].id,
+        type: "CORPORATE",
+        email: "customer2@example.com",
+        phone: "09087654321",
+        lastName: "佐藤",
+        firstName: "花子",
+        lastNameKana: "サトウ",
+        firstNameKana: "ハナコ",
+        birthDate: new Date("1985-05-20"),
+        postalCode: "5300001",
+        prefecture: "大阪府",
+        city: "大阪市北区",
+        address: "梅田2-2-2",
+        companyName: "テスト株式会社",
+        companyNameKana: "テストカブシキガイシャ",
+        establishedDate: new Date("2015-04-01"),
+        companyPostalCode: "5300001",
+        companyPrefecture: "大阪府",
+        companyCity: "大阪市北区",
+        companyAddress: "梅田2-2-2",
+        companyBuilding: "オフィスタワー5F",
+        status: "ACTIVE",
+      },
+    }),
+    prisma.customer.upsert({
+      where: { email: "customer3@example.com" },
+      update: {},
+      create: {
+        userId: testUsers[2].id,
+        type: "INDIVIDUAL",
+        email: "customer3@example.com",
+        phone: "08011112222",
+        lastName: "鈴木",
+        firstName: "一郎",
+        lastNameKana: "スズキ",
+        firstNameKana: "イチロウ",
+        birthDate: new Date("1992-08-10"),
+        postalCode: "2310023",
+        prefecture: "神奈川県",
+        city: "横浜市中区",
+        address: "山下町1-1",
+        status: "ACTIVE",
+      },
+    }),
+  ]);
+  console.log(`Created ${customers.length} customers`);
+
+  // 11. クーポンデータ
+  const coupons = await Promise.all([
+    prisma.coupon.upsert({
+      where: { code: "WELCOME2024" },
+      update: {},
+      create: {
+        code: "WELCOME2024",
+        planId: buppan3monthPlan.id,
+        unitPrice: 4000,
+        description: "新規登録キャンペーン",
+        maxUsages: 100,
+        usageCount: 5,
+        validFrom: new Date("2024-01-01"),
+        validUntil: new Date("2024-12-31"),
+        isActive: true,
+      },
+    }),
+    prisma.coupon.upsert({
+      where: { code: "SPRING50" },
+      update: {},
+      create: {
+        code: "SPRING50",
+        planId: versusAuthPlan.id,
+        unitPrice: 3000,
+        description: "春の特別割引（50回線以上）",
+        maxUsages: 50,
+        usageCount: 2,
+        validFrom: new Date("2024-03-01"),
+        validUntil: new Date("2024-05-31"),
+        isActive: true,
+      },
+    }),
+  ]);
+  console.log(`Created ${coupons.length} coupons`);
+
+  // 12. 申込データ
+  const priorityLineTag = lineTags.find((t) => t.code === "priority")!;
+  const normalLineTag = lineTags.find((t) => t.code === "normal")!;
+
+  const application1 = await prisma.application.upsert({
+    where: { applicationNumber: "APP2024010001" },
+    update: {},
+    create: {
+      applicationNumber: "APP2024010001",
+      customerId: customers[0].id,
+      serviceId: buppanService.id,
+      planId: buppan3monthPlan.id,
+      lineCount: 10,
+      unitPrice: 4600,
+      totalAmount: 46000,
+      status: "COMPLETED",
+      kycStatus: "COMPLETED",
+      paymentStatus: "PAID",
+      addressStatus: "COMPLETED",
+      paidAt: new Date("2024-01-15"),
+      couponId: coupons[0].id,
+      couponCode: "WELCOME2024",
+      comment1: "優良顧客",
+      comment2: "迅速な対応を希望",
+    },
+  });
+
+  const application2 = await prisma.application.upsert({
+    where: { applicationNumber: "APP2024010002" },
+    update: {},
+    create: {
+      applicationNumber: "APP2024010002",
+      customerId: customers[1].id,
+      serviceId: versusService.id,
+      planId: versusAuthPlan.id,
+      lineCount: 50,
+      unitPrice: 3300,
+      totalAmount: 165000,
+      status: "SHIPPING",
+      kycStatus: "COMPLETED",
+      paymentStatus: "PAID",
+      addressStatus: "COMPLETED",
+      paidAt: new Date("2024-01-16"),
+    },
+  });
+
+  const application3 = await prisma.application.upsert({
+    where: { applicationNumber: "APP2024010003" },
+    update: {},
+    create: {
+      applicationNumber: "APP2024010003",
+      customerId: customers[2].id,
+      serviceId: avarisService.id,
+      planId: avarisAuthPlan.id,
+      lineCount: 20,
+      unitPrice: 3200,
+      totalAmount: 64000,
+      status: "PAYMENT_PENDING",
+      kycStatus: "PENDING",
+      paymentStatus: "BEFORE_INVOICE",
+      addressStatus: "PENDING",
+    },
+  });
+  console.log("Created 3 applications");
+
+  // 13. 申込回線データ
+  for (let i = 0; i < 10; i++) {
+    await prisma.applicationLine.upsert({
+      where: { applicationId_lineNumber: { applicationId: application1.id, lineNumber: i + 1 } },
+      update: {},
+      create: {
+        applicationId: application1.id,
+        lineNumber: i + 1,
+        simId: sims[i].iccid,
+        msisdn: sims[i].msisdn,
+        status: "ACTIVATED",
+        lineTagId: i < 5 ? priorityLineTag.id : normalLineTag.id,
+        shippedAt: new Date("2024-01-16"),
+      },
+    });
+  }
+
+  for (let i = 0; i < 50; i++) {
+    await prisma.applicationLine.upsert({
+      where: { applicationId_lineNumber: { applicationId: application2.id, lineNumber: i + 1 } },
+      update: {},
+      create: {
+        applicationId: application2.id,
+        lineNumber: i + 1,
+        status: "SHIPPED",
+        lineTagId: normalLineTag.id,
+        shippedAt: new Date("2024-01-17"),
+      },
+    });
+  }
+
+  for (let i = 0; i < 20; i++) {
+    await prisma.applicationLine.upsert({
+      where: { applicationId_lineNumber: { applicationId: application3.id, lineNumber: i + 1 } },
+      update: {},
+      create: {
+        applicationId: application3.id,
+        lineNumber: i + 1,
+        status: "NOT_ACTIVATED",
+        lineTagId: normalLineTag.id,
+      },
+    });
+  }
+  console.log("Created application lines");
+
+  // 14. KYC画像データ
+  await prisma.kycImage.upsert({
+    where: { id: "kyc-image-1" },
+    update: {},
+    create: {
+      id: "kyc-image-1",
+      applicationId: application1.id,
+      type: "ID_FRONT",
+      storagePath: "kyc/customer1/id_front.jpg",
+      status: "APPROVED",
+      reviewedAt: new Date("2024-01-15"),
+      reviewNote: "確認完了",
+    },
+  });
+
+  await prisma.kycImage.upsert({
+    where: { id: "kyc-image-2" },
+    update: {},
+    create: {
+      id: "kyc-image-2",
+      applicationId: application1.id,
+      type: "ID_BACK",
+      storagePath: "kyc/customer1/id_back.jpg",
+      status: "APPROVED",
+      reviewedAt: new Date("2024-01-15"),
+    },
+  });
+
+  await prisma.kycImage.upsert({
+    where: { id: "kyc-image-3" },
+    update: {},
+    create: {
+      id: "kyc-image-3",
+      applicationId: application2.id,
+      type: "CORPORATE_REGISTRY",
+      storagePath: "kyc/customer2/registry.pdf",
+      status: "APPROVED",
+      reviewedAt: new Date("2024-01-16"),
+      reviewNote: "法人確認完了",
+    },
+  });
+
+  await prisma.kycImage.upsert({
+    where: { id: "kyc-image-4" },
+    update: {},
+    create: {
+      id: "kyc-image-4",
+      applicationId: application3.id,
+      type: "ID_FRONT",
+      storagePath: "kyc/customer3/id_front.jpg",
+      status: "PENDING",
+    },
+  });
+  console.log("Created KYC images");
+
+  // 15. 契約データ
+  for (let i = 0; i < 10; i++) {
+    const contract = await prisma.contract.create({
+      data: {
+        iccid: sims[i].iccid,
+        serviceName: "buppan",
+        customerId: customers[0].id,
+        contractStart: new Date("2024-01-16"),
+        contractEnd: new Date("2024-04-16"),
+        status: "ACTIVE",
+        shippedAt: new Date("2024-01-16"),
+        arrivedAt: new Date("2024-01-17"),
+        msisdnSnapshot: sims[i].msisdn,
+      },
+    });
+
+    // 用途タグを契約に紐付け
+    await prisma.contractUsageTag.create({
+      data: {
+        contractId: contract.id,
+        usageTagId: authTag.id,
+        note: "認証用途として利用",
+      },
+    });
+
+    // SIMの状態を更新
+    await prisma.sim.update({
+      where: { iccid: sims[i].iccid },
+      data: {
+        status: "ACTIVE",
+        currentContractId: contract.id,
+        consumedTagIds: [authTag.id],
+      },
+    });
+  }
+  console.log("Created contracts and contract usage tags");
+
   console.log("Seeding completed!");
 }
 

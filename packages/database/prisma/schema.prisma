@@ -7,9 +7,8 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 // ==================== ENUMS ====================
@@ -103,6 +102,15 @@ enum KycVerificationStatus {
   COMPLETED // 完了
 }
 
+enum PurchaseOrderStatus {
+  ORDERED            // 発注済（発注書作成）
+  CONFIRMED          // 発注（先方受理）
+  AWAITING_SEAL      // しぃさん印鑑待ち
+  BEFORE_PAYMENT     // 振込前
+  AWAITING_DELIVERY  // 納品待ち
+  DELIVERED          // 納品済
+}
+
 // ==================== SIM管理 ====================
 
 model Supplier {
@@ -113,18 +121,20 @@ model Supplier {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  sims Sim[]
+  sims           Sim[]
+  purchaseOrders PurchaseOrder[]
 
   @@index([isActive])
 }
 
 model Sim {
-  iccid       String       @id @db.VarChar(20)
-  msisdn      String?      @db.VarChar(20)
-  supplierId  Int
-  simType     SimType      @default(INDIVIDUAL)
-  carrierType CarrierType?
-  plan        String?      @db.VarChar(100)
+  iccid            String       @id @db.VarChar(20)
+  msisdn           String?      @db.VarChar(20)
+  supplierId       Int
+  purchaseOrderId  String?      @db.VarChar(30)
+  simType          SimType      @default(INDIVIDUAL)
+  carrierType      CarrierType?
+  plan             String?      @db.VarChar(100)
 
   // 仕入れ先契約期間
   supplierContractStart DateTime?
@@ -155,12 +165,14 @@ model Sim {
   updatedAt DateTime @updatedAt
 
   supplier         Supplier          @relation(fields: [supplierId], references: [id])
+  purchaseOrder    PurchaseOrder?    @relation(fields: [purchaseOrderId], references: [id])
   simLocationTag   SimLocationTag?   @relation(fields: [simLocationTagId], references: [id])
   contracts        Contract[]
   applicationLines ApplicationLine[]
 
   @@index([status])
   @@index([supplierId])
+  @@index([purchaseOrderId])
   @@index([msisdn])
   @@index([simType])
   @@index([isMnpEligible])
@@ -555,4 +567,42 @@ model KycImage {
 
   @@index([applicationId])
   @@index([status])
+}
+
+// ==================== 仕入れ管理 ====================
+
+model PurchaseOrder {
+  id            String               @id @default(cuid())
+  orderNumber   String               @unique @db.VarChar(50)
+  supplierId    Int
+  carrierType   CarrierType
+  quantity      Int
+  unitPrice     Int
+  totalAmount   Int
+  status        PurchaseOrderStatus  @default(ORDERED)
+
+  // 日付
+  orderedAt     DateTime             @default(now())
+  invoiceDate   DateTime?
+  deliveryDate  DateTime?
+
+  // 書類（画像パス）
+  purchaseOrderImagePath String?    @db.VarChar(500)
+  quoteImagePath         String?    @db.VarChar(500)
+  invoiceImagePath       String?    @db.VarChar(500)
+
+  // 備考
+  note          String?              @db.Text
+
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  // リレーション
+  supplier      Supplier             @relation(fields: [supplierId], references: [id])
+  sims          Sim[]
+
+  @@index([supplierId])
+  @@index([status])
+  @@index([orderedAt])
+  @@index([deliveryDate])
 }
