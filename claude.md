@@ -456,3 +456,265 @@ pnpm --filter avaris dev     # localhost:3003
 ### Phase 4: 統合・連携
 1. 申込→SIM割当
 2. 解約→返却処理
+
+---
+
+## パフォーマンス最適化ガイドライン
+
+**目的**: 全ページで統一されたパフォーマンス最適化を実施し、ユーザー体験を向上させる。
+
+### 最適化の背景
+
+初期実装では以下の問題がありました:
+- サーバー起動: 6秒以上
+- ダッシュボードAPI: 900ms超
+- 不要なWebpack transpileによるオーバーヘッド
+- 直列クエリ実行による遅延
+- 重複リクエストによるネットワーク負荷
+
+### 最適化手順（5ステップ）
+
+#### Step 1: transpilePackages最適化（全アプリ共通・最優先）
+
+**問題**: `@repo/shared`をWebpackでtranspileしていた
+- サーバー側コードなのにクライアント向けにトランスパイル
+- 不要な処理で6秒以上の起動時間
+
+**解決策**: 全アプリの`next.config.js`から`@repo/shared`を削除
+
+```javascript
+// BEFORE
+const nextConfig = {
+  transpilePackages: ["@repo/ui", "@repo/auth", "@repo/validation", "@repo/shared"],
+  // ...
+};
+
+// AFTER
+const nextConfig = {
+  transpilePackages: ["@repo/ui", "@repo/auth", "@repo/validation"],
+  // @repo/sharedを削除（サーバー側コードは不要）
+  // ...
+};
+```
+
+**効果**:
+- サーバー起動時間: 6秒 → 1.5秒 (75%改善)
+- 全アプリに適用済み
+
+**実施コマンド**:
+```bash
+# Webpackキャッシュをクリア
+rm -rf apps/*/. next
+
+# サーバー再起動
+pnpm dev
+```
+
+---
+
+#### Step 2: APIクエリ最適化（ページごと）
+
+**問題**: 不要なクエリや直列実行による遅延
+
+**解決策**:
+1. **不要なクエリを削除**
+2. **複数クエリをPromise.allで並列実行**
+
+```typescript
+// BEFORE: 直列実行（遅い）
+const overview = await prisma.$queryRaw`...`;
+const tags = await prisma.usageTag.findMany(...);
+const plans = await prisma.$queryRaw`...`;
+// 合計時間 = query1 + query2 + query3
+
+// AFTER: 並列実行（速い）
+const [overview, tags, plans] = await Promise.all([
+  prisma.$queryRaw`...`,
+  prisma.usageTag.findMany(...),
+  prisma.$queryRaw`...`,
+]);
+// 合計時間 = max(query1, query2, query3)
+```
+
+**効果**:
+- ダッシュボードAPI: 900ms → 200-400ms (最大75%改善)
+
+**チェックポイント**:
+- サーバーログで`prisma:query`を確認
+- 直列実行されているクエリを特定
+- 依存関係のないクエリは並列化
+
+---
+
+#### Step 3: データベースINDEX追加（必要に応じて）
+
+**問題**: JOIN + WHERE + GROUP BYが遅い
+
+**解決策**: 複合INDEXで最適化
+
+```prisma
+model ApplicationLine {
+  // ... 既存のフィールド
+
+  // 複合INDEX: WHERE status = 'X' + JOIN applicationId
+  @@index([status, applicationId])
+  @@index([applicationId])
+  @@index([status])
+  // ...
+}
+```
+
+**実施コマンド**:
+```bash
+cd packages/database
+pnpm prisma db push
+```
+
+**効果**:
+- クエリ実行速度: 最大75%改善
+- データ量が増えても高速
+
+**チェックポイント**:
+- `EXPLAIN ANALYZE`でクエリプランを確認
+- Sequential Scanが多い場合はINDEX追加を検討
+- WHERE句とJOIN条件に使われるカラムの組み合わせ
+
+---
+
+#### Step 4: React Queryキャッシュ設定
+
+**問題**: 同じデータを何度も取得（重複リクエスト）
+
+**解決策**: `staleTime`を設定してキャッシュ
+
+```typescript
+const { data, isLoading } = useQuery({
+  queryKey: ['dashboard-stats'],
+  queryFn: api.getDashboardStats,
+  staleTime: 30000, // 30秒間キャッシュ（重複リクエスト防止）
+});
+```
+
+**効果**:
+- ページ遷移時の重複リクエスト削減
+- ネットワーク負荷低減
+
+**推奨値**:
+- リアルタイム性が必要: `staleTime: 5000` (5秒)
+- 通常のデータ: `staleTime: 30000` (30秒)
+- 静的データ: `staleTime: Infinity`
+
+---
+
+#### Step 5: UIの簡素化（必要に応じて）
+
+**問題**: 1ページに多すぎるデータを表示
+
+**解決策**:
+1. 必要最小限のデータのみ表示
+2. 詳細データは別ページへ分離
+3. 遅延ローディング（Suspense）
+
+```typescript
+// 概要のみ表示
+<Dashboard>
+  <OverviewCards data={overview} />
+  <Link to="/details">詳細を見る</Link>
+</Dashboard>
+
+// 詳細は別ページ
+<DetailsPage>
+  <DetailedCharts data={detailed} />
+</DetailsPage>
+```
+
+**効果**:
+- 初期表示速度の向上
+- ユーザー体験の向上
+
+---
+
+### 実績データ（ダッシュボード最適化）
+
+| 項目 | 変更前 | 変更後 | 改善率 |
+|------|--------|--------|--------|
+| サーバー起動 | 6秒以上 | 1.5秒 | 75% |
+| ダッシュボードAPI | 905ms | 200-400ms | 最大75% |
+| リクエスト数 | 27 | 25 | 7% |
+| データ転送 | 4.5MB | 4.5MB | 変更なし |
+
+**Git Commits**:
+- `94d105c`: transpilePackages最適化
+- `00fe50b`: ダッシュボードクエリ最適化
+- `9cd2fac`: 詳細セクション復元（並列クエリ）
+- `38e0dcb`: 複合INDEX追加
+
+---
+
+### 全ページ適用チェックリスト
+
+以下のページで同様の最適化を実施:
+
+#### apps/admin
+- [x] `/` - ダッシュボード（完了）
+- [ ] `/applications` - 申込一覧
+- [ ] `/sims` - SIM一覧
+- [ ] `/lines` - 回線管理
+- [ ] `/shipping` - 発送管理
+- [ ] `/users` - ユーザー管理
+- [ ] その他の一覧ページ
+
+#### apps/buppan, versus, avaris
+- [ ] 顧客ダッシュボード
+- [ ] 申込一覧
+- [ ] 回線一覧
+- [ ] 管理画面各ページ
+
+**実施手順**:
+1. ページを開く
+2. Chrome DevTools → Network タブで計測
+3. サーバーログで`prisma:query`を確認
+4. 上記5ステップを適用
+5. 再計測して改善を確認
+6. Git commit
+
+---
+
+### トラブルシューティング
+
+#### キャッシュクリアが必要な場合
+```bash
+# Next.jsキャッシュ
+rm -rf apps/*/. next
+
+# node_modules再インストール
+rm -rf node_modules
+pnpm install
+
+# Prisma Client再生成
+cd packages/database
+pnpm prisma generate
+```
+
+#### マイグレーションエラー
+```bash
+# スキーマをDBに反映（開発環境）
+pnpm prisma db push
+
+# 本番環境ではマイグレーションを使用
+pnpm prisma migrate deploy
+```
+
+#### クエリパフォーマンス確認
+```sql
+-- PostgreSQLで実行
+EXPLAIN ANALYZE SELECT ... ;
+```
+
+---
+
+### 参考資料
+
+- [Next.js Performance](https://nextjs.org/docs/app/building-your-application/optimizing)
+- [Prisma Performance](https://www.prisma.io/docs/guides/performance-and-optimization)
+- [React Query](https://tanstack.com/query/latest/docs/framework/react/guides/important-defaults)
