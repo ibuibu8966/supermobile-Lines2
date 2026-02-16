@@ -540,6 +540,7 @@ model ApplicationLine {
   lineReserveTag LineReserveTag? @relation(fields: [lineReserveTagId], references: [id])
 
   @@unique([applicationId, lineNumber])
+  @@index([status, applicationId]) // 複合INDEX: dashboard query最適化
   @@index([applicationId])
   @@index([simId])
   @@index([contractId])
