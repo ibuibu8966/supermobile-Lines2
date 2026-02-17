@@ -1,11 +1,11 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@repo/database";
-import { getAdminSession } from "@/lib/admin-session";
-import { getAllApplications, withErrorHandling } from "@repo/shared";
+import { getAdminSession } from "@/lib/auth/admin-session";
+import { getAllApplications } from "@/controllers/application.controller";
 
 export const dynamic = "force-dynamic";
 
 // 全サービス統合一覧取得
-export const GET = withErrorHandling(async (request: NextRequest) => {
+export async function GET (request: NextRequest) {
   return await getAllApplications(request, prisma, getAdminSession);
-});
+}

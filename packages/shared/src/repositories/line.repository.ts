@@ -5,7 +5,7 @@
  * Prismaとの直接的なやり取りを担当
  */
 
-import { LineWithRelations, LineUpdateInput, LineStatus } from '../domain/entities/line.entity';
+import { LineWithRelations, LineUpdateInput, LineStatus } from '@repo/entities';
 import { logger } from '../shared/utils/logger';
 
 export interface LineFilters {

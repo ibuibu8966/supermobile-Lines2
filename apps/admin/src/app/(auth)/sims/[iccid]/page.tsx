@@ -1,8 +1,11 @@
 "use client";
 
 import { useState, useEffect, use } from "react";
-import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@repo/ui";
-import { Loader2, Phone, Building2, User, Calendar, Tag, CheckCircle, XCircle } from "lucide-react";
+import { Button, Card, CardContent, CardHeader, CardTitle, Badge, Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, Label, Input, Checkbox, Popover, PopoverContent, PopoverTrigger, Calendar as CalendarComponent } from "@repo/ui";
+import { Loader2, Phone, Building2, User, Calendar, Tag, CheckCircle, XCircle, Edit, CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
+import { ja } from "date-fns/locale";
+import { cn } from "@repo/ui";
 
 interface UsageTag {
   id: number;
@@ -52,6 +55,7 @@ interface SimDetail {
   status: string;
   isMnpEligible: boolean;
   isAutoCancel: boolean;
+  autoCancelDate: string | null;
   supplierContractStart: string | null;
   supplierContractEnd: string | null;
   createdAt: string;
@@ -60,6 +64,7 @@ interface SimDetail {
   contracts: Contract[];
   consumedTags: UsageTag[];
   availableTags: UsageTag[];
+  eligibleTagIds: number[];
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -111,6 +116,13 @@ export default function SimDetailPage({ params }: { params: Promise<{ iccid: str
   const [sim, setSim] = useState<SimDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [allUsageTags, setAllUsageTags] = useState<UsageTag[]>([]);
+  const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
+  const [saving, setSaving] = useState(false);
+
+  // 自動解約予定日のポップオーバー表示用
+  const [autoCancelPopoverOpen, setAutoCancelPopoverOpen] = useState(false);
 
   useEffect(() => {
     const fetchSim = async () => {
@@ -162,6 +174,106 @@ export default function SimDetailPage({ params }: { params: Promise<{ iccid: str
     return `${customer.lastName} ${customer.firstName}`;
   };
 
+  // 用途タグを取得
+  useEffect(() => {
+    const fetchUsageTags = async () => {
+      try {
+        const res = await fetch('/api/usage-tags');
+        if (res.ok) {
+          const tags = await res.json();
+          setAllUsageTags(tags);
+        }
+      } catch (err) {
+        console.error('用途タグ取得エラー:', err);
+      }
+    };
+    fetchUsageTags();
+  }, []);
+
+  // 編集モーダルを開く（利用可能な用途タグのみ）
+  const openEditModal = () => {
+    if (sim) {
+      setSelectedTagIds(sim.eligibleTagIds || []);
+      setEditModalOpen(true);
+    }
+  };
+
+  // 利用可能な用途タグ保存処理
+  const handleSave = async () => {
+    if (!sim) return;
+
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/sims/${sim.iccid}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          eligibleTagIds: selectedTagIds,
+        }),
+      });
+
+      if (res.ok) {
+        const updated = await res.json();
+        setSim(updated);
+        setEditModalOpen(false);
+      } else {
+        const data = await res.json();
+        alert(data.error || '更新に失敗しました');
+      }
+    } catch (err) {
+      console.error('更新エラー:', err);
+      alert('更新に失敗しました');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // 自動解約予定日を自動保存
+  const handleAutoCancelDateChange = async (date: Date | undefined) => {
+    if (!sim) return;
+
+    try {
+      // ローカルタイムゾーンでYYYY-MM-DD形式に変換
+      let dateString: string | null = null;
+      if (date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        dateString = `${year}-${month}-${day}`;
+      }
+
+      const res = await fetch(`/api/sims/${sim.iccid}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          autoCancelDate: dateString,
+        }),
+      });
+
+      if (res.ok) {
+        const updated = await res.json();
+        setSim(updated);
+        setAutoCancelPopoverOpen(false);
+        alert('自動解約予定日を更新しました');
+      } else {
+        const data = await res.json();
+        alert(data.error || '更新に失敗しました');
+      }
+    } catch (err) {
+      console.error('更新エラー:', err);
+      alert('更新に失敗しました');
+    }
+  };
+
+  // タグの選択/解除
+  const toggleTag = (tagId: number) => {
+    setSelectedTagIds(prev =>
+      prev.includes(tagId)
+        ? prev.filter(id => id !== tagId)
+        : [...prev, tagId]
+    );
+  };
+
   if (loading) {
     return (
       <div className="p-6 flex items-center justify-center min-h-[400px]">
@@ -193,9 +305,6 @@ export default function SimDetailPage({ params }: { params: Promise<{ iccid: str
             <h1 className="text-2xl font-bold text-gray-900 font-mono">
               {sim.iccid}
             </h1>
-            <p className="text-sm text-gray-500 mt-1">
-              SIM詳細情報
-            </p>
           </div>
           <Badge variant={STATUS_VARIANTS[sim.status] || "default"} className="text-sm px-3 py-1">
             {STATUS_LABELS[sim.status] || sim.status}
@@ -281,7 +390,12 @@ export default function SimDetailPage({ params }: { params: Promise<{ iccid: str
           {/* 用途タグ状況 */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">用途タグ状況</CardTitle>
+              <div className="flex justify-between items-center">
+                <CardTitle className="text-base">用途タグ状況</CardTitle>
+                <Button variant="ghost" size="sm" onClick={openEditModal}>
+                  <Edit className="h-4 w-4" />
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
@@ -304,12 +418,12 @@ export default function SimDetailPage({ params }: { params: Promise<{ iccid: str
               <div className="border-t pt-4">
                 <p className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                   <CheckCircle className="h-4 w-4 text-green-500" />
-                  販売可能
+                  利用可能な用途
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {sim.availableTags.length > 0 ? (
                     sim.availableTags.map((tag) => (
-                      <Badge key={tag.id} variant="success">
+                      <Badge key={tag.id} variant="outline">
                         {tag.name}
                       </Badge>
                     ))
@@ -317,6 +431,39 @@ export default function SimDetailPage({ params }: { params: Promise<{ iccid: str
                     <span className="text-sm text-gray-400">なし</span>
                   )}
                 </div>
+              </div>
+              <div className="border-t pt-4">
+                <p className="text-sm font-medium text-gray-700 mb-2">自動解約予定日</p>
+                <Popover
+                  open={autoCancelPopoverOpen}
+                  onOpenChange={setAutoCancelPopoverOpen}
+                >
+                  <PopoverTrigger asChild>
+                    <button className="text-sm text-gray-600 hover:underline text-left">
+                      {sim.autoCancelDate ? formatDate(sim.autoCancelDate) : "—"}
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <CalendarComponent
+                      mode="single"
+                      selected={sim.autoCancelDate ? new Date(sim.autoCancelDate) : undefined}
+                      onSelect={handleAutoCancelDateChange}
+                      initialFocus
+                    />
+                    {sim.autoCancelDate && (
+                      <div className="p-3 border-t">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => handleAutoCancelDateChange(undefined)}
+                        >
+                          クリア
+                        </Button>
+                      </div>
+                    )}
+                  </PopoverContent>
+                </Popover>
               </div>
             </CardContent>
           </Card>
@@ -450,11 +597,44 @@ export default function SimDetailPage({ params }: { params: Promise<{ iccid: str
           </CardContent>
         </Card>
 
+        {/* 編集モーダル（利用可能な用途タグのみ） */}
+        <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>利用可能な用途タグを編集</DialogTitle>
+            </DialogHeader>
+            <div className="py-4">
+              <Label className="text-base font-medium mb-3 block">利用可能な用途タグ</Label>
+              <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto p-2 border rounded">
+                {allUsageTags.map((tag) => (
+                  <label
+                    key={tag.id}
+                    className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded cursor-pointer"
+                  >
+                    <Checkbox
+                      checked={selectedTagIds.includes(tag.id)}
+                      onCheckedChange={() => toggleTag(tag.id)}
+                    />
+                    <span className="text-sm">{tag.name}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditModalOpen(false)} disabled={saving}>
+                キャンセル
+              </Button>
+              <Button onClick={handleSave} disabled={saving}>
+                {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                保存
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         {/* アクションボタン */}
         <div className="mt-6 flex justify-end gap-2">
-          <Button variant="outline">
-            編集
-          </Button>
           <Button variant="outline">
             契約を追加
           </Button>

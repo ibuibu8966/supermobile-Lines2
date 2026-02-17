@@ -6,8 +6,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@repo/ui";
 import { Plus, Pencil, Trash2, Loader2, X, Settings } from "lucide-react";
 import { toast } from "sonner";
-import { queryKeys } from "@/lib/query-keys";
-import { api } from "@/lib/api";
+import { queryKeys } from "@/lib/api/query-keys";
+import { api } from "@/lib/api/client";
 
 interface UsageTag {
   id: number;
@@ -55,7 +55,7 @@ export default function ServicesPage() {
   // TanStack Query
   const { data: servicesData = [], isLoading: loading } = useQuery<Service[]>({
     queryKey: queryKeys.services,
-    queryFn: api.getServices,
+    queryFn: api.getServices as unknown as () => Promise<Service[]>,
   });
 
   // フィルター適用
@@ -208,9 +208,6 @@ export default function ServicesPage() {
     <div className="p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">サービス・プラン管理</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          サービスとプランの登録・編集
-        </p>
       </div>
 
       <div className="max-w-6xl">

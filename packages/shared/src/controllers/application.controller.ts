@@ -9,7 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { ApplicationService } from '../services/application.service';
 import { ApplicationRepository } from '../repositories/application.repository';
-import { CustomerApplicationInput, CustomerInfo } from '../domain/entities/customer-application.entity';
+import { CustomerApplicationInput, CustomerInfo } from '@repo/entities';
 import { parsePaginationParams, parseBooleanParam } from '../shared/validators/validation';
 import { NotFoundError, ValidationError } from '../shared/errors/custom-errors';
 import { logger } from '../shared/utils/logger';

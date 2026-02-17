@@ -7,13 +7,14 @@ import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@repo/u
 import { Plus, Pencil, Trash2, Loader2, X, Eye, EyeOff, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryState } from "nuqs";
-import { queryKeys } from "@/lib/query-keys";
-import { api } from "@/lib/api";
+import { queryKeys, STALE_TIMES } from "@/lib/api/query-keys";
+import { api } from "@/lib/api/client";
 
 interface User {
   id: string;
   email: string;
-  role: "CUSTOMER" | "ADMIN" | "SUPER_ADMIN";
+  name: string | null;
+  role: "CUSTOMER" | "EMPLOYEE" | "ADMIN" | "SUPER_ADMIN";
   serviceId: string | null;
   service: { id: string; code: string; name: string } | null;
   isActive: boolean;
@@ -25,12 +26,14 @@ interface User {
 
 const ROLE_LABELS: Record<string, string> = {
   CUSTOMER: "顧客",
+  EMPLOYEE: "従業員",
   ADMIN: "管理者",
   SUPER_ADMIN: "スーパー管理者",
 };
 
 const ROLE_VARIANTS: Record<string, "default" | "secondary" | "success" | "warning" | "destructive" | "outline"> = {
   CUSTOMER: "secondary",
+  EMPLOYEE: "outline",
   ADMIN: "default",
   SUPER_ADMIN: "warning",
 };
@@ -38,12 +41,12 @@ const ROLE_VARIANTS: Record<string, "default" | "secondary" | "success" | "warni
 export default function UsersPage() {
   const queryClient = useQueryClient();
   const { data: sessionData } = useSession();
-  const isSuperAdmin = sessionData?.user?.role === "SUPER_ADMIN";
+  const isSuperAdmin = sessionData?.user?.role === "SUPER_ADMIN" || sessionData?.user?.role === "EMPLOYEE";
 
   // Services from cache (prefetched at login)
   const { data: services = [] } = useQuery<{ id: string; code: string; name: string }[]>({
     queryKey: queryKeys.services,
-    queryFn: api.getServices,
+    queryFn: api.getServices as () => Promise<{ id: string; code: string; name: string }[]>,
   });
 
   // URL状態管理
@@ -55,53 +58,33 @@ export default function UsersPage() {
   const [filterRole, setFilterRole] = useQueryState("role", { defaultValue: "" });
   const [filterServiceId, setFilterServiceId] = useQueryState("service", { defaultValue: "" });
 
-  // フィルターが設定されているかチェック
-  const hasFilters = !!(showInactive === "true" || filterRole || filterServiceId);
-
-  // クエリパラメータ生成
+  // クエリパラメータ生成（フィルター変更時に queryKey も変わるので再フェッチが走る）
   const queryParams = useMemo(() => {
-    if (!hasFilters) return undefined;
     const params: Record<string, string> = {};
     if (showInactive === "true") params.includeInactive = "true";
     if (filterRole) params.role = filterRole;
     if (filterServiceId) params.serviceId = filterServiceId;
     return params;
-  }, [hasFilters, showInactive, filterRole, filterServiceId]);
+  }, [showInactive, filterRole, filterServiceId]);
 
-  // Users data from cache (prefetched at login for default view)
-  const { data: usersData = [], isLoading: isLoadingUsers, error: fetchError } = useQuery<User[]>({
-    queryKey: queryKeys.users,
+  // Users data — フィルターを queryKey に含めてキャッシュを正しく分離
+  const { data: users = [], isLoading: isLoadingUsers, error: fetchError } = useQuery<User[]>({
+    queryKey: Object.keys(queryParams).length === 0 ? queryKeys.users : ["users", queryParams],
     queryFn: () => {
-      const params = new URLSearchParams();
-      if (showInactive === "true") params.set("includeInactive", "true");
-      if (filterRole) params.set("role", filterRole);
-      if (filterServiceId) params.set("serviceId", filterServiceId);
-      return api.getUsers();
+      const params = new URLSearchParams(queryParams);
+      return api.getUsers(params) as unknown as Promise<User[]>;
     },
+    staleTime: STALE_TIMES.LIST,
   });
-
-  // クライアントサイドでフィルター適用
-  const users = useMemo(() => {
-    let filtered = usersData;
-    if (showInactive !== "true") {
-      filtered = filtered.filter((u) => u.isActive);
-    }
-    if (filterRole) {
-      filtered = filtered.filter((u) => u.role === filterRole);
-    }
-    if (filterServiceId) {
-      filtered = filtered.filter((u) => u.serviceId === filterServiceId);
-    }
-    return filtered;
-  }, [usersData, showInactive, filterRole, filterServiceId]);
 
   // モーダル状態
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [formData, setFormData] = useState({
     email: "",
+    name: "",
     password: "",
-    role: "CUSTOMER" as "CUSTOMER" | "ADMIN" | "SUPER_ADMIN",
+    role: "CUSTOMER" as "CUSTOMER" | "EMPLOYEE" | "ADMIN" | "SUPER_ADMIN",
     serviceId: "" as string | null,
   });
   const [showPassword, setShowPassword] = useState(false);
@@ -112,6 +95,7 @@ export default function UsersPage() {
     setEditingUser(null);
     setFormData({
       email: "",
+      name: "",
       password: "",
       role: "CUSTOMER",
       serviceId: null,
@@ -125,6 +109,7 @@ export default function UsersPage() {
     setEditingUser(user);
     setFormData({
       email: user.email,
+      name: user.name || "",
       password: "",
       role: user.role,
       serviceId: user.serviceId,
@@ -153,6 +138,7 @@ export default function UsersPage() {
 
       const payload: Record<string, unknown> = {
         email: formData.email,
+        name: formData.name || null,
         role: formData.role,
         serviceId: formData.serviceId || null,
       };
@@ -244,9 +230,6 @@ export default function UsersPage() {
     <div className="p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">ユーザー管理</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          管理者・顧客ユーザーを管理
-        </p>
       </div>
 
       {fetchError && (
@@ -269,6 +252,7 @@ export default function UsersPage() {
                   <option value="">全ロール</option>
                   <option value="SUPER_ADMIN">スーパー管理者</option>
                   <option value="ADMIN">管理者</option>
+                  <option value="EMPLOYEE">従業員</option>
                   <option value="CUSTOMER">顧客</option>
                 </select>
                 <select
@@ -328,6 +312,7 @@ export default function UsersPage() {
                   <thead>
                     <tr className="border-b">
                       <th className="text-left py-3 px-4">メールアドレス</th>
+                      <th className="text-left py-3 px-4">名前</th>
                       <th className="text-left py-3 px-4">ロール</th>
                       <th className="text-left py-3 px-4">サービス</th>
                       <th className="text-left py-3 px-4">顧客数</th>
@@ -342,6 +327,13 @@ export default function UsersPage() {
                         className={`border-b hover:bg-gray-50 ${!user.isActive ? "opacity-60" : ""}`}
                       >
                         <td className="py-3 px-4 font-medium">{user.email}</td>
+                        <td className="py-3 px-4">
+                          {user.name ? (
+                            <span>{user.name}</span>
+                          ) : (
+                            <span className="text-gray-400">—</span>
+                          )}
+                        </td>
                         <td className="py-3 px-4">
                           <Badge variant={ROLE_VARIANTS[user.role]}>
                             {ROLE_LABELS[user.role]}
@@ -432,6 +424,24 @@ export default function UsersPage() {
                     required
                   />
                 </div>
+                {/* 名前フィールド（従業員・管理者・スーパー管理者のみ） */}
+                {(formData.role === "EMPLOYEE" || formData.role === "ADMIN" || formData.role === "SUPER_ADMIN") && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      名前
+                      <span className="text-gray-400 font-normal ml-2">（任意）</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) =>
+                        setFormData({ ...formData, name: e.target.value })
+                      }
+                      className="w-full px-3 py-2 border rounded-md"
+                      placeholder="例: 山田 太郎"
+                    />
+                  </div>
+                )}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     パスワード
@@ -477,46 +487,45 @@ export default function UsersPage() {
                         onChange={(e) =>
                           setFormData({
                             ...formData,
-                            role: e.target.value as "CUSTOMER" | "ADMIN" | "SUPER_ADMIN",
+                            role: e.target.value as "CUSTOMER" | "EMPLOYEE" | "ADMIN" | "SUPER_ADMIN",
                           })
                         }
                         className="w-full px-3 py-2 border rounded-md"
                         required
                       >
                         <option value="CUSTOMER">顧客</option>
+                        <option value="EMPLOYEE">従業員</option>
                         <option value="ADMIN">管理者</option>
                         <option value="SUPER_ADMIN">スーパー管理者</option>
                       </select>
                     </div>
-                    {(formData.role === "CUSTOMER" || formData.role === "ADMIN" || formData.role === "SUPER_ADMIN") && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          所属サービス
-                          {formData.role === "SUPER_ADMIN" && (
-                            <span className="text-gray-400 font-normal ml-2">
-                              （スーパー管理者は全サービス管理可）
-                            </span>
-                          )}
-                        </label>
-                        <select
-                          value={formData.serviceId || ""}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              serviceId: e.target.value || null,
-                            })
-                          }
-                          className="w-full px-3 py-2 border rounded-md"
-                        >
-                          <option value="">未設定</option>
-                          {services.map((service) => (
-                            <option key={service.id} value={service.id}>
-                              {service.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        所属サービス
+                        {formData.role === "SUPER_ADMIN" && (
+                          <span className="text-gray-400 font-normal ml-2">
+                            （スーパー管理者は全サービス管理可）
+                          </span>
+                        )}
+                      </label>
+                      <select
+                        value={formData.serviceId || ""}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            serviceId: e.target.value || null,
+                          })
+                        }
+                        className="w-full px-3 py-2 border rounded-md"
+                      >
+                        <option value="">未設定</option>
+                        {services.map((service) => (
+                          <option key={service.id} value={service.id}>
+                            {service.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </>
                 )}
               </div>

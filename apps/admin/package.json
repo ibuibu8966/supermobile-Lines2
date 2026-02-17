@@ -11,7 +11,9 @@
   "dependencies": {
     "@repo/auth": "workspace:*",
     "@repo/database": "workspace:*",
+    "@repo/entities": "workspace:*",
     "@repo/ui": "workspace:*",
+    "@repo/utils": "workspace:*",
     "@repo/validation": "workspace:*",
     "@tanstack/react-query": "^5.90.20",
     "bcryptjs": "^2.4.3",

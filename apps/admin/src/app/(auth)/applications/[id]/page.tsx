@@ -604,14 +604,6 @@ export default function ApplicationDetailPage() {
               </Badge>
             )}
           </div>
-          <p className="text-sm text-gray-500 mt-1">
-            {getCustomerName(application.customer)} / {application.service.name}
-            {application.archivedAt && (
-              <span className="ml-2 text-gray-400">
-                （{formatDate(application.archivedAt)} アーカイブ）
-              </span>
-            )}
-          </p>
         </div>
         <div className="flex gap-2">
           {application.isArchived ? (

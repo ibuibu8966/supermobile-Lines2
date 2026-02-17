@@ -5,8 +5,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@repo/ui";
 import { Plus, Pencil, Trash2, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
-import { queryKeys } from "@/lib/query-keys";
-import { api } from "@/lib/api";
+import { queryKeys } from "@/lib/api/query-keys";
+import { api } from "@/lib/api/client";
 
 interface Supplier {
   id: number;
@@ -18,14 +18,37 @@ interface Supplier {
   };
 }
 
-export function SupplierManager() {
+interface SupplierManagerProps {
+  hideControls?: boolean;
+  showInactive?: boolean;
+  onShowInactiveChange?: (value: boolean) => void;
+  isCreateDialogOpen?: boolean;
+  onCreateDialogChange?: (open: boolean) => void;
+}
+
+export function SupplierManager({
+  hideControls = false,
+  showInactive: externalShowInactive,
+  onShowInactiveChange,
+  isCreateDialogOpen: externalIsCreateDialogOpen,
+  onCreateDialogChange,
+}: SupplierManagerProps) {
   const queryClient = useQueryClient();
-  const [showInactive, setShowInactive] = useState(false);
+  const [internalShowInactive, setInternalShowInactive] = useState(false);
+
+  const showInactive = externalShowInactive ?? internalShowInactive;
+  const handleShowInactiveChange = (checked: boolean) => {
+    if (onShowInactiveChange) {
+      onShowInactiveChange(checked);
+    } else {
+      setInternalShowInactive(checked);
+    }
+  };
 
   // TanStack Query - suppliers (prefetched at login)
   const { data: suppliersData = [], isLoading } = useQuery<Supplier[]>({
     queryKey: queryKeys.suppliers,
-    queryFn: api.getSuppliers,
+    queryFn: api.getSuppliers as () => Promise<Supplier[]>,
   });
 
   // フィルター適用
@@ -35,22 +58,31 @@ export function SupplierManager() {
   }, [suppliersData, showInactive]);
 
   // Modal state
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [internalIsModalOpen, setInternalIsModalOpen] = useState(false);
+  const isModalOpen = externalIsCreateDialogOpen ?? internalIsModalOpen;
+  const setIsModalOpen = (open: boolean) => {
+    if (onCreateDialogChange) {
+      onCreateDialogChange(open);
+    } else {
+      setInternalIsModalOpen(open);
+    }
+  };
+
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
-  const [formData, setFormData] = useState({ code: "", name: "" });
+  const [formData, setFormData] = useState({ name: "" });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const openCreateModal = () => {
     setEditingSupplier(null);
-    setFormData({ code: "", name: "" });
+    setFormData({ name: "" });
     setError(null);
     setIsModalOpen(true);
   };
 
   const openEditModal = (supplier: Supplier) => {
     setEditingSupplier(supplier);
-    setFormData({ code: supplier.code, name: supplier.name });
+    setFormData({ name: supplier.name });
     setError(null);
     setIsModalOpen(true);
   };
@@ -58,7 +90,7 @@ export function SupplierManager() {
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingSupplier(null);
-    setFormData({ code: "", name: "" });
+    setFormData({ name: "" });
     setError(null);
   };
 
@@ -149,21 +181,23 @@ export function SupplierManager() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <label className="flex items-center gap-2 text-sm text-gray-600">
-          <input
-            type="checkbox"
-            checked={showInactive}
-            onChange={(e) => setShowInactive(e.target.checked)}
-            className="rounded"
-          />
-          無効な仕入れ先も表示
-        </label>
-        <Button onClick={openCreateModal}>
-          <Plus className="h-4 w-4 mr-2" />
-          新規仕入れ先登録
-        </Button>
-      </div>
+      {!hideControls && (
+        <div className="flex justify-between items-center mb-6">
+          <label className="flex items-center gap-2 text-sm text-gray-600">
+            <input
+              type="checkbox"
+              checked={showInactive}
+              onChange={(e) => handleShowInactiveChange(e.target.checked)}
+              className="rounded"
+            />
+            無効な仕入れ先も表示
+          </label>
+          <Button onClick={openCreateModal}>
+            <Plus className="h-4 w-4 mr-2" />
+            新規仕入れ先登録
+          </Button>
+        </div>
+      )}
 
       <Card>
         <CardHeader>
@@ -187,8 +221,6 @@ export function SupplierManager() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left py-3 px-4">ID</th>
-                  <th className="text-left py-3 px-4">コード</th>
                   <th className="text-left py-3 px-4">仕入れ先名</th>
                   <th className="text-left py-3 px-4">SIM数</th>
                   <th className="text-left py-3 px-4">ステータス</th>
@@ -198,8 +230,6 @@ export function SupplierManager() {
               <tbody>
                 {suppliers.map((supplier) => (
                   <tr key={supplier.id} className="border-b hover:bg-gray-50">
-                    <td className="py-3 px-4">{supplier.id}</td>
-                    <td className="py-3 px-4 font-mono">{supplier.code}</td>
                     <td className="py-3 px-4">{supplier.name}</td>
                     <td className="py-3 px-4">{supplier._count.sims.toLocaleString()}</td>
                     <td className="py-3 px-4">
@@ -257,19 +287,6 @@ export function SupplierManager() {
                     {error}
                   </div>
                 )}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    コード
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.code}
-                    onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-md"
-                    placeholder="arts"
-                    required
-                  />
-                </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     仕入れ先名

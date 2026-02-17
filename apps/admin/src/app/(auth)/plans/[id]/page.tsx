@@ -280,9 +280,6 @@ export default function PlanDetailPage({
                 {plan.isActive ? "有効" : "無効"}
               </Badge>
             </div>
-            <p className="text-sm text-gray-500 mt-1">
-              {plan.service.name} / {plan.code}
-            </p>
           </div>
           <div className="flex items-center gap-2">
             {!isEditing && (

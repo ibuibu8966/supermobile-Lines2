@@ -4,6 +4,9 @@
  * 申込エンティティの型定義
  */
 
+import type { ServiceEntity } from './service.entity';
+import type { PlanEntity } from './plan.entity';
+
 export interface ApplicationEntity {
   id: string;
   applicationNumber: string;
@@ -116,18 +119,6 @@ export interface CustomerEntity {
   companyNameKana: string | null;
   email: string;
   phone: string;
-}
-
-export interface ServiceEntity {
-  id: string;
-  code: string;
-  name: string;
-}
-
-export interface PlanEntity {
-  id: string;
-  code: string;
-  name: string;
 }
 
 export interface ApplicationLineEntity {

@@ -36,6 +36,7 @@ export interface SimEntity {
   supplierId: number | null;
   simLocationTagId: number | null;
   consumedTagIds: number[];
+  eligibleTagIds?: number[];
   note: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -85,6 +86,10 @@ export interface SimWithRelations extends SimEntity {
     };
   }>;
   consumedTags?: Array<{
+    id: number;
+    name: string;
+  }>;
+  eligibleTags?: Array<{
     id: number;
     name: string;
   }>;

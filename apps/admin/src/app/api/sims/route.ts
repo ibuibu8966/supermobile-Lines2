@@ -1,9 +1,9 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@repo/database";
-import { getAllSims, withErrorHandling } from "@repo/shared";
+import { getAllSims } from "@/controllers/sim.controller";
 
 export const dynamic = "force-dynamic";
 
-export const GET = withErrorHandling(async (request: NextRequest) => {
+export async function GET (request: NextRequest) {
   return await getAllSims(request, prisma);
-});
+}

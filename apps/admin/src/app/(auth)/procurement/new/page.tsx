@@ -37,10 +37,12 @@ const CARRIER_OPTIONS = [
 export default function NewProcurementPage() {
   const router = useRouter();
   const [supplierId, setSupplierId] = useState<string>("");
-  const [carrierType, setCarrierType] = useState<string>("");
   const [quantity, setQuantity] = useState<string>("");
-  const [unitPrice, setUnitPrice] = useState<string>("");
   const [note, setNote] = useState<string>("");
+
+  // 固定値
+  const carrierType = "DOCOMO";
+  const unitPrice = 1000;
 
   const { data: suppliers, isLoading: loadingSuppliers } = useQuery<Supplier[]>({
     queryKey: ["suppliers"],
@@ -62,8 +64,8 @@ export default function NewProcurementPage() {
     },
   });
 
-  const totalAmount = quantity && unitPrice
-    ? parseInt(quantity) * parseInt(unitPrice)
+  const totalAmount = quantity
+    ? parseInt(quantity) * unitPrice
     : 0;
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -72,14 +74,14 @@ export default function NewProcurementPage() {
       supplierId: parseInt(supplierId),
       carrierType,
       quantity: parseInt(quantity),
-      unitPrice: parseInt(unitPrice),
+      unitPrice,
       totalAmount,
       note: note || null,
     });
   };
 
   const isValid =
-    supplierId && carrierType && quantity && unitPrice && parseInt(quantity) > 0 && parseInt(unitPrice) > 0;
+    supplierId && quantity && parseInt(quantity) > 0;
 
   return (
     <div className="p-6">
@@ -129,20 +131,18 @@ export default function NewProcurementPage() {
 
             <div className="space-y-2">
               <Label htmlFor="carrier">
-                回線種別 <span className="text-red-500">*</span>
+                回線種別
               </Label>
-              <Select value={carrierType} onValueChange={setCarrierType}>
-                <SelectTrigger id="carrier">
-                  <SelectValue placeholder="回線種別を選択" />
-                </SelectTrigger>
-                <SelectContent>
-                  {CARRIER_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Input
+                id="carrier"
+                type="text"
+                value="ドコモ"
+                disabled
+                className="bg-gray-50"
+              />
+              <p className="text-xs text-muted-foreground">
+                ※ 現在はドコモ回線のみ対応しています
+              </p>
             </div>
 
             <div className="space-y-2">
@@ -167,7 +167,7 @@ export default function NewProcurementPage() {
 
             <div className="space-y-2">
               <Label htmlFor="unitPrice">
-                回線単価 <span className="text-red-500">*</span>
+                回線単価
               </Label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
@@ -175,14 +175,15 @@ export default function NewProcurementPage() {
                 </span>
                 <Input
                   id="unitPrice"
-                  type="number"
-                  min="0"
-                  value={unitPrice}
-                  onChange={(e) => setUnitPrice(e.target.value)}
-                  placeholder="1000"
-                  className="pl-8"
+                  type="text"
+                  value="1,000"
+                  disabled
+                  className="pl-8 bg-gray-50"
                 />
               </div>
+              <p className="text-xs text-muted-foreground">
+                ※ 標準単価: ¥1,000/回線
+              </p>
             </div>
 
             <div className="bg-gray-50 p-4 rounded-lg">
@@ -192,9 +193,9 @@ export default function NewProcurementPage() {
                   ¥{totalAmount.toLocaleString()}
                 </span>
               </div>
-              {quantity && unitPrice && (
+              {quantity && (
                 <p className="text-xs text-muted-foreground mt-1">
-                  {parseInt(quantity).toLocaleString()}枚 × ¥{parseInt(unitPrice).toLocaleString()}
+                  {parseInt(quantity).toLocaleString()}枚 × ¥{unitPrice.toLocaleString()}
                 </p>
               )}
             </div>

@@ -28,7 +28,7 @@ declare module "next-auth/jwt" {
   }
 }
 
-export type UserRole = "CUSTOMER" | "ADMIN" | "SUPER_ADMIN";
+export type UserRole = "CUSTOMER" | "EMPLOYEE" | "ADMIN" | "SUPER_ADMIN";
 
 export interface AuthUser {
   id: string;
@@ -39,11 +39,11 @@ export interface AuthUser {
 }
 
 export function isAdmin(role: string): boolean {
-  return role === "ADMIN" || role === "SUPER_ADMIN";
+  return role === "ADMIN" || role === "SUPER_ADMIN" || role === "EMPLOYEE";
 }
 
 export function isSuperAdmin(role: string): boolean {
-  return role === "SUPER_ADMIN";
+  return role === "SUPER_ADMIN" || role === "EMPLOYEE";
 }
 
 export function canAccessService(
@@ -51,7 +51,7 @@ export function canAccessService(
   userServiceId: string | null,
   targetServiceId: string
 ): boolean {
-  if (userRole === "SUPER_ADMIN") {
+  if (userRole === "SUPER_ADMIN" || userRole === "EMPLOYEE") {
     return true;
   }
   if (userRole === "ADMIN" && userServiceId === targetServiceId) {

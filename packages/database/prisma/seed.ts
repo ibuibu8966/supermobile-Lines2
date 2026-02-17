@@ -435,9 +435,10 @@ async function main() {
 
   await prisma.user.upsert({
     where: { email: "admin@example.com" },
-    update: {},
+    update: { name: "野田 システム管理者" },
     create: {
       email: "admin@example.com",
+      name: "野田 システム管理者",
       password: hashedPassword,
       role: "SUPER_ADMIN",
       isActive: true,
@@ -446,9 +447,10 @@ async function main() {
 
   await prisma.user.upsert({
     where: { email: "buppan-admin@example.com" },
-    update: {},
+    update: { name: "田中 二郎" },
     create: {
       email: "buppan-admin@example.com",
+      name: "田中 二郎",
       password: hashedPassword,
       role: "ADMIN",
       serviceId: buppanService.id,
@@ -458,9 +460,10 @@ async function main() {
 
   await prisma.user.upsert({
     where: { email: "versus-admin@example.com" },
-    update: {},
+    update: { name: "中村 健太" },
     create: {
       email: "versus-admin@example.com",
+      name: "中村 健太",
       password: hashedPassword,
       role: "ADMIN",
       serviceId: versusService.id,
@@ -470,9 +473,10 @@ async function main() {
 
   await prisma.user.upsert({
     where: { email: "avaris-admin@example.com" },
-    update: {},
+    update: { name: "高橋 美咲" },
     create: {
       email: "avaris-admin@example.com",
+      name: "高橋 美咲",
       password: hashedPassword,
       role: "ADMIN",
       serviceId: avarisService.id,
@@ -482,9 +486,10 @@ async function main() {
 
   await prisma.user.upsert({
     where: { email: "machinegun-admin@example.com" },
-    update: {},
+    update: { name: "伊藤 大輔" },
     create: {
       email: "machinegun-admin@example.com",
+      name: "伊藤 大輔",
       password: hashedPassword,
       role: "ADMIN",
       serviceId: machinegunService.id,
@@ -494,15 +499,42 @@ async function main() {
 
   await prisma.user.upsert({
     where: { email: "maeda-admin@example.com" },
-    update: {},
+    update: { name: "前田 隆司" },
     create: {
       email: "maeda-admin@example.com",
+      name: "前田 隆司",
       password: hashedPassword,
       role: "ADMIN",
       serviceId: maedaService.id,
       isActive: true,
     },
   });
+
+  // 従業員ユーザー
+  await prisma.user.upsert({
+    where: { email: "employee1@example.com" },
+    update: { name: "小林 さやか" },
+    create: {
+      email: "employee1@example.com",
+      name: "小林 さやか",
+      password: hashedPassword,
+      role: "EMPLOYEE",
+      isActive: true,
+    },
+  });
+
+  await prisma.user.upsert({
+    where: { email: "employee2@example.com" },
+    update: { name: "渡辺 拓也" },
+    create: {
+      email: "employee2@example.com",
+      name: "渡辺 拓也",
+      password: hashedPassword,
+      role: "EMPLOYEE",
+      isActive: true,
+    },
+  });
+
   console.log("Created test admin users");
 
   // 8. タグマスタ（SimLocationTag, LineTag, LineReserveTag）
@@ -579,7 +611,6 @@ async function main() {
         carrierType: ["DOCOMO", "AU", "SOFTBANK", "RAKUTEN"][i % 4] as any,
         plan: "標準プラン",
         status: i <= 30 ? "IN_STOCK" : i <= 40 ? "ACTIVE" : "RETURNING",
-        isMnpEligible: i % 3 === 0,
         simLocationTagId: i % 2 === 0 ? tokyoLocation.id : osakaLocation.id,
         eligibleTagIds: [authTag.id, pokekaTag.id],
       },
@@ -936,6 +967,181 @@ async function main() {
     });
   }
   console.log("Created contracts and contract usage tags");
+
+  // 16. 発注データ（PurchaseOrder + PurchaseOrderLine）
+  // 発注1: ドコモ100枚
+  await prisma.purchaseOrder.create({
+    data: {
+      supplierId: artsSupplier.id,
+      totalAmount: 100000,
+      status: "DELIVERED",
+      orderedAt: new Date("2024-01-01"),
+      invoiceDate: new Date("2024-01-05"),
+      deliveryDate: new Date("2024-01-10"),
+      note: "初回発注分、納品完了",
+      lines: {
+        create: [
+          { carrierType: "DOCOMO", quantity: 100, unitPrice: 1000, subtotal: 100000 },
+        ],
+      },
+    },
+  });
+
+  // 発注2: au50枚
+  await prisma.purchaseOrder.create({
+    data: {
+      supplierId: linklifeSupplier.id,
+      totalAmount: 47500,
+      status: "AWAITING_DELIVERY",
+      orderedAt: new Date("2024-01-15"),
+      invoiceDate: new Date("2024-01-20"),
+      note: "au回線、納品待ち",
+      lines: {
+        create: [
+          { carrierType: "AU", quantity: 50, unitPrice: 950, subtotal: 47500 },
+        ],
+      },
+    },
+  });
+
+  // 発注3: ソフトバンク200枚
+  await prisma.purchaseOrder.create({
+    data: {
+      supplierId: artsSupplier.id,
+      totalAmount: 220000,
+      status: "BEFORE_PAYMENT",
+      orderedAt: new Date("2024-01-20"),
+      invoiceDate: new Date("2024-01-25"),
+      note: "ソフトバンク回線、大口発注",
+      lines: {
+        create: [
+          { carrierType: "SOFTBANK", quantity: 200, unitPrice: 1100, subtotal: 220000 },
+        ],
+      },
+    },
+  });
+
+  // 発注4: 楽天30枚
+  await prisma.purchaseOrder.create({
+    data: {
+      supplierId: linklifeSupplier.id,
+      totalAmount: 24000,
+      status: "AWAITING_SEAL",
+      orderedAt: new Date("2024-01-25"),
+      note: "楽天回線、印鑑待ち",
+      lines: {
+        create: [
+          { carrierType: "RAKUTEN", quantity: 30, unitPrice: 800, subtotal: 24000 },
+        ],
+      },
+    },
+  });
+
+  // 発注5: 複数キャリア混在（ドコモ500 + 楽天500）
+  await prisma.purchaseOrder.create({
+    data: {
+      supplierId: artsSupplier.id,
+      totalAmount: 925000,
+      status: "CONFIRMED",
+      orderedAt: new Date("2024-02-01"),
+      note: "複数キャリア混在発注、先方受理済み",
+      lines: {
+        create: [
+          { carrierType: "DOCOMO", quantity: 500, unitPrice: 1050, subtotal: 525000 },
+          { carrierType: "RAKUTEN", quantity: 500, unitPrice: 800, subtotal: 400000 },
+        ],
+      },
+    },
+  });
+
+  // 発注6: ドコモ80枚
+  await prisma.purchaseOrder.create({
+    data: {
+      supplierId: linklifeSupplier.id,
+      totalAmount: 80000,
+      status: "ORDERED",
+      orderedAt: new Date("2024-02-05"),
+      note: "通常発注",
+      lines: {
+        create: [
+          { carrierType: "DOCOMO", quantity: 80, unitPrice: 1000, subtotal: 80000 },
+        ],
+      },
+    },
+  });
+
+  // 発注7: au120枚
+  await prisma.purchaseOrder.create({
+    data: {
+      supplierId: artsSupplier.id,
+      totalAmount: 117600,
+      status: "DELIVERED",
+      orderedAt: new Date("2024-02-10"),
+      invoiceDate: new Date("2024-02-15"),
+      deliveryDate: new Date("2024-02-20"),
+      note: "au回線、納品完了",
+      lines: {
+        create: [
+          { carrierType: "AU", quantity: 120, unitPrice: 980, subtotal: 117600 },
+        ],
+      },
+    },
+  });
+
+  // 発注8: 複数キャリア混在（ソフトバンク300 + au200）
+  await prisma.purchaseOrder.create({
+    data: {
+      supplierId: linklifeSupplier.id,
+      totalAmount: 514000,
+      status: "AWAITING_DELIVERY",
+      orderedAt: new Date("2024-02-15"),
+      invoiceDate: new Date("2024-02-18"),
+      note: "複数キャリア混在、納品待ち",
+      lines: {
+        create: [
+          { carrierType: "SOFTBANK", quantity: 300, unitPrice: 1080, subtotal: 324000 },
+          { carrierType: "AU", quantity: 200, unitPrice: 950, subtotal: 190000 },
+        ],
+      },
+    },
+  });
+
+  // 発注9: 楽天40枚
+  await prisma.purchaseOrder.create({
+    data: {
+      supplierId: artsSupplier.id,
+      totalAmount: 34000,
+      status: "BEFORE_PAYMENT",
+      orderedAt: new Date("2024-02-20"),
+      invoiceDate: new Date("2024-02-22"),
+      note: "楽天回線、振込前",
+      lines: {
+        create: [
+          { carrierType: "RAKUTEN", quantity: 40, unitPrice: 850, subtotal: 34000 },
+        ],
+      },
+    },
+  });
+
+  // 発注10: ドコモ90枚
+  await prisma.purchaseOrder.create({
+    data: {
+      supplierId: linklifeSupplier.id,
+      totalAmount: 91800,
+      status: "DELIVERED",
+      orderedAt: new Date("2024-02-25"),
+      invoiceDate: new Date("2024-02-28"),
+      deliveryDate: new Date("2024-03-05"),
+      note: "ドコモ回線、納品完了",
+      lines: {
+        create: [
+          { carrierType: "DOCOMO", quantity: 90, unitPrice: 1020, subtotal: 91800 },
+        ],
+      },
+    },
+  });
+
+  console.log("Created 10 purchase orders with multiple carrier lines");
 
   console.log("Seeding completed!");
 }

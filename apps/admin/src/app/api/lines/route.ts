@@ -1,9 +1,9 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@repo/database";
-import { getAllLines, withErrorHandling } from "@repo/shared";
+import { getAllLines } from "@/controllers/line.controller";
 
 export const dynamic = "force-dynamic";
 
-export const GET = withErrorHandling(async (request: NextRequest) => {
+export async function GET (request: NextRequest) {
   return await getAllLines(request, prisma);
-});
+}

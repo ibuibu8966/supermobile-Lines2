@@ -6,7 +6,7 @@
  */
 
 import { PrismaClient } from '@prisma/client';
-import { PlanWithRelations, PlanUpdateInput } from '../domain/entities/plan.entity';
+import { PlanWithRelations, PlanUpdateInput } from '@repo/entities';
 import { logger } from '../shared/utils/logger';
 
 export interface PlanFilters {

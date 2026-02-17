@@ -17,6 +17,16 @@ export interface TagEntity {
   [key: string]: any;
 }
 
+export interface TagCreateInput {
+  code: string;
+  name: string;
+  category?: string | null;
+  description?: string | null;
+  displayOrder?: number;
+  isActive?: boolean;
+  [key: string]: any;
+}
+
 export interface TagUpdateInput {
   code?: string;
   name?: string;
@@ -33,6 +43,7 @@ export interface TagConfig {
   usageTableName?: string;
   usageColumnName?: string;
   includeFields?: any;
+  orderBy?: any;
 }
 
 /**
@@ -43,6 +54,50 @@ export class TagCrudService {
     private prisma: PrismaClient,
     private config: TagConfig
   ) {}
+
+  /**
+   * タグ一覧を取得
+   */
+  async getTagList(includeInactive: boolean = false): Promise<any[]> {
+    logger.info(`${this.config.displayName}一覧取得`, { includeInactive });
+
+    const where = includeInactive ? {} : { isActive: true };
+
+    const tags = await (this.prisma as any)[this.config.tableName].findMany({
+      where,
+      include: this.config.includeFields || {},
+      orderBy: this.config.orderBy || [{ displayOrder: 'asc' }, { name: 'asc' }],
+    });
+
+    logger.debug(`${this.config.displayName}一覧取得完了`, { count: tags.length });
+
+    return tags;
+  }
+
+  /**
+   * タグを作成
+   * ビジネスルール: コードの重複チェック
+   */
+  async createTag(createData: TagCreateInput): Promise<any> {
+    logger.info(`${this.config.displayName}作成開始`, { code: createData.code });
+
+    // ビジネスルール: コードの重複チェック
+    const existing = await (this.prisma as any)[this.config.tableName].findUnique({
+      where: { code: createData.code },
+    });
+
+    if (existing) {
+      throw new ConflictError('このコードは既に使用されています');
+    }
+
+    const created = await (this.prisma as any)[this.config.tableName].create({
+      data: createData,
+    });
+
+    logger.info(`${this.config.displayName}作成完了`, { id: created.id });
+
+    return created;
+  }
 
   /**
    * タグ詳細を取得

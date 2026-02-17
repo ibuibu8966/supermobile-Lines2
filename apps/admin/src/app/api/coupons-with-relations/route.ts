@@ -1,0 +1,77 @@
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@repo/database";
+
+export const dynamic = "force-dynamic";
+
+/**
+ * クーポン・プラン・サービスを1リクエストで取得
+ * パフォーマンス最適化のための統合エンドポイント
+ */
+export async function GET(request: NextRequest) {
+  try {
+    // 並列実行で高速化
+    const [coupons, services, plans] = await Promise.all([
+      // クーポン取得（プラン・サービス情報を含む）
+      prisma.coupon.findMany({
+        include: {
+          plan: {
+            include: {
+              service: {
+                select: {
+                  id: true,
+                  code: true,
+                  name: true,
+                },
+              },
+            },
+          },
+          _count: {
+            select: {
+              applications: true,
+            },
+          },
+        },
+        orderBy: [
+          { isActive: "desc" },
+          { validUntil: "desc" },
+        ],
+      }),
+      // サービス一覧（フィルター用）
+      prisma.service.findMany({
+        where: { isActive: true },
+        select: {
+          id: true,
+          code: true,
+          name: true,
+        },
+        orderBy: { name: "asc" },
+      }),
+      // プラン一覧（モーダル用）
+      prisma.plan.findMany({
+        where: { isActive: true },
+        include: {
+          service: {
+            select: {
+              id: true,
+              code: true,
+              name: true,
+            },
+          },
+        },
+        orderBy: { name: "asc" },
+      }),
+    ]);
+
+    return NextResponse.json({
+      coupons,
+      services,
+      plans,
+    });
+  } catch (error) {
+    console.error("Error fetching coupons with relations:", error);
+    return NextResponse.json(
+      { error: "クーポンデータの取得に失敗しました" },
+      { status: 500 }
+    );
+  }
+}

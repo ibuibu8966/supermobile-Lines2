@@ -6,7 +6,7 @@
  */
 
 import { UserRepository, UserFilters } from '../repositories/user.repository';
-import { UserWithRelations, UserCreateInput, UserUpdateInput } from '../domain/entities/user.entity';
+import { UserWithRelations, UserCreateInput, UserUpdateInput } from '@repo/entities';
 import { logger } from '../shared/utils/logger';
 import { ConflictError, ForbiddenError, NotFoundError } from '../shared/errors/custom-errors';
 import bcrypt from 'bcryptjs';

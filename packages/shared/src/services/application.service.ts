@@ -6,8 +6,8 @@
  */
 
 import { ApplicationRepository, ApplicationFilters } from '../repositories/application.repository';
-import { ApplicationWithRelations } from '../domain/entities/application.entity';
-import { CustomerApplicationInput, CustomerApplicationResult, CustomerInfo } from '../domain/entities/customer-application.entity';
+import { ApplicationWithRelations } from '@repo/entities';
+import { CustomerApplicationInput, CustomerApplicationResult, CustomerInfo } from '@repo/entities';
 import { getServiceConfig } from '../config/service.config';
 import { PaginationInfo, createPaginationInfo } from '../shared/utils/helpers';
 import { logger } from '../shared/utils/logger';

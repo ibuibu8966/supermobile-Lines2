@@ -5,8 +5,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@repo/ui";
 import { Plus, Pencil, Trash2, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
-import { queryKeys } from "@/lib/query-keys";
-import { api } from "@/lib/api";
+import { queryKeys } from "@/lib/api/query-keys";
+import { api } from "@/lib/api/client";
 
 interface Coupon {
   id: string;
@@ -35,26 +35,33 @@ interface Plan {
   service: { id: string; code: string; name: string };
 }
 
+interface Service {
+  id: string;
+  name: string;
+  code: string;
+}
+
+interface CouponsWithRelations {
+  services: Service[];
+  plans: Plan[];
+  coupons: Coupon[];
+}
+
 function CouponsContent() {
   const queryClient = useQueryClient();
 
   const [showInactive, setShowInactive] = useState(false);
   const [filterServiceId, setFilterServiceId] = useState<string>("");
 
-  const { data: services = [] } = useQuery<{ id: string; code: string; name: string }[]>({
-    queryKey: queryKeys.services,
-    queryFn: api.getServices,
+  // 最適化: 1リクエストでcoupons, services, plansを取得
+  const { data, isLoading: loading } = useQuery<CouponsWithRelations>({
+    queryKey: queryKeys.couponsWithRelations,
+    queryFn: api.getCouponsWithRelations as () => Promise<CouponsWithRelations>,
   });
 
-  const { data: plansData = [] } = useQuery<Plan[]>({
-    queryKey: queryKeys.plans,
-    queryFn: api.getPlans,
-  });
-
-  const { data: couponsData = [], isLoading: loading } = useQuery<Coupon[]>({
-    queryKey: queryKeys.coupons,
-    queryFn: api.getCoupons,
-  });
+  const services = data?.services ?? [];
+  const plansData = data?.plans ?? [];
+  const couponsData = data?.coupons ?? [];
 
   const coupons = useMemo(() => {
     let filtered = couponsData;
@@ -237,9 +244,6 @@ function CouponsContent() {
     <div className="p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">クーポン管理</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          クーポンコードの作成・管理
-        </p>
       </div>
 
       <div className="max-w-6xl">

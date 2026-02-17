@@ -1,32 +1,32 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@repo/database";
-import { getServiceDetail, updateService, deleteService, withErrorHandling } from "@repo/shared";
+import { getServiceDetail, updateService, deleteService } from "@/controllers/service.controller";
 
 export const dynamic = "force-dynamic";
 
 // 詳細取得
-export const GET = withErrorHandling(async (
+export async function GET (
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-) => {
+) {
   const { id } = await params;
   return await getServiceDetail(id, prisma);
-});
+}
 
 // 更新
-export const PATCH = withErrorHandling(async (
+export async function PATCH (
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-) => {
+) {
   const { id } = await params;
   return await updateService(id, request, prisma);
-});
+}
 
 // 削除
-export const DELETE = withErrorHandling(async (
+export async function DELETE (
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-) => {
+) {
   const { id } = await params;
   return await deleteService(id, prisma);
-});
+}

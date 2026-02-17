@@ -6,8 +6,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@repo/ui";
 import { Plus, Pencil, Trash2, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
-import { queryKeys } from "@/lib/query-keys";
-import { api } from "@/lib/api";
+import { queryKeys } from "@/lib/api/query-keys";
+import { api } from "@/lib/api/client";
 
 interface PlanPricing {
   id: string;
@@ -48,17 +48,17 @@ function PlansContent() {
   // TanStack Query
   const { data: services = [] } = useQuery<{ id: string; code: string; name: string }[]>({
     queryKey: queryKeys.services,
-    queryFn: api.getServices,
+    queryFn: api.getServices as () => Promise<{ id: string; code: string; name: string }[]>,
   });
 
   const { data: usageTags = [] } = useQuery<{ id: number; code: string; name: string }[]>({
     queryKey: queryKeys.usageTags,
-    queryFn: api.getUsageTags,
+    queryFn: api.getUsageTags as () => Promise<{ id: number; code: string; name: string }[]>,
   });
 
   const { data: plansData = [], isLoading: loading } = useQuery<Plan[]>({
     queryKey: queryKeys.plans,
-    queryFn: api.getPlans,
+    queryFn: api.getPlans as unknown as () => Promise<Plan[]>,
   });
 
   // フィルター適用
@@ -269,9 +269,6 @@ function PlansContent() {
     <div className="p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">プラン管理</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          各サービスのプランを管理
-        </p>
       </div>
 
       <div className="max-w-6xl">

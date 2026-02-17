@@ -8,8 +8,8 @@ import {
   CardTitle,
 } from "@repo/ui";
 import { Loader2, Package, Smartphone, RotateCcw } from "lucide-react";
-import { queryKeys } from "@/lib/query-keys";
-import { api } from "@/lib/api";
+import { queryKeys, STALE_TIMES } from "@/lib/api/query-keys";
+import { api } from "@/lib/api/client";
 
 interface DashboardStats {
   overview: {
@@ -36,7 +36,7 @@ export function DashboardStats() {
   const { data: stats, isLoading } = useQuery<DashboardStats>({
     queryKey: queryKeys.dashboardStats,
     queryFn: api.getDashboardStats,
-    staleTime: 30000, // 30秒間キャッシュ（重複リクエスト防止）
+    staleTime: STALE_TIMES.STATS,
   });
 
   if (isLoading || !stats) {

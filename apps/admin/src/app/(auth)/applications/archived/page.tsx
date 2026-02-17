@@ -7,8 +7,8 @@ import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@repo/u
 import { Search, Loader2, ExternalLink, AlertCircle, ArchiveRestore } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryState } from "nuqs";
-import { queryKeys } from "@/lib/query-keys";
-import { api } from "@/lib/api";
+import { queryKeys, STALE_TIMES } from "@/lib/api/query-keys";
+import { api } from "@/lib/api/client";
 
 interface Application {
   id: string;
@@ -70,7 +70,7 @@ export default function ArchivedApplicationsPage() {
   // Services from cache (prefetched at login)
   const { data: services = [] } = useQuery<{ id: string; name: string }[]>({
     queryKey: queryKeys.services,
-    queryFn: api.getServices,
+    queryFn: api.getServices as () => Promise<{ id: string; name: string }[]>,
   });
 
   // URL状態管理
@@ -112,8 +112,9 @@ export default function ArchivedApplicationsPage() {
       if (serviceFilter) params.set("serviceId", serviceFilter);
       if (customerTypeFilter) params.set("customerType", customerTypeFilter);
       params.set("page", page);
-      return api.getApplications(params);
+      return api.getApplications(params) as Promise<ApplicationsResponse>;
     },
+    staleTime: STALE_TIMES.LIST,
   });
 
   const applications = applicationsData?.data || [];
@@ -165,9 +166,6 @@ export default function ArchivedApplicationsPage() {
     <div className="p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">アーカイブ一覧</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          アーカイブされた申し込みの一覧
-        </p>
       </div>
 
       {error && (

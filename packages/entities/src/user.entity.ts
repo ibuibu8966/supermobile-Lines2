@@ -7,6 +7,7 @@
 // User Role Enum
 export enum UserRole {
   CUSTOMER = 'CUSTOMER',
+  EMPLOYEE = 'EMPLOYEE',
   ADMIN = 'ADMIN',
   SUPER_ADMIN = 'SUPER_ADMIN',
 }
@@ -17,6 +18,7 @@ export enum UserRole {
 export interface UserEntity {
   id: string;
   email: string;
+  name: string | null;
   password: string;
   role: UserRole;
   serviceId: string | null;
@@ -45,6 +47,7 @@ export interface UserWithRelations extends Omit<UserEntity, 'password'> {
  */
 export interface UserCreateInput {
   email: string;
+  name?: string | null;
   password: string;
   role: UserRole;
   serviceId?: string | null;
@@ -56,6 +59,7 @@ export interface UserCreateInput {
  */
 export interface UserUpdateInput {
   email?: string;
+  name?: string | null;
   password?: string;
   role?: UserRole;
   serviceId?: string | null;

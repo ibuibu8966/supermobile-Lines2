@@ -7,7 +7,7 @@
 
 import { PrismaClient, Prisma } from '@prisma/client';
 import { PlanRepository, PlanFilters } from '../repositories/plan.repository';
-import { PlanWithRelations, PlanUpdateInput } from '../domain/entities/plan.entity';
+import { PlanWithRelations, PlanUpdateInput } from '@repo/entities';
 import { logger } from '../shared/utils/logger';
 import { NotFoundError, ConflictError } from '../shared/errors/custom-errors';
 

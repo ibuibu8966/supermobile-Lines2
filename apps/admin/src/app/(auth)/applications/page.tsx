@@ -8,8 +8,8 @@ import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@repo/u
 import { Search, Loader2, ExternalLink, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryState } from "nuqs";
-import { queryKeys } from "@/lib/query-keys";
-import { api } from "@/lib/api";
+import { queryKeys, STALE_TIMES } from "@/lib/api/query-keys";
+import { api } from "@/lib/api/client";
 import { KycModal } from "@/components/kyc-modal";
 
 interface Application {
@@ -96,7 +96,7 @@ export default function ApplicationsPage() {
   // Services from cache (prefetched at login)
   const { data: services = [] } = useQuery<{ id: string; name: string }[]>({
     queryKey: queryKeys.services,
-    queryFn: api.getServices,
+    queryFn: api.getServices as () => Promise<{ id: string; name: string }[]>,
   });
 
   // URL状態管理
@@ -148,8 +148,9 @@ export default function ApplicationsPage() {
       if (customerTypeFilter) params.set("customerType", customerTypeFilter);
       if (showArchived === "true") params.set("includeArchived", "true");
       params.set("page", page);
-      return api.getApplications(params);
+      return api.getApplications(params) as Promise<ApplicationsResponse>;
     },
+    staleTime: STALE_TIMES.LIST,
   });
 
   const applications = applicationsData?.data || [];
@@ -276,9 +277,6 @@ export default function ApplicationsPage() {
     <div className="p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">申し込み一覧</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          全サービスの申し込みを一元管理
-        </p>
       </div>
 
       {error && (

@@ -45,7 +45,6 @@ const menuItems = [
   { title: "SIM管理", href: "/sims", icon: Smartphone, superAdminOnly: true },
   { title: "仕入れ管理", href: "/procurement", icon: ShoppingCart, superAdminOnly: true },
   { title: "タグ管理", href: "/tags", icon: Tags, superAdminOnly: true },
-  { title: "販売ルール管理", href: "/rules", icon: Settings, superAdminOnly: true },
   { title: "サービス・プラン管理", href: "/services", icon: Package, superAdminOnly: true },
   { title: "クーポン管理", href: "/coupons", icon: Ticket, superAdminOnly: true },
   { title: "ユーザー管理", href: "/users", icon: Users },

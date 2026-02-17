@@ -1,13 +1,15 @@
 import { QueryClient } from "@tanstack/react-query";
-import { queryKeys } from "./query-keys";
-import { api } from "./api";
+import { queryKeys } from "./api/query-keys";
+import { api } from "./api/client";
 
+/**
+ * 初回ページロード時にプリフェッチするマスターデータ
+ * ・頻繁に変わらない参照系データのみ対象
+ * ・ページネーション付きリスト(applications/lines/sims)は各ページで個別取得
+ */
 export async function prefetchAdminData(queryClient: QueryClient) {
   await Promise.allSettled([
-    queryClient.prefetchQuery({
-      queryKey: queryKeys.dashboardStats,
-      queryFn: api.getDashboardStats,
-    }),
+    // マスターデータ（変更頻度低・全ページで共用）
     queryClient.prefetchQuery({
       queryKey: queryKeys.services,
       queryFn: api.getServices,
@@ -33,28 +35,16 @@ export async function prefetchAdminData(queryClient: QueryClient) {
       queryFn: api.getLineTags,
     }),
     queryClient.prefetchQuery({
-      queryKey: queryKeys.users,
-      queryFn: api.getUsers,
-    }),
-    queryClient.prefetchQuery({
-      queryKey: queryKeys.rules,
-      queryFn: api.getRules,
+      queryKey: queryKeys.referrerTags,
+      queryFn: api.getReferrerTags,
     }),
     queryClient.prefetchQuery({
       queryKey: queryKeys.suppliers,
       queryFn: api.getSuppliers,
     }),
     queryClient.prefetchQuery({
-      queryKey: queryKeys.sims(),
-      queryFn: () => api.getSims(),
-    }),
-    queryClient.prefetchQuery({
-      queryKey: queryKeys.applications(),
-      queryFn: () => api.getApplications(),
-    }),
-    queryClient.prefetchQuery({
-      queryKey: queryKeys.lines(),
-      queryFn: () => api.getLines(),
+      queryKey: queryKeys.couponsWithRelations,
+      queryFn: api.getCouponsWithRelations,
     }),
   ]);
 }

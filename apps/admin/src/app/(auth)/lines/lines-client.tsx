@@ -7,8 +7,8 @@ import { Filter, ChevronDown, ChevronUp, Loader2, AlertCircle } from "lucide-rea
 import { toast } from "sonner";
 import { useQueryState } from "nuqs";
 import { CustomerDetailModal } from "@/components/customer-detail-modal";
-import { queryKeys } from "@/lib/query-keys";
-import { api } from "@/lib/api";
+import { queryKeys, STALE_TIMES } from "@/lib/api/query-keys";
+import { api } from "@/lib/api/client";
 
 interface ApplicationLine {
   id: string;
@@ -83,6 +83,17 @@ interface LinesResponse {
   };
 }
 
+interface LineTag {
+  id: number;
+  name: string;
+}
+
+interface LinesWithTagsResponse {
+  lines: LinesResponse;
+  simLocationTags: LineTag[];
+  lineReserveTags: LineTag[];
+}
+
 const STATUS_LABELS: Record<string, string> = {
   NOT_ACTIVATED: "未開通",
   ACTIVATED: "開通済み",
@@ -101,17 +112,6 @@ const STATUS_VARIANTS: Record<string, "default" | "success" | "destructive" | "s
 
 export function LinesClient() {
   const queryClient = useQueryClient();
-
-  // Tags from cache (prefetched at login)
-  const { data: simLocationTags = [] } = useQuery<{ id: number; name: string }[]>({
-    queryKey: queryKeys.simLocationTags,
-    queryFn: api.getSimLocationTags,
-  });
-
-  const { data: lineReserveTags = [] } = useQuery<{ id: number; name: string }[]>({
-    queryKey: queryKeys.lineReserveTags,
-    queryFn: api.getLineReserveTags,
-  });
 
   // Filter states
   const [search, setSearch] = useQueryState("search", { defaultValue: "" });
@@ -169,9 +169,9 @@ export function LinesClient() {
     return params;
   }, [hasFilters, search, simLocationTagIds, lineReserveTagIds, statuses, shippedFrom, shippedTo, returnedFrom, returnedTo, showArchived, page]);
 
-  // Lines data from cache (prefetched at login for default view)
-  const { data: linesData, isLoading: isLoadingLines, error } = useQuery<LinesResponse>({
-    queryKey: queryKeys.lines(queryParams),
+  // Lines + tags data (統合API)
+  const { data, isLoading: isLoadingLines, error } = useQuery<LinesWithTagsResponse>({
+    queryKey: queryKeys.linesWithTags(queryParams),
     queryFn: () => {
       const params = new URLSearchParams();
       if (search) params.set("search", search);
@@ -184,13 +184,17 @@ export function LinesClient() {
       if (returnedTo) params.set("returnedTo", returnedTo);
       if (showArchived === "true") params.set("includeArchived", "true");
       params.set("page", page);
-      return api.getLines(params);
+      return api.getLinesWithTags(params) as Promise<LinesWithTagsResponse>;
     },
+    staleTime: STALE_TIMES.LIST,
   });
 
+  const linesData = data?.lines;
+  const simLocationTags = data?.simLocationTags || [];
+  const lineReserveTags = data?.lineReserveTags || [];
   const lines = linesData?.data || [];
   const pagination = linesData?.pagination || null;
-  const currentQueryKey = queryKeys.lines(queryParams);
+  const currentQueryKey = queryKeys.linesWithTags(queryParams);
 
   const handleSearch = () => {
     setSearch(searchInput);
@@ -307,24 +311,27 @@ export function LinesClient() {
     const currentEditedLines = { ...editedLines };
 
     // 楽観的更新: まずUIを即座に更新
-    queryClient.setQueryData<LinesResponse>(currentQueryKey, (old) => {
+    queryClient.setQueryData<LinesWithTagsResponse>(currentQueryKey, (old) => {
       if (!old) return old;
       return {
         ...old,
-        data: old.data.map((line) => {
-          const changes = currentEditedLines[line.id];
-          if (!changes) return line;
-          return {
-            ...line,
-            ...(changes.lineReserveTagId !== undefined && { lineReserveTagId: changes.lineReserveTagId }),
-            ...(changes.status !== undefined && { status: changes.status }),
-            ...(changes.shippedAt !== undefined && { shippedAt: changes.shippedAt ? new Date(changes.shippedAt) : null }),
-            ...(changes.returnedAt !== undefined && { returnedAt: changes.returnedAt ? new Date(changes.returnedAt) : null }),
-            sim: line.sim && changes.simLocationTagId !== undefined
-              ? { ...line.sim, simLocationTagId: changes.simLocationTagId }
-              : line.sim,
-          };
-        }),
+        lines: {
+          ...old.lines,
+          data: old.lines.data.map((line) => {
+            const changes = currentEditedLines[line.id];
+            if (!changes) return line;
+            return {
+              ...line,
+              ...(changes.lineReserveTagId !== undefined && { lineReserveTagId: changes.lineReserveTagId }),
+              ...(changes.status !== undefined && { status: changes.status }),
+              ...(changes.shippedAt !== undefined && { shippedAt: changes.shippedAt ? new Date(changes.shippedAt) : null }),
+              ...(changes.returnedAt !== undefined && { returnedAt: changes.returnedAt ? new Date(changes.returnedAt) : null }),
+              sim: line.sim && changes.simLocationTagId !== undefined
+                ? { ...line.sim, simLocationTagId: changes.simLocationTagId }
+                : line.sim,
+            };
+          }),
+        },
       };
     });
 
@@ -364,12 +371,9 @@ export function LinesClient() {
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">総合回線管理</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            全回線の一覧表示・フィルター・編集
-          </p>
         </div>
         <div className="flex items-center gap-2">
-          {pagination && (
+          {pagination?.total && (
             <span className="text-sm text-gray-500">
               表示: {pagination.total.toLocaleString()}件
             </span>
@@ -723,7 +727,7 @@ export function LinesClient() {
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             回線一覧
-            {pagination && (
+            {pagination?.total && (
               <span className="text-sm font-normal text-gray-500">
                 {pagination.total.toLocaleString()}件
               </span>
@@ -825,7 +829,6 @@ export function LinesClient() {
                             const value = e.target.value ? Number(e.target.value) : null;
                             handleFieldChange(line.id, "simLocationTagId", value);
                           }}
-                          disabled={!line.simId}
                         >
                           <option value="">選択してください</option>
                           {simLocationTags.map((tag) => (

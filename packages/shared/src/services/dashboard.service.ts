@@ -4,7 +4,7 @@
  * ダッシュボード情報に関するビジネスロジックを担当
  */
 
-import { DashboardResult } from '../domain/entities/dashboard.entity';
+import { DashboardResult } from '@repo/entities';
 import { NotFoundError } from '../shared/errors/custom-errors';
 import { logger } from '../shared/utils/logger';
 import type { PrismaClient } from '@prisma/client';

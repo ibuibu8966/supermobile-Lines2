@@ -1,20 +1,27 @@
 "use client";
 
-import { useState } from "react";
 import { SessionProvider } from "next-auth/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "sonner";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
+import { prefetchAdminData } from "@/lib/prefetch-admin-data";
 
 function makeQueryClient() {
   return new QueryClient({
     defaultOptions: {
       queries: {
+        // マスターデータ（services/plans/tags等）はページ内で自動再フェッチしない
         staleTime: Infinity,
         gcTime: Infinity,
         refetchOnWindowFocus: false,
         refetchOnMount: false,
-        retry: 1,
+        refetchOnReconnect: false,
+        // Supabase接続エラー時の無駄なリトライを抑制
+        retry: false,
+      },
+      mutations: {
+        // mutationエラーは呼び出し側でハンドリングするのでリトライなし
+        retry: false,
       },
     },
   });
@@ -28,6 +35,7 @@ function getQueryClient() {
   }
   if (!browserQueryClient) {
     browserQueryClient = makeQueryClient();
+    prefetchAdminData(browserQueryClient);
   }
   return browserQueryClient;
 }

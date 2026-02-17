@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@repo/database";
-import { getTagDetail, updateTag, deleteTag, withErrorHandling, TagConfig } from "@repo/shared";
+import { getTagDetail, updateTag, deleteTag, TagConfig } from "@/controllers/tag-crud.controller";
 
 export const dynamic = "force-dynamic";
 
@@ -20,28 +20,28 @@ const config: TagConfig = {
 };
 
 // 詳細取得
-export const GET = withErrorHandling(async (
+export async function GET (
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-) => {
+) {
   const { id } = await params;
   return await getTagDetail(id, prisma, config);
-});
+}
 
 // 更新
-export const PATCH = withErrorHandling(async (
+export async function PATCH (
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-) => {
+) {
   const { id } = await params;
   return await updateTag(id, request, prisma, config);
-});
+}
 
 // 削除
-export const DELETE = withErrorHandling(async (
+export async function DELETE (
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-) => {
+) {
   const { id } = await params;
   return await deleteTag(id, prisma, config);
-});
+}

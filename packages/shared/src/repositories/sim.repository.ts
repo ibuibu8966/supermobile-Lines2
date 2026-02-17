@@ -5,7 +5,7 @@
  * Prismaとの直接的なやり取りを担当
  */
 
-import { SimWithRelations } from '../domain/entities/sim.entity';
+import { SimWithRelations } from '@repo/entities';
 import { logger } from '../shared/utils/logger';
 
 export interface SimFilters {

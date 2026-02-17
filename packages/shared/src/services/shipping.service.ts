@@ -4,7 +4,7 @@
  * 発送・配送に関するビジネスロジックを担当
  */
 
-import { ShippingScanInput, ShippingScanResult, ShippingCompleteInput, ShippingCompleteResult, ShippingPendingResult } from '../domain/entities/shipping.entity';
+import { ShippingScanInput, ShippingScanResult, ShippingCompleteInput, ShippingCompleteResult, ShippingPendingResult } from '@repo/entities';
 import { ValidationError, NotFoundError } from '../shared/errors/custom-errors';
 import { logger } from '../shared/utils/logger';
 import type { PrismaClient } from '@prisma/client';

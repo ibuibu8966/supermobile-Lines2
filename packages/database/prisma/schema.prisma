@@ -23,7 +23,8 @@ enum SimStatus {
 
 enum SimType {
   INDIVIDUAL // 個人回線
-  CORPORATE // 法人回線
+  CORPORATE  // 法人回線
+  BOTH       // 両方
 }
 
 enum CarrierType {
@@ -54,6 +55,7 @@ enum CustomerStatus {
 
 enum UserRole {
   CUSTOMER
+  EMPLOYEE
   ADMIN
   SUPER_ADMIN
 }
@@ -140,11 +142,6 @@ model Sim {
   supplierContractStart DateTime?
   supplierContractEnd   DateTime?
 
-  // MNP関連
-  isMnpEligible        Boolean   @default(false)
-  mnpReservationNumber String?   @db.VarChar(20)
-  mnpExpiryDate        DateTime?
-
   // 自動解約
   isAutoCancel   Boolean   @default(false)
   autoCancelDate DateTime?
@@ -175,7 +172,6 @@ model Sim {
   @@index([purchaseOrderId])
   @@index([msisdn])
   @@index([simType])
-  @@index([isMnpEligible])
   @@index([carrierType])
   @@index([simLocationTagId])
 }
@@ -224,7 +220,6 @@ model UsageTag {
   updatedAt DateTime @updatedAt
 
   contractTags ContractUsageTag[]
-  rules        UsageRule[]
   planTags     PlanUsageTag[]
 
   @@index([isActive])
@@ -244,29 +239,6 @@ model ContractUsageTag {
   @@unique([contractId, usageTagId])
   @@index([usageTagId])
   @@index([appliedAt])
-}
-
-model UsageRule {
-  id              Int          @id @default(autoincrement())
-  usageTagId      Int
-  supplierFilter  String?      @db.VarChar(50)
-  carrierFilter   CarrierType?
-  planFilter      String?      @db.VarChar(100)
-  excludedTagIds  Int[]        @default([])
-  minContractDays Int          @default(0)
-  requiresMnp     Boolean      @default(false)
-  conditions      Json         @default("{}")
-  priority        Int          @default(0)
-  isActive        Boolean      @default(true)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  usageTag UsageTag @relation(fields: [usageTagId], references: [id], onDelete: Cascade)
-
-  @@index([usageTagId])
-  @@index([priority])
-  @@index([isActive])
 }
 
 // ==================== タグマスタ ====================
@@ -313,6 +285,20 @@ model LineReserveTag {
   @@index([isActive])
 }
 
+model ReferrerTag {
+  id           Int      @id @default(autoincrement())
+  code         String   @unique @db.VarChar(50)
+  name         String   @db.VarChar(100)
+  isActive     Boolean  @default(true)
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  customers Customer[]
+
+  @@index([isActive])
+}
+
 // ==================== サービス・顧客・申込 ====================
 
 model Service {
@@ -333,6 +319,7 @@ model Service {
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
+  name      String?
   password  String   @db.Text
   role      UserRole @default(CUSTOMER)
   serviceId String?
@@ -380,16 +367,20 @@ model Customer {
   status CustomerStatus @default(ACTIVE)
   note   String?        @db.Text
 
+  referrerTagId Int?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   user         User?         @relation(fields: [userId], references: [id])
+  referrerTag  ReferrerTag?  @relation(fields: [referrerTagId], references: [id])
   applications Application[]
   contracts    Contract[]
 
   @@index([userId])
   @@index([type])
   @@index([status])
+  @@index([referrerTagId])
 }
 
 model Plan {
@@ -574,11 +565,7 @@ model KycImage {
 
 model PurchaseOrder {
   id            String               @id @default(cuid())
-  orderNumber   String               @unique @db.VarChar(50)
   supplierId    Int
-  carrierType   CarrierType
-  quantity      Int
-  unitPrice     Int
   totalAmount   Int
   status        PurchaseOrderStatus  @default(ORDERED)
 
@@ -600,10 +587,29 @@ model PurchaseOrder {
 
   // リレーション
   supplier      Supplier             @relation(fields: [supplierId], references: [id])
+  lines         PurchaseOrderLine[]
   sims          Sim[]
 
   @@index([supplierId])
   @@index([status])
   @@index([orderedAt])
   @@index([deliveryDate])
+}
+
+model PurchaseOrderLine {
+  id              String         @id @default(cuid())
+  purchaseOrderId String
+  carrierType     CarrierType
+  quantity        Int
+  unitPrice       Int
+  subtotal        Int
+
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  // リレーション
+  purchaseOrder   PurchaseOrder  @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+
+  @@index([purchaseOrderId])
+  @@index([carrierType])
 }

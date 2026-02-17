@@ -1,24 +1,26 @@
 import { NextRequest } from "next/server";
 import { prisma, getSignedUrl } from "@repo/database";
-import { getAdminSession, assertServiceAccess } from "@/lib/admin-session";
-import { getApplicationById, updateApplication, withErrorHandling } from "@repo/shared";
+import { getAdminSession, assertServiceAccess } from "@/lib/auth/admin-session";
+import { getApplicationById, updateApplication } from "@/controllers/application.controller";
 
 export const dynamic = "force-dynamic";
 
 // 詳細取得
-export const GET = withErrorHandling(async (
+export async function GET (
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-) => {
+) {
   const { id } = await params;
-  return await getApplicationById(id, prisma, getAdminSession, assertServiceAccess, getSignedUrl);
-});
+  const signedUrlFn = async (bucket: string, path: string): Promise<string> =>
+    (await getSignedUrl(bucket, path)) ?? "";
+  return await getApplicationById(id, prisma, getAdminSession, assertServiceAccess, signedUrlFn);
+}
 
 // 更新
-export const PATCH = withErrorHandling(async (
+export async function PATCH (
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-) => {
+) {
   const { id } = await params;
   return await updateApplication(id, request, prisma, getAdminSession, assertServiceAccess);
-});
+}

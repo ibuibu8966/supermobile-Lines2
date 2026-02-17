@@ -1,22 +1,11 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import type { BaseTag } from "@/lib/api/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@repo/ui";
 import { Plus, Pencil, Trash2, Loader2, X, GripVertical } from "lucide-react";
 import { toast } from "sonner";
-
-// Base tag interface
-interface BaseTag {
-  id: number;
-  code: string;
-  name: string;
-  displayOrder: number;
-  isActive: boolean;
-  category?: string | null;
-  description?: string | null;
-  _count: Record<string, number>;
-}
 
 // Form field configuration
 interface FormField {
@@ -46,9 +35,10 @@ export interface TagManagerConfig {
 
 interface TagManagerProps {
   config: TagManagerConfig;
+  createTrigger?: number;
 }
 
-export function TagManager({ config }: TagManagerProps) {
+export function TagManager({ config, createTrigger }: TagManagerProps) {
   const queryClient = useQueryClient();
   const [showInactive, setShowInactive] = useState(false);
 
@@ -70,6 +60,13 @@ export function TagManager({ config }: TagManagerProps) {
   const [formData, setFormData] = useState<Record<string, string | number>>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Watch for create trigger from parent
+  useEffect(() => {
+    if (createTrigger && createTrigger > 0) {
+      openCreateModal();
+    }
+  }, [createTrigger]);
 
   const initFormData = (tag?: BaseTag) => {
     const data: Record<string, string | number> = {};
@@ -219,7 +216,6 @@ export function TagManager({ config }: TagManagerProps) {
       <thead>
         <tr className="border-b">
           {showGripHandle && <th className="text-left py-2 px-4 w-8"></th>}
-          <th className="text-left py-2 px-4">コード</th>
           <th className="text-left py-2 px-4">表示名</th>
           <th className="text-left py-2 px-4">使用数</th>
           <th className="text-left py-2 px-4">ステータス</th>
@@ -234,12 +230,11 @@ export function TagManager({ config }: TagManagerProps) {
                 <GripVertical className="h-4 w-4 text-gray-300" />
               </td>
             )}
-            <td className="py-2 px-4 font-mono text-xs">{tag.code}</td>
             <td className="py-2 px-4">
               <Badge variant="secondary">{tag.name}</Badge>
             </td>
             <td className="py-2 px-4 text-gray-500 text-xs">
-              {config.renderCount(tag._count)}
+              {config.renderCount(tag._count ?? {})}
             </td>
             <td className="py-2 px-4">
               <button onClick={() => toggleActive(tag)}>
@@ -274,30 +269,25 @@ export function TagManager({ config }: TagManagerProps) {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <label className="flex items-center gap-2 text-sm text-gray-600">
-          <input
-            type="checkbox"
-            checked={showInactive}
-            onChange={(e) => setShowInactive(e.target.checked)}
-            className="rounded"
-          />
-          無効なタグも表示
-        </label>
-        <Button onClick={openCreateModal}>
-          <Plus className="h-4 w-4 mr-2" />
-          {config.labels.createButton}
-        </Button>
-      </div>
-
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">
-            {config.title}
-            <span className="text-sm font-normal text-gray-500 ml-2">
-              {tags.length}件
-            </span>
-          </CardTitle>
+          <div className="flex justify-between items-center">
+            <CardTitle className="text-base">
+              {config.title}
+              <span className="text-sm font-normal text-gray-500 ml-2">
+                {tags.length}件
+              </span>
+            </CardTitle>
+            <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showInactive}
+                onChange={(e) => setShowInactive(e.target.checked)}
+                className="rounded cursor-pointer"
+              />
+              無効なタグも表示
+            </label>
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (

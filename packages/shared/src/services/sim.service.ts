@@ -6,7 +6,7 @@
  */
 
 import { SimRepository, SimFilters } from '../repositories/sim.repository';
-import { SimWithRelations, SimUpdateInput } from '../domain/entities/sim.entity';
+import { SimWithRelations, SimUpdateInput } from '@repo/entities';
 import { PaginationInfo, createPaginationInfo } from '../shared/utils/helpers';
 import { logger } from '../shared/utils/logger';
 import { NotFoundError, ValidationError } from '../shared/errors/custom-errors';

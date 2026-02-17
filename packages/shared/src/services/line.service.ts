@@ -6,7 +6,7 @@
  */
 
 import { LineRepository, LineFilters } from '../repositories/line.repository';
-import { LineWithRelations, LineUpdateInput } from '../domain/entities/line.entity';
+import { LineWithRelations, LineUpdateInput } from '@repo/entities';
 import { PaginationInfo, createPaginationInfo } from '../shared/utils/helpers';
 import { logger } from '../shared/utils/logger';
 import { NotFoundError, ValidationError } from '../shared/errors/custom-errors';

@@ -5,7 +5,7 @@
  * Prismaとの直接的なやり取りを担当
  */
 
-import { UserWithRelations, UserCreateInput } from '../domain/entities/user.entity';
+import { UserWithRelations, UserCreateInput } from '@repo/entities';
 import { logger } from '../shared/utils/logger';
 
 export interface UserFilters {

@@ -11,7 +11,7 @@ import {
   ApplicationWithRelations,
   ApplicationCreateInput,
   ApplicationUpdateInput,
-} from '../domain/entities/application.entity';
+} from '@repo/entities';
 import { NotFoundError } from '../shared/errors/custom-errors';
 
 export interface ApplicationFilters {
