@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { auth } from "@/auth";
-import { prisma } from "@repo/database";
-import { getCustomerApplications, createAdditionalApplication } from "@repo/shared";
+import { prisma } from "@/lib/database";
+import { getCustomerApplications, createAdditionalApplication } from "@/lib";
 
 export const dynamic = "force-dynamic";
 

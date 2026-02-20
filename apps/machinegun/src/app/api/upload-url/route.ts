@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
-import { createSignedUploadUrl } from "@repo/database";
-import { createUploadUrl } from "@repo/shared";
+import { createSignedUploadUrl } from "@/lib/supabase";
+import { createUploadUrl } from "@/lib";
 
 export const dynamic = "force-dynamic";
 

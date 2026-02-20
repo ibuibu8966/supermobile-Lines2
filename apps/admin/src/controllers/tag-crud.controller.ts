@@ -14,7 +14,7 @@ export type { TagConfig };
 
 // 汎用作成スキーマ
 const createTagSchema = z.object({
-  code: z.string().min(1, 'コードは必須です').max(50),
+  code: z.string().max(50).optional().nullable(),
   name: z.string().min(1, '名前は必須です').max(100),
   category: z.string().max(50).optional().nullable(),
   description: z.string().optional().nullable(),
@@ -59,11 +59,27 @@ export async function createTag(
 ): Promise<NextResponse> {
   // バリデーション
   const body = await request.json();
-  const validated = createTagSchema.parse(body);
+  const result = createTagSchema.safeParse(body);
+  if (!result.success) {
+    return NextResponse.json(
+      { error: 'バリデーションエラー', details: result.error.flatten() },
+      { status: 400 }
+    );
+  }
+  const validated = result.data;
+
+  // codeが未指定の場合はnameから自動生成（重複回避のためタイムスタンプを付加）
+  const codeBase = (validated.code || validated.name)
+    .toLowerCase()
+    .replace(/\s+/g, '_')
+    .replace(/[^a-z0-9_\u3040-\u9fff]/g, '')
+    .slice(0, 32);
+  const finalCode = (codeBase || 'tag') + (validated.code ? '' : `_${Date.now()}`);
+  const createData = { ...validated, code: finalCode };
 
   // Service呼び出し
   const tagService = new TagCrudService(prisma, config);
-  const created = await tagService.createTag(validated);
+  const created = await tagService.createTag(createData);
 
   return NextResponse.json(created, { status: 201 });
 }
@@ -95,7 +111,14 @@ export async function updateTag(
 
   // バリデーション
   const body = await request.json();
-  const validated = updateTagSchema.parse(body);
+  const result = updateTagSchema.safeParse(body);
+  if (!result.success) {
+    return NextResponse.json(
+      { error: 'バリデーションエラー', details: result.error.flatten() },
+      { status: 400 }
+    );
+  }
+  const validated = result.data;
 
   // Service呼び出し
   const tagService = new TagCrudService(prisma, config);

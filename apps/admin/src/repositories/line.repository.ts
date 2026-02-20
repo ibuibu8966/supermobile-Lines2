@@ -5,7 +5,8 @@
  * Prismaとの直接的なやり取りを担当
  */
 
-import { LineWithRelations, LineUpdateInput, LineStatus } from '@repo/entities';
+import { PrismaClient, Prisma, $Enums } from '@prisma/client';
+import { LineWithRelations, LineUpdateInput, LineStatus } from '@/entities';
 import { logger } from '../shared/utils/logger';
 
 export interface LineFilters {
@@ -25,7 +26,7 @@ export interface LineFilters {
 }
 
 export class LineRepository {
-  constructor(private prisma: any) {}
+  constructor(private prisma: PrismaClient) {}
 
   /**
    * 回線一覧を取得（フィルタリング・ページネーション対応）
@@ -109,7 +110,7 @@ export class LineRepository {
       this.prisma.applicationLine.count({ where }),
     ]);
 
-    return { lines, total };
+    return { lines: lines as unknown as LineWithRelations[], total };
   }
 
   /**
@@ -118,7 +119,7 @@ export class LineRepository {
   async findById(id: string): Promise<LineWithRelations | null> {
     logger.debug('LineRepository.findById', { id });
 
-    return await this.prisma.applicationLine.findUnique({
+    const line = await this.prisma.applicationLine.findUnique({
       where: { id },
       include: {
         application: {
@@ -145,6 +146,7 @@ export class LineRepository {
         lineReserveTag: true,
       },
     });
+    return line as unknown as LineWithRelations | null;
   }
 
   /**
@@ -153,7 +155,7 @@ export class LineRepository {
   async findByApplicationIdAndLineId(applicationId: string, lineId: string): Promise<LineWithRelations | null> {
     logger.debug('LineRepository.findByApplicationIdAndLineId', { applicationId, lineId });
 
-    return await this.prisma.applicationLine.findFirst({
+    const line = await this.prisma.applicationLine.findFirst({
       where: {
         id: lineId,
         applicationId: applicationId,
@@ -168,6 +170,7 @@ export class LineRepository {
         lineReserveTag: true,
       },
     });
+    return line as unknown as LineWithRelations | null;
   }
 
   /**
@@ -177,7 +180,7 @@ export class LineRepository {
     logger.debug('LineRepository.update', { id, data });
 
     // ステータス自動更新ロジック
-    const updateData: any = { ...data };
+    const updateData: LineUpdateInput & { status?: LineStatus } = { ...data };
 
     if (data.shippedAt !== undefined && data.shippedAt && !data.status) {
       updateData.status = LineStatus.SHIPPED;
@@ -190,7 +193,7 @@ export class LineRepository {
     // simLocationTagIdは除外（後で別途SIM更新）
     const { simLocationTagId: _, ...lineUpdateData } = updateData;
 
-    return await this.prisma.applicationLine.update({
+    const line = await this.prisma.applicationLine.update({
       where: { id },
       data: lineUpdateData,
       include: {
@@ -218,6 +221,7 @@ export class LineRepository {
         lineReserveTag: true,
       },
     });
+    return line as unknown as LineWithRelations;
   }
 
   /**
@@ -251,7 +255,7 @@ export class LineRepository {
   async findAllByApplicationId(applicationId: string): Promise<LineWithRelations[]> {
     logger.debug('LineRepository.findAllByApplicationId', { applicationId });
 
-    return await this.prisma.applicationLine.findMany({
+    const lines = await this.prisma.applicationLine.findMany({
       where: { applicationId },
       include: {
         sim: {
@@ -264,26 +268,28 @@ export class LineRepository {
       },
       orderBy: { lineNumber: 'asc' },
     });
+    return lines as unknown as LineWithRelations[];
   }
 
   /**
    * 申込に属する回線を複数取得
    */
-  async findManyByApplicationId(applicationId: string, lineIds: string[]): Promise<any[]> {
+  async findManyByApplicationId(applicationId: string, lineIds: string[]): Promise<LineWithRelations[]> {
     logger.debug('LineRepository.findManyByApplicationId', { applicationId, lineIds });
 
-    return await this.prisma.applicationLine.findMany({
+    const lines = await this.prisma.applicationLine.findMany({
       where: {
         id: { in: lineIds },
         applicationId,
       },
     });
+    return lines as unknown as LineWithRelations[];
   }
 
   /**
    * 回線を一括更新
    */
-  async updateMany(applicationId: string, lineIds: string[], data: any): Promise<number> {
+  async updateMany(applicationId: string, lineIds: string[], data: Prisma.ApplicationLineUpdateManyMutationInput): Promise<number> {
     logger.debug('LineRepository.updateMany', { applicationId, lineIds, data });
 
     const result = await this.prisma.applicationLine.updateMany({
@@ -300,8 +306,8 @@ export class LineRepository {
   /**
    * フィルタ条件からWhere句を構築
    */
-  private buildWhereClause(filters: LineFilters): any {
-    const where: any = {};
+  private buildWhereClause(filters: LineFilters): Prisma.ApplicationLineWhereInput {
+    const where: Prisma.ApplicationLineWhereInput = {};
 
     // デフォルトでアーカイブ済み申し込みの回線を除外
     if (!filters.includeArchived) {
@@ -346,7 +352,7 @@ export class LineRepository {
 
     // Status filter
     if (filters.statuses && filters.statuses.length > 0) {
-      where.status = { in: filters.statuses };
+      where.status = { in: filters.statuses as $Enums.ApplicationLineStatus[] };
     }
 
     // Shipped date range

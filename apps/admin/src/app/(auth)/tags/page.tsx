@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Tabs, TabsList, TabsTrigger, TabsContent, Button } from "@repo/ui";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Tags, MapPin, Tag, Bookmark, UserPlus, Plus } from "lucide-react";
 import { TagManager, TagManagerConfig } from "@/components/tags/tag-manager";
 import { queryKeys } from "@/lib/api/query-keys";

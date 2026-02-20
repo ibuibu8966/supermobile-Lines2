@@ -4,7 +4,7 @@
  * 発注データのデータアクセス層
  */
 
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, $Enums } from '@prisma/client';
 import { logger } from '../shared/utils/logger';
 
 export interface PurchaseOrderCreateInput {
@@ -21,8 +21,8 @@ export interface PurchaseOrderCreateInput {
 
 export interface PurchaseOrderUpdateInput {
   status?: string;
-  invoiceDate?: Date | null;
-  deliveryDate?: Date | null;
+  invoiceDate?: Date | string | null;
+  deliveryDate?: Date | string | null;
   totalAmount?: number;
 }
 
@@ -43,6 +43,64 @@ export interface PurchaseOrderInclude {
 }
 
 /**
+ * 発注とリレーションを含む型
+ */
+export interface PurchaseOrderWithRelations {
+  id: string;
+  supplierId: number;
+  totalAmount: number;
+  status: string;
+  orderedAt: Date;
+  invoiceDate: Date | null;
+  deliveryDate: Date | null;
+  purchaseOrderImagePath: string | null;
+  quoteImagePath: string | null;
+  invoiceImagePath: string | null;
+  note: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  supplier: {
+    id: number;
+    name: string;
+    code: string;
+  };
+  lines: {
+    id: string;
+    purchaseOrderId: string;
+    carrierType: string;
+    quantity: number;
+    unitPrice: number;
+    subtotal: number;
+  }[];
+  _count?: {
+    sims: number;
+  };
+}
+
+/**
+ * Raw SQLクエリの結果型
+ */
+interface PurchaseOrderRawRow {
+  id: string;
+  supplierId: number;
+  totalAmount: number;
+  status: string;
+  orderedAt: Date;
+  invoiceDate: Date | null;
+  deliveryDate: Date | null;
+  purchaseOrderImagePath: string | null;
+  quoteImagePath: string | null;
+  invoiceImagePath: string | null;
+  note: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  supplier_id: number;
+  supplier_name: string;
+  supplier_code: string;
+  _count_sims: number;
+}
+
+/**
  * 発注リポジトリ
  */
 export class ProcurementRepository {
@@ -52,7 +110,7 @@ export class ProcurementRepository {
    * 発注一覧を取得
    * パフォーマンス最適化: 1クエリで全データ取得
    */
-  async findMany(include?: PurchaseOrderInclude): Promise<any[]> {
+  async findMany(include?: PurchaseOrderInclude): Promise<PurchaseOrderWithRelations[]> {
     logger.debug('発注一覧取得');
 
     // Raw SQLで1クエリに統合（パフォーマンス最適化）
@@ -83,16 +141,16 @@ export class ProcurementRepository {
         GROUP BY "purchaseOrderId"
       ) sim_count ON po.id = sim_count."purchaseOrderId"
       ORDER BY po."orderedAt" DESC
-    ` as any[];
+    ` as PurchaseOrderRawRow[];
 
     // linesを別途取得（これは避けられない）
-    const orderIds = ordersData.map((o: any) => o.id);
+    const orderIds = ordersData.map((o) => o.id);
     const lines = orderIds.length > 0 ? await this.prisma.purchaseOrderLine.findMany({
       where: { purchaseOrderId: { in: orderIds } },
     }) : [];
 
     // データを整形
-    const orders = ordersData.map((order: any) => ({
+    const orders = ordersData.map((order) => ({
       id: order.id,
       supplierId: order.supplierId,
       totalAmount: order.totalAmount,
@@ -111,7 +169,7 @@ export class ProcurementRepository {
         name: order.supplier_name,
         code: order.supplier_code,
       },
-      lines: lines.filter((l: any) => l.purchaseOrderId === order.id),
+      lines: lines.filter((l) => l.purchaseOrderId === order.id),
       _count: {
         sims: order._count_sims,
       },
@@ -128,7 +186,7 @@ export class ProcurementRepository {
   async create(
     data: PurchaseOrderCreateInput,
     include?: PurchaseOrderInclude
-  ): Promise<any> {
+  ): Promise<PurchaseOrderWithRelations> {
     logger.info('発注作成開始', { supplierId: data.supplierId });
 
     const order = await this.prisma.purchaseOrder.create({
@@ -137,7 +195,10 @@ export class ProcurementRepository {
         totalAmount: data.totalAmount,
         note: data.note || null,
         lines: {
-          create: data.lines as any,
+          create: data.lines.map((l) => ({
+            ...l,
+            carrierType: l.carrierType as $Enums.CarrierType,
+          })),
         },
       },
       include: include || {
@@ -160,7 +221,7 @@ export class ProcurementRepository {
   /**
    * 発注を取得（IDで）
    */
-  async findById(id: string): Promise<any | null> {
+  async findById(id: string): Promise<PurchaseOrderWithRelations | null> {
     logger.debug('発注取得', { id });
 
     const order = await this.prisma.purchaseOrder.findUnique({
@@ -187,12 +248,15 @@ export class ProcurementRepository {
     id: string,
     data: PurchaseOrderUpdateInput,
     include?: PurchaseOrderInclude
-  ): Promise<any> {
+  ): Promise<PurchaseOrderWithRelations> {
     logger.info('発注更新開始', { id });
 
     const order = await this.prisma.purchaseOrder.update({
       where: { id },
-      data: data as any,
+      data: {
+        ...data,
+        status: data.status ? (data.status as $Enums.PurchaseOrderStatus) : undefined,
+      },
       include: include || {
         supplier: {
           select: {
@@ -217,7 +281,7 @@ export class ProcurementRepository {
     id: string,
     fieldName: string,
     url: string
-  ): Promise<any> {
+  ): Promise<PurchaseOrderWithRelations> {
     logger.info('発注画像パス更新', { id, fieldName });
 
     const order = await this.prisma.purchaseOrder.update({

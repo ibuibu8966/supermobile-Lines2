@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Button, Card, CardContent } from "@repo/ui";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { CheckCircle, Home, FileText } from "lucide-react";
 
 export default function ApplyCompletePage() {

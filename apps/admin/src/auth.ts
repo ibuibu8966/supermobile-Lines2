@@ -1,5 +1,5 @@
 import NextAuth from "next-auth";
-import { createAuthConfig } from "@repo/auth";
-import { prisma } from "@repo/database";
+import { createAuthConfig } from "@/lib/auth/config";
+import { prisma } from "@/lib/database";
 
 export const { handlers, auth, signIn, signOut } = NextAuth(createAuthConfig(prisma));

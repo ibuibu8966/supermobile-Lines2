@@ -1,19 +1,8 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "@repo/ui";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { AlertCircle } from "lucide-react";
 import type { RawDataRow } from "@/lib/procurement/generic-parser";
 import type { ColumnMapping, FieldMapping } from "@/types/procurement-import";

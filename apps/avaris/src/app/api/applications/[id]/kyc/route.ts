@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
-import { prisma } from "@repo/database";
-import { getKycImages, createKycImage } from "@repo/shared";
+import { prisma } from "@/lib/database";
+import { getKycImages, createKycImage } from "@/lib";
 
 export const dynamic = "force-dynamic";
 

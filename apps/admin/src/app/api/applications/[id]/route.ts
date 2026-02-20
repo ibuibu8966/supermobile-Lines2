@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
-import { prisma, getSignedUrl } from "@repo/database";
+import { prisma } from "@/lib/database";
+import { getSignedUrl } from "@/lib/supabase";
 import { getAdminSession, assertServiceAccess } from "@/lib/auth/admin-session";
 import { getApplicationById, updateApplication } from "@/controllers/application.controller";
 

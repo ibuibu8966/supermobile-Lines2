@@ -1,8 +1,9 @@
 import Link from "next/link";
 import Image from "next/image";
-import { Button, Card, CardContent, CardHeader, CardTitle } from "@repo/ui";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Phone, Settings, FileText, Check } from "lucide-react";
-import { prisma } from "@repo/database";
+import { prisma } from "@/lib/database";
 import { Header } from "./components/Header";
 import { Footer } from "./components/Footer";
 import { FAQ } from "./components/FAQ";

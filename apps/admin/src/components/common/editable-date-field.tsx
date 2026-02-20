@@ -1,7 +1,7 @@
 "use client";
 
-import { Input } from "@repo/ui";
-import { formatDateForInput } from "@repo/utils";
+import { Input } from "@/components/ui/input";
+import { formatDateForInput } from "@/lib/utils/formatters";
 
 interface EditableDateFieldProps {
   orderId: string;

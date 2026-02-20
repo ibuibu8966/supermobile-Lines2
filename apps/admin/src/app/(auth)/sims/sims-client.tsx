@@ -3,15 +3,24 @@
 import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, Card, CardContent, CardHeader, CardTitle, Badge, Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, Input, Checkbox, Label, Popover, PopoverContent, PopoverTrigger, Calendar } from "@repo/ui";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ChevronDown, ChevronRight, ChevronUp, Search, Loader2, AlertCircle, Edit, CalendarIcon, Filter } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryState } from "nuqs";
 import { queryKeys, STALE_TIMES } from "@/lib/api/query-keys";
 import { api } from "@/lib/api/client";
+import type { SimUpdateInput } from "@/entities";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";
-import { cn } from "@repo/ui";
+import { cn } from "@/components/ui/lib/utils";
 
 interface Contract {
   id: string;
@@ -89,17 +98,11 @@ interface SimsResponse {
 const STATUS_LABELS: Record<string, string> = {
   IN_STOCK: "在庫",
   ACTIVE: "利用中",
-  RETURNING: "返却中",
-  RETIRED: "廃止",
-  CANCELLED: "解約済",
 };
 
 const STATUS_VARIANTS: Record<string, "default" | "success" | "destructive" | "secondary" | "outline"> = {
   IN_STOCK: "default",
   ACTIVE: "success",
-  RETURNING: "secondary",
-  RETIRED: "destructive",
-  CANCELLED: "destructive",
 };
 
 const CONTRACT_STATUS_LABELS: Record<string, string> = {
@@ -514,9 +517,6 @@ export function SimsClient() {
                     <option value="">選択なし</option>
                     <option value="IN_STOCK">在庫</option>
                     <option value="ACTIVE">利用中</option>
-                    <option value="RETURNING">返却中</option>
-                    <option value="RETIRED">廃止</option>
-                    <option value="CANCELLED">解約済</option>
                   </select>
 
                   <div className="h-8 w-px bg-gray-300" />
@@ -965,7 +965,7 @@ export function SimsClient() {
                   // 各SIMを個別に更新
                   await Promise.all(
                     iccids.map(async (iccid) => {
-                      const updateData: any = {};
+                      const updateData: Partial<SimUpdateInput & { eligibleTagIds: number[]; autoCancelDate: string }> = {};
 
                       // タグが選択されている場合のみ更新
                       if (bulkSelectedTagIds.length > 0) {

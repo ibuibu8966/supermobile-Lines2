@@ -2,8 +2,8 @@
  * Password change service
  */
 
-import { PrismaClient } from "@repo/database";
-import { PasswordChangeRequest, PasswordChangeResult } from "@repo/entities";
+import { PrismaClient } from "@/lib/database";
+import { PasswordChangeRequest, PasswordChangeResult } from "@/entities";
 import { NotFoundError, ValidationError } from "@/shared/errors/custom-errors";
 import { logger } from "@/shared/utils/logger";
 

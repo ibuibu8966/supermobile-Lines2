@@ -3,18 +3,14 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import {
-  Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  Label,
-  Checkbox,
-  Input,
-  cn,
-} from "@repo/ui";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/components/ui/lib/utils";
 import {
   ChevronLeft,
   ChevronRight,
@@ -22,7 +18,14 @@ import {
   Loader2,
   Package,
   FileCheck,
+  Upload,
+  X,
+  AlertTriangle,
+  CalendarDays,
 } from "lucide-react";
+import { format } from "date-fns";
+import { ja } from "date-fns/locale";
+import { useDashboard } from "../context";
 
 interface PlanPricing {
   id: string;
@@ -40,13 +43,47 @@ interface Plan {
   pricings: PlanPricing[];
 }
 
+interface KycUploadFile {
+  type: "ID_FRONT" | "ID_BACK";
+  file: File | null;
+  path: string | null;
+  uploading: boolean;
+  uploaded: boolean;
+  error: string | null;
+  expiryDate: string | null;
+}
+
 export default function AdditionalApplyPage() {
   const router = useRouter();
+  const { data: dashboardData } = useDashboard();
+
+  // KYC期限切れチェック（dashboardData が null の間は false）
+  const isKycExpired = (() => {
+    const kycImages = dashboardData?.customer?.kycImages ?? [];
+    if (kycImages.length === 0) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const latestExpiry = kycImages
+      .map((img) => img.expiryDate)
+      .filter(Boolean)
+      .sort()
+      .at(-1);
+    if (!latestExpiry) return false;
+    return new Date(latestExpiry) < today;
+  })();
+
   const [step, setStep] = useState(1);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // KYCアップロード状態
+  const [kycFiles, setKycFiles] = useState<KycUploadFile[]>([
+    { type: "ID_FRONT", file: null, path: null, uploading: false, uploaded: false, error: null, expiryDate: null },
+    { type: "ID_BACK", file: null, path: null, uploading: false, uploaded: false, error: null, expiryDate: null },
+  ]);
+  const [kycExpiryDate, setKycExpiryDate] = useState<string>("");
 
   // フォームデータ
   const [selectedPlanId, setSelectedPlanId] = useState<string>("");
@@ -65,10 +102,36 @@ export default function AdditionalApplyPage() {
   const [couponValidating, setCouponValidating] = useState(false);
   const [couponError, setCouponError] = useState<string | null>(null);
 
-  const steps = [
-    { id: 1, name: "プラン選択" },
-    { id: 2, name: "確認・同意" },
-  ];
+  // dashboardData が読み込まれたら step を再設定
+  useEffect(() => {
+    if (dashboardData !== null) {
+      const kycImages = dashboardData?.customer?.kycImages ?? [];
+      if (kycImages.length > 0) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const latestExpiry = kycImages
+          .map((img) => img.expiryDate)
+          .filter(Boolean)
+          .sort()
+          .at(-1);
+        const expired = !!latestExpiry && new Date(latestExpiry) < today;
+        if (expired) {
+          setStep(0);
+        }
+      }
+    }
+  }, [dashboardData]);
+
+  const steps = isKycExpired
+    ? [
+        { id: 0, name: "身分証更新" },
+        { id: 1, name: "プラン選択" },
+        { id: 2, name: "確認・同意" },
+      ]
+    : [
+        { id: 1, name: "プラン選択" },
+        { id: 2, name: "確認・同意" },
+      ];
 
   useEffect(() => {
     fetchPlans();
@@ -86,6 +149,74 @@ export default function AdditionalApplyPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const uploadKycFile = async (index: number, file: File) => {
+    const kycType = kycFiles[index].type;
+    const ext = file.name.split(".").pop() ?? "jpg";
+    const path = `kyc/${Date.now()}_${kycType.toLowerCase()}.${ext}`;
+
+    setKycFiles((prev) =>
+      prev.map((f, i) =>
+        i === index ? { ...f, file, uploading: true, error: null } : f
+      )
+    );
+
+    try {
+      // 署名付きURLを取得
+      const urlRes = await fetch("/api/upload-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bucket: "kyc", path }),
+      });
+
+      if (!urlRes.ok) {
+        throw new Error("アップロードURLの取得に失敗しました");
+      }
+
+      const { signedUrl, path: savedPath } = await urlRes.json();
+
+      // Supabaseへアップロード
+      const uploadRes = await fetch(signedUrl, {
+        method: "PUT",
+        headers: { "Content-Type": file.type },
+        body: file,
+      });
+
+      if (!uploadRes.ok) {
+        throw new Error("ファイルのアップロードに失敗しました");
+      }
+
+      setKycFiles((prev) =>
+        prev.map((f, i) =>
+          i === index
+            ? { ...f, path: savedPath, uploading: false, uploaded: true }
+            : f
+        )
+      );
+    } catch (err) {
+      setKycFiles((prev) =>
+        prev.map((f, i) =>
+          i === index
+            ? {
+                ...f,
+                uploading: false,
+                error: err instanceof Error ? err.message : "アップロードエラー",
+              }
+            : f
+        )
+      );
+    }
+  };
+
+  const removeKycFile = (index: number) => {
+    setKycFiles((prev) =>
+      prev.map((f, i) =>
+        i === index
+          ? { ...f, file: null, path: null, uploaded: false, error: null }
+          : f
+      )
+    );
   };
 
   const validateCoupon = async () => {
@@ -129,7 +260,6 @@ export default function AdditionalApplyPage() {
 
   const selectedPlan = plans.find((p) => p.id === selectedPlanId);
 
-  // 回線数に応じた単価を取得（階層料金対応）
   const getUnitPrice = (plan: Plan, quantity: number): number => {
     const sortedPricings = [...plan.pricings].sort(
       (a, b) => a.minQuantity - b.minQuantity
@@ -147,13 +277,9 @@ export default function AdditionalApplyPage() {
     return unitPrice;
   };
 
-  const canProceedStep1 = () => {
-    return selectedPlanId !== "" && lineCount >= 10 && lineCount % 10 === 0;
-  };
-
-  const canSubmit = () => {
-    return agreements.terms && agreements.privacy && agreements.cancellation;
-  };
+  const canProceedStep0 = () => kycFiles.every((f) => f.uploaded) && !!kycExpiryDate;
+  const canProceedStep1 = () => selectedPlanId !== "" && lineCount >= 10 && lineCount % 10 === 0;
+  const canSubmit = () => agreements.terms && agreements.privacy && agreements.cancellation;
 
   const handleSubmit = async () => {
     if (!canSubmit() || !selectedPlan) return;
@@ -162,14 +288,22 @@ export default function AdditionalApplyPage() {
     setError(null);
 
     try {
+      const body: Record<string, unknown> = {
+        planId: selectedPlanId,
+        lineCount,
+        ...(couponApplied && couponCode ? { couponCode } : {}),
+      };
+
+      if (isKycExpired) {
+        body.kycImages = kycFiles
+          .filter((f) => f.path)
+          .map((f) => ({ type: f.type, path: f.path, expiryDate: kycExpiryDate || null }));
+      }
+
       const res = await fetch("/api/customer/applications", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          planId: selectedPlanId,
-          lineCount,
-          ...(couponApplied && couponCode ? { couponCode } : {}),
-        }),
+        body: JSON.stringify(body),
       });
 
       if (!res.ok) {
@@ -177,7 +311,6 @@ export default function AdditionalApplyPage() {
         throw new Error(data.error || "申込に失敗しました");
       }
 
-      // 完了ページへ
       router.push("/dashboard/apply/complete");
     } catch (err) {
       setError(err instanceof Error ? err.message : "申込に失敗しました");
@@ -201,9 +334,7 @@ export default function AdditionalApplyPage() {
     );
   }
 
-  const baseUnitPrice = selectedPlan
-    ? getUnitPrice(selectedPlan, lineCount)
-    : 0;
+  const baseUnitPrice = selectedPlan ? getUnitPrice(selectedPlan, lineCount) : 0;
   const selectedPlanPrice = couponApplied && couponUnitPrice !== null ? couponUnitPrice : baseUnitPrice;
 
   return (
@@ -240,7 +371,7 @@ export default function AdditionalApplyPage() {
                     {step > s.id ? (
                       <Check className="h-4 w-4" />
                     ) : (
-                      <span className="text-sm font-medium">{s.id}</span>
+                      <span className="text-sm font-medium">{index + 1}</span>
                     )}
                   </div>
                   <span
@@ -267,6 +398,114 @@ export default function AdditionalApplyPage() {
           {error && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
               {error}
+            </div>
+          )}
+
+          {/* Step 0: 身分証アップロード（KYC期限切れ時のみ） */}
+          {step === 0 && (
+            <div className="space-y-6">
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+                <div>
+                  <p className="font-medium text-amber-800">身分証明書の有効期限が切れています</p>
+                  <p className="text-sm text-amber-700 mt-1">
+                    追加申込を行うには、有効な身分証明書の表面・裏面をアップロードしてください。
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-sm font-medium">
+                    新しい身分証明書の有効期限 *
+                  </Label>
+                  <div className="mt-2 max-w-xs">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !kycExpiryDate && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarDays className="mr-2 h-4 w-4" />
+                          {kycExpiryDate
+                            ? format(new Date(kycExpiryDate), "yyyy年MM月dd日", { locale: ja })
+                            : "有効期限を選択"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={kycExpiryDate ? new Date(kycExpiryDate) : undefined}
+                          onSelect={(date) =>
+                            setKycExpiryDate(date ? format(date, "yyyy-MM-dd") : "")
+                          }
+                          startMonth={new Date()}
+                          endMonth={new Date(new Date().getFullYear() + 15, 11)}
+                          captionLayout="dropdown"
+                          locale={ja}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      運転免許証等の有効期限を入力してください
+                    </p>
+                  </div>
+                </div>
+                {kycFiles.map((kycFile, index) => (
+                  <div key={kycFile.type}>
+                    <Label className="text-sm font-medium">
+                      身分証明書 {kycFile.type === "ID_FRONT" ? "表面" : "裏面"} *
+                    </Label>
+                    <div className="mt-2">
+                      {kycFile.uploaded ? (
+                        <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                          <Check className="h-4 w-4 text-green-600" />
+                          <span className="text-sm text-green-700">
+                            {kycFile.file?.name ?? "アップロード済み"}
+                          </span>
+                          <button
+                            onClick={() => removeKycFile(index)}
+                            className="ml-auto text-gray-400 hover:text-red-500"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-primary hover:bg-gray-50 transition-colors">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            disabled={kycFile.uploading}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) uploadKycFile(index, file);
+                            }}
+                          />
+                          {kycFile.uploading ? (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              アップロード中...
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center gap-1 text-sm text-muted-foreground">
+                              <Upload className="h-5 w-5" />
+                              <span>クリックして画像を選択</span>
+                              <span className="text-xs">JPG, PNG など</span>
+                            </div>
+                          )}
+                        </label>
+                      )}
+                      {kycFile.error && (
+                        <p className="text-xs text-red-500 mt-1">{kycFile.error}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
@@ -313,14 +552,9 @@ export default function AdditionalApplyPage() {
                                 ? `${p.minQuantity}〜${p.maxQuantity}回線`
                                 : `${p.minQuantity}回線以上`;
                               return (
-                                <div
-                                  key={i}
-                                  className="text-xs text-muted-foreground"
-                                >
+                                <div key={i} className="text-xs text-muted-foreground">
                                   {rangeText}:{" "}
-                                  <strong>
-                                    {formatCurrency(p.unitPrice)}
-                                  </strong>
+                                  <strong>{formatCurrency(p.unitPrice)}</strong>
                                   /回線
                                 </div>
                               );
@@ -356,7 +590,6 @@ export default function AdditionalApplyPage() {
                 />
               </div>
 
-              {/* 料金テーブル */}
               {selectedPlan && selectedPlan.pricings.length > 1 && (
                 <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-blue-900">
                   <h4 className="font-medium text-blue-900 mb-2">
@@ -368,8 +601,7 @@ export default function AdditionalApplyPage() {
                       .map((pricing, i) => {
                         const isCurrentTier =
                           lineCount >= pricing.minQuantity &&
-                          (!pricing.maxQuantity ||
-                            lineCount <= pricing.maxQuantity);
+                          (!pricing.maxQuantity || lineCount <= pricing.maxQuantity);
                         const rangeText = pricing.maxQuantity
                           ? `${pricing.minQuantity}〜${pricing.maxQuantity}回線`
                           : `${pricing.minQuantity}回線以上`;
@@ -377,15 +609,11 @@ export default function AdditionalApplyPage() {
                           <div
                             key={i}
                             className={`flex justify-between text-sm py-1 px-2 rounded ${
-                              isCurrentTier
-                                ? "bg-blue-100 font-medium text-blue-900"
-                                : ""
+                              isCurrentTier ? "bg-blue-100 font-medium text-blue-900" : ""
                             }`}
                           >
                             <span>{rangeText}</span>
-                            <span>
-                              {formatCurrency(pricing.unitPrice)}/回線
-                            </span>
+                            <span>{formatCurrency(pricing.unitPrice)}/回線</span>
                           </div>
                         );
                       })}
@@ -393,7 +621,6 @@ export default function AdditionalApplyPage() {
                 </div>
               )}
 
-              {/* クーポンコード */}
               {selectedPlan && (
                 <div>
                   <Label className="text-base font-medium">クーポンコード（お持ちの方）</Label>
@@ -439,18 +666,12 @@ export default function AdditionalApplyPage() {
                   <h4 className="font-medium mb-2">お見積り</h4>
                   <div className="space-y-1 text-sm">
                     <div className="flex justify-between">
-                      <span>
-                        {formatCurrency(selectedPlanPrice)} × {lineCount}回線
-                      </span>
-                      <span>
-                        {formatCurrency(selectedPlanPrice * lineCount)}
-                      </span>
+                      <span>{formatCurrency(selectedPlanPrice)} × {lineCount}回線</span>
+                      <span>{formatCurrency(selectedPlanPrice * lineCount)}</span>
                     </div>
                     <div className="border-t pt-2 mt-2 flex justify-between font-medium text-lg">
                       <span>月額合計（税込）</span>
-                      <span>
-                        {formatCurrency(selectedPlanPrice * lineCount)}
-                      </span>
+                      <span>{formatCurrency(selectedPlanPrice * lineCount)}</span>
                     </div>
                   </div>
                 </div>
@@ -483,15 +704,11 @@ export default function AdditionalApplyPage() {
                   )}
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">単価</span>
-                    <span className="font-medium">
-                      {formatCurrency(selectedPlanPrice)}
-                    </span>
+                    <span className="font-medium">{formatCurrency(selectedPlanPrice)}</span>
                   </div>
                   <div className="flex justify-between font-medium text-base border-t pt-2">
                     <span>月額合計（税込）</span>
-                    <span>
-                      {formatCurrency(selectedPlanPrice * lineCount)}
-                    </span>
+                    <span>{formatCurrency(selectedPlanPrice * lineCount)}</span>
                   </div>
                 </div>
               </div>
@@ -501,10 +718,16 @@ export default function AdditionalApplyPage() {
                   <FileCheck className="h-4 w-4" />
                   本人確認について
                 </h4>
-                <p className="text-sm text-blue-600">
-                  追加申込の場合、以前ご提出いただいた本人確認書類を使用します。
-                  新たな書類のアップロードは不要です。
-                </p>
+                {isKycExpired ? (
+                  <p className="text-sm text-blue-600">
+                    新しい身分証明書をアップロードしていただきました。確認完了後、申込が処理されます。
+                  </p>
+                ) : (
+                  <p className="text-sm text-blue-600">
+                    追加申込の場合、以前ご提出いただいた本人確認書類を使用します。
+                    新たな書類のアップロードは不要です。
+                  </p>
+                )}
               </div>
 
               <div className="space-y-3">
@@ -531,13 +754,8 @@ export default function AdditionalApplyPage() {
                         setAgreements({ ...agreements, privacy: !!checked })
                       }
                     />
-                    <label
-                      htmlFor="privacy"
-                      className="text-sm cursor-pointer"
-                    >
-                      <span className="text-primary underline">
-                        プライバシーポリシー
-                      </span>
+                    <label htmlFor="privacy" className="text-sm cursor-pointer">
+                      <span className="text-primary underline">プライバシーポリシー</span>
                       に同意します
                     </label>
                   </div>
@@ -546,19 +764,11 @@ export default function AdditionalApplyPage() {
                       id="cancellation"
                       checked={agreements.cancellation}
                       onCheckedChange={(checked) =>
-                        setAgreements({
-                          ...agreements,
-                          cancellation: !!checked,
-                        })
+                        setAgreements({ ...agreements, cancellation: !!checked })
                       }
                     />
-                    <label
-                      htmlFor="cancellation"
-                      className="text-sm cursor-pointer"
-                    >
-                      <span className="text-primary underline">
-                        解約・返金ポリシー
-                      </span>
+                    <label htmlFor="cancellation" className="text-sm cursor-pointer">
+                      <span className="text-primary underline">解約・返金ポリシー</span>
                       に同意します
                     </label>
                   </div>
@@ -569,7 +779,7 @@ export default function AdditionalApplyPage() {
 
           {/* ナビゲーションボタン */}
           <div className="mt-8 flex justify-between">
-            {step > 1 ? (
+            {step > (isKycExpired ? 0 : 1) ? (
               <Button variant="outline" onClick={() => setStep(step - 1)}>
                 <ChevronLeft className="h-4 w-4 mr-1" />
                 戻る
@@ -581,7 +791,7 @@ export default function AdditionalApplyPage() {
             {step < 2 ? (
               <Button
                 onClick={() => setStep(step + 1)}
-                disabled={!canProceedStep1()}
+                disabled={step === 0 ? !canProceedStep0() : !canProceedStep1()}
               >
                 次へ
                 <ChevronRight className="h-4 w-4 ml-1" />

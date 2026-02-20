@@ -1,19 +1,8 @@
 "use client";
 
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-  Badge,
-} from "@repo/ui";
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Loader2, FileText } from "lucide-react";
 import { useProcurementSims } from "@/hooks/use-procurement-sims";
 
@@ -39,18 +28,12 @@ const SIM_TYPE_LABELS: Record<string, string> = {
 
 const STATUS_LABELS: Record<string, string> = {
   IN_STOCK: "在庫",
-  ACTIVE: "稼働中",
-  RETURNING: "返却中",
-  RETIRED: "廃棄",
-  CANCELLED: "解約済",
+  ACTIVE: "利用中",
 };
 
 const STATUS_COLORS: Record<string, string> = {
   IN_STOCK: "bg-blue-100 text-blue-800",
   ACTIVE: "bg-green-100 text-green-800",
-  RETURNING: "bg-yellow-100 text-yellow-800",
-  RETIRED: "bg-gray-100 text-gray-800",
-  CANCELLED: "bg-red-100 text-red-800",
 };
 
 // インライン表示用コンポーネント（ダイアログなし）

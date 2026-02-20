@@ -1,3 +1,4 @@
+import { PrismaClient } from '@prisma/client';
 /**
  * Coupon Controller
  *
@@ -17,7 +18,7 @@ import { logger } from '../shared/utils/logger';
  */
 export async function getAllCoupons(
   request: NextRequest,
-  prisma: any
+  prisma: PrismaClient
 ): Promise<NextResponse> {
   // 1. パラメータパース
   const searchParams = request.nextUrl.searchParams;
@@ -49,11 +50,18 @@ const couponSchema = z.object({
 
 export async function createCoupon(
   request: NextRequest,
-  prisma: any
+  prisma: PrismaClient
 ): Promise<NextResponse> {
   // 1. バリデーション
   const body = await request.json();
-  const validated = couponSchema.parse(body);
+  const result = couponSchema.safeParse(body);
+  if (!result.success) {
+    return NextResponse.json(
+      { error: 'バリデーションエラー', details: result.error.flatten() },
+      { status: 400 }
+    );
+  }
+  const validated = result.data;
 
   // 2. Service呼び出し
   const couponService = new CouponService(new CouponRepository(prisma));
@@ -80,11 +88,18 @@ const updateCouponSchema = z.object({
 export async function updateCoupon(
   id: string,
   request: NextRequest,
-  prisma: any
+  prisma: PrismaClient
 ): Promise<NextResponse> {
   // 1. バリデーション
   const body = await request.json();
-  const validated = updateCouponSchema.parse(body);
+  const result = updateCouponSchema.safeParse(body);
+  if (!result.success) {
+    return NextResponse.json(
+      { error: 'バリデーションエラー', details: result.error.flatten() },
+      { status: 400 }
+    );
+  }
+  const validated = result.data;
 
   // 2. Service呼び出し
   const couponService = new CouponService(new CouponRepository(prisma));
@@ -99,7 +114,7 @@ export async function updateCoupon(
  */
 export async function deleteCoupon(
   id: string,
-  prisma: any
+  prisma: PrismaClient
 ): Promise<NextResponse> {
   // Service呼び出し
   const couponService = new CouponService(new CouponRepository(prisma));

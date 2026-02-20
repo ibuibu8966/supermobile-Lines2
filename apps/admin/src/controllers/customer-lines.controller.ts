@@ -3,7 +3,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@repo/database";
+import { PrismaClient } from "@/lib/database";
 import { CustomerLinesService } from "@/services/customer-lines.service";
 import { handleApiError } from "@/shared/errors/api-errors";
 

@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { prisma } from "@repo/database";
+import { prisma } from "@/lib/database";
 import { getAdminSession } from "@/lib/auth/admin-session";
 import { getAllApplications } from "@/controllers/application.controller";
 

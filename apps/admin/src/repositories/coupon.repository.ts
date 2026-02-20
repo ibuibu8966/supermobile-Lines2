@@ -5,7 +5,8 @@
  * Prismaとの直接的なやり取りを担当
  */
 
-import { CouponWithRelations, CouponCreateInput } from '@repo/entities';
+import { PrismaClient, Prisma } from '@prisma/client';
+import { CouponWithRelations, CouponCreateInput } from '@/entities';
 import { logger } from '../shared/utils/logger';
 
 export interface CouponFilters {
@@ -13,7 +14,7 @@ export interface CouponFilters {
 }
 
 export class CouponRepository {
-  constructor(private prisma: any) {}
+  constructor(private prisma: PrismaClient) {}
 
   /**
    * クーポン一覧を取得
@@ -23,7 +24,7 @@ export class CouponRepository {
 
     logger.debug('CouponRepository.findMany', { where });
 
-    return await this.prisma.coupon.findMany({
+    const coupons = await this.prisma.coupon.findMany({
       where,
       include: {
         plan: {
@@ -39,6 +40,7 @@ export class CouponRepository {
       },
       orderBy: { createdAt: 'desc' },
     });
+    return coupons as unknown as CouponWithRelations[];
   }
 
   /**
@@ -47,7 +49,7 @@ export class CouponRepository {
   async findByCode(code: string): Promise<CouponWithRelations | null> {
     logger.debug('CouponRepository.findByCode', { code });
 
-    return await this.prisma.coupon.findUnique({
+    const coupon = await this.prisma.coupon.findUnique({
       where: { code },
       include: {
         plan: {
@@ -57,6 +59,7 @@ export class CouponRepository {
         },
       },
     });
+    return coupon as unknown as CouponWithRelations | null;
   }
 
   /**
@@ -65,7 +68,7 @@ export class CouponRepository {
   async findById(id: string): Promise<CouponWithRelations | null> {
     logger.debug('CouponRepository.findById', { id });
 
-    return await this.prisma.coupon.findUnique({
+    const coupon = await this.prisma.coupon.findUnique({
       where: { id },
       include: {
         plan: {
@@ -80,6 +83,7 @@ export class CouponRepository {
         },
       },
     });
+    return coupon as unknown as CouponWithRelations | null;
   }
 
   /**
@@ -88,7 +92,7 @@ export class CouponRepository {
   async create(data: CouponCreateInput): Promise<CouponWithRelations> {
     logger.debug('CouponRepository.create', { code: data.code, planId: data.planId });
 
-    return await this.prisma.coupon.create({
+    const coupon = await this.prisma.coupon.create({
       data: {
         code: data.code,
         planId: data.planId,
@@ -112,6 +116,7 @@ export class CouponRepository {
         },
       },
     });
+    return coupon as unknown as CouponWithRelations;
   }
 
   /**
@@ -150,21 +155,22 @@ export class CouponRepository {
   async findByCodeExcept(code: string, excludeId: string): Promise<CouponWithRelations | null> {
     logger.debug('CouponRepository.findByCodeExcept', { code, excludeId });
 
-    return await this.prisma.coupon.findFirst({
+    const coupon = await this.prisma.coupon.findFirst({
       where: {
         code,
         id: { not: excludeId },
       },
     });
+    return coupon as unknown as CouponWithRelations | null;
   }
 
   /**
    * クーポンを更新
    */
-  async update(id: string, data: any): Promise<CouponWithRelations> {
+  async update(id: string, data: Prisma.CouponUpdateInput): Promise<CouponWithRelations> {
     logger.debug('CouponRepository.update', { id, data });
 
-    return await this.prisma.coupon.update({
+    const coupon = await this.prisma.coupon.update({
       where: { id },
       data,
       include: {
@@ -180,6 +186,7 @@ export class CouponRepository {
         },
       },
     });
+    return coupon as unknown as CouponWithRelations;
   }
 
   /**

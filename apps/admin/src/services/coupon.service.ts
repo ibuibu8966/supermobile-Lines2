@@ -6,7 +6,7 @@
  */
 
 import { CouponRepository, CouponFilters } from '../repositories/coupon.repository';
-import { CouponWithRelations, CouponCreateInput } from '@repo/entities';
+import { CouponWithRelations, CouponCreateInput, CouponUpdateInput } from '@/entities';
 import { logger } from '../shared/utils/logger';
 import { ConflictError, ValidationError, NotFoundError } from '../shared/errors/custom-errors';
 
@@ -101,7 +101,7 @@ export class CouponService {
    * - コード重複チェック（自分以外）
    * - 日付を当日の開始/終了時刻に正規化
    */
-  async updateCoupon(id: string, input: any): Promise<CouponWithRelations> {
+  async updateCoupon(id: string, input: CouponUpdateInput): Promise<CouponWithRelations> {
     logger.info('クーポン更新開始', { couponId: id, input });
 
     // 存在確認
@@ -121,7 +121,16 @@ export class CouponService {
     }
 
     // データ整形
-    const updateData: Record<string, unknown> = {};
+    const updateData: {
+      code?: string;
+      planId?: string;
+      unitPrice?: number;
+      description?: string | null;
+      maxUsages?: number | null;
+      validFrom?: Date;
+      validUntil?: Date;
+      isActive?: boolean;
+    } = {};
     if (input.code !== undefined) updateData.code = input.code;
     if (input.planId !== undefined) updateData.planId = input.planId;
     if (input.unitPrice !== undefined) updateData.unitPrice = input.unitPrice;

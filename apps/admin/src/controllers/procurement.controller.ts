@@ -6,10 +6,54 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { z } from 'zod';
 import { ProcurementService } from '../services/procurement.service';
 import { ProcurementSimImportService } from '../services/procurement-sim-import.service';
 import { ImageUploadService, StorageClient } from '../services/image-upload.service';
 import { logger } from '../shared/utils/logger';
+
+// ==================== Validation Schemas ====================
+
+const createPurchaseOrderSchema = z.object({
+  supplierId: z.number().int().positive('仕入先IDは正の整数である必要があります'),
+  totalAmount: z.number().positive('金額は正の数である必要があります').optional(),
+  lines: z
+    .array(
+      z.object({
+        carrierType: z.enum(['DOCOMO', 'AU', 'SOFTBANK', 'RAKUTEN']),
+        quantity: z.number().int().positive('数量は正の整数である必要があります'),
+        unitPrice: z.number().positive('単価は正の数である必要があります'),
+      })
+    )
+    .min(1, '明細は1件以上必要です'),
+  note: z.string().optional(),
+});
+
+const updatePurchaseOrderSchema = z.object({
+  status: z
+    .enum(['ORDERED', 'CONFIRMED', 'AWAITING_SEAL', 'BEFORE_PAYMENT', 'AWAITING_DELIVERY', 'DELIVERED'])
+    .optional(),
+  invoiceDate: z.string().nullable().optional(),
+  deliveryDate: z.string().nullable().optional(),
+  totalAmount: z.number().positive('金額は正の数である必要があります').optional(),
+});
+
+const importSimDataSchema = z.object({
+  iccid: z.string().min(1, 'ICCIDは必須です'),
+  msisdn: z.string().optional(),
+  simType: z.enum(['INDIVIDUAL', 'CORPORATE', 'BOTH']).optional(),
+  carrierType: z.enum(['DOCOMO', 'AU', 'SOFTBANK', 'RAKUTEN']).optional(),
+  plan: z.string().optional(),
+  supplierContractEnd: z.string().optional(),
+  isAutoCancel: z.boolean().optional(),
+  autoCancelDate: z.string().optional(),
+  eligibleTagIds: z.array(z.number().int()).optional(),
+});
+
+const importSimsSchema = z.object({
+  sims: z.array(importSimDataSchema).min(1, 'SIMデータは1件以上必要です'),
+  supplierId: z.number().int().positive('仕入先IDは正の整数である必要があります'),
+});
 
 /**
  * 発注一覧を取得
@@ -28,8 +72,15 @@ export async function createPurchaseOrder(
   prisma: PrismaClient
 ): Promise<NextResponse> {
   const body = await request.json();
+  const result = createPurchaseOrderSchema.safeParse(body);
+  if (!result.success) {
+    return NextResponse.json(
+      { error: 'バリデーションエラー', details: result.error.flatten() },
+      { status: 400 }
+    );
+  }
   const service = new ProcurementService(prisma);
-  const order = await service.createPurchaseOrder(body);
+  const order = await service.createPurchaseOrder(result.data);
   return NextResponse.json(order, { status: 201 });
 }
 
@@ -54,8 +105,15 @@ export async function updatePurchaseOrder(
   prisma: PrismaClient
 ): Promise<NextResponse> {
   const body = await request.json();
+  const result = updatePurchaseOrderSchema.safeParse(body);
+  if (!result.success) {
+    return NextResponse.json(
+      { error: 'バリデーションエラー', details: result.error.flatten() },
+      { status: 400 }
+    );
+  }
   const service = new ProcurementService(prisma);
-  const order = await service.updatePurchaseOrder(id, body);
+  const order = await service.updatePurchaseOrder(id, result.data);
   return NextResponse.json(order);
 }
 
@@ -99,7 +157,7 @@ export async function uploadPurchaseOrderImage(
 
   // フィールド名を取得
   const fieldName = imageTypeFieldMap[imageType];
-  const existingUrl = order[fieldName];
+  const existingUrl = (order as unknown as Record<string, unknown>)[fieldName] as string | null;
 
   // 画像をアップロード
   const uploadResult = await imageService.uploadImage(
@@ -128,8 +186,15 @@ export async function importSimsToPurchaseOrder(
   prisma: PrismaClient
 ): Promise<NextResponse> {
   const body = await request.json();
+  const validation = importSimsSchema.safeParse(body);
+  if (!validation.success) {
+    return NextResponse.json(
+      { error: 'バリデーションエラー', details: validation.error.flatten() },
+      { status: 400 }
+    );
+  }
   const service = new ProcurementSimImportService(prisma);
-  const result = await service.importSims(id, body);
+  const result = await service.importSims(id, validation.data);
   return NextResponse.json(result);
 }
 
@@ -172,7 +237,7 @@ export async function deletePurchaseOrderImage(
 
   // フィールド名を取得
   const fieldName = imageTypeFieldMap[imageType];
-  const imageUrl = order[fieldName];
+  const imageUrl = (order as unknown as Record<string, unknown>)[fieldName] as string | null;
 
   if (!imageUrl) {
     return NextResponse.json(
@@ -184,15 +249,8 @@ export async function deletePurchaseOrderImage(
   // 画像を削除
   await imageService.deleteImage(imageUrl, id);
 
-  // データベースを更新
-  const updatedOrder = await procurementService.updateImagePath(
-    id,
-    fieldName,
-    null as any // nullで画像パスをクリア
-  );
-
-  // nullを設定するために、直接updateする
-  const finalOrder = await prisma.purchaseOrder.update({
+  // データベースを更新（画像パスをnullにクリア）
+  const updatedOrder = await prisma.purchaseOrder.update({
     where: { id },
     data: {
       [fieldName]: null,
@@ -209,7 +267,7 @@ export async function deletePurchaseOrderImage(
     },
   });
 
-  return NextResponse.json(finalOrder);
+  return NextResponse.json(updatedOrder);
 }
 
 /**

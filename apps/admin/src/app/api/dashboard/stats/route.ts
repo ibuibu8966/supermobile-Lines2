@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@repo/database";
+import { prisma } from "@/lib/database";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +10,18 @@ export async function GET() {
       // 1. 概要統計（3つのCOUNT）
       prisma.$queryRaw<Array<{ in_stock: bigint; active: bigint; returned: bigint }>>`
         SELECT
-          (SELECT COUNT(*) FROM "Sim" WHERE status = 'IN_STOCK') as in_stock,
+          (
+            -- IN_STOCK: 回線なし or 最新回線がACTIVATED/SHIPPED以外
+            SELECT COUNT(*) FROM "Sim" s
+            WHERE NOT EXISTS (
+              SELECT 1 FROM "ApplicationLine" al
+              WHERE al."simId" = s.iccid
+                AND al.status IN ('ACTIVATED', 'SHIPPED')
+                AND al."updatedAt" = (
+                  SELECT MAX(al2."updatedAt") FROM "ApplicationLine" al2 WHERE al2."simId" = s.iccid
+                )
+            )
+          ) as in_stock,
           (SELECT COUNT(*) FROM "ApplicationLine" WHERE status = 'ACTIVATED') as active,
           (SELECT COUNT(*) FROM "ApplicationLine" WHERE status = 'RETURNED') as returned
       `,

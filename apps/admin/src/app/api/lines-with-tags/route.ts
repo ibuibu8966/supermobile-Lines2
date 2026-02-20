@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@repo/database";
+import { prisma } from "@/lib/database";
 import { LineService } from "@/services/line.service";
 import { LineRepository } from "@/repositories/line.repository";
 import { TagCrudService } from "@/services/tag-crud.service";

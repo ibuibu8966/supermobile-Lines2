@@ -1,5 +1,5 @@
-import { prisma } from "@repo/database";
-import { getServicePlans } from "@repo/shared";
+import { prisma } from "@/lib/database";
+import { getServicePlans } from "@/lib";
 
 export const dynamic = "force-dynamic";
 

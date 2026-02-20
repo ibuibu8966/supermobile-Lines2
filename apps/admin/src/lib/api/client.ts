@@ -120,4 +120,8 @@ export const api = {
     fetchJson<unknown>(`/api/lines?${params?.toString() || "page=1"}`),
   getLinesWithTags: (params?: URLSearchParams): Promise<unknown> =>
     fetchJson<unknown>(`/api/lines-with-tags?${params?.toString() || "page=1"}`),
+  getInStockIccids: (): Promise<{ iccids: string[] }> =>
+    fetchJson<{ iccids: string[] }>("/api/sims/in-stock-iccids"),
+  getApplicationById: (id: string): Promise<unknown> =>
+    fetchJson<unknown>(`/api/applications/${id}`),
 };

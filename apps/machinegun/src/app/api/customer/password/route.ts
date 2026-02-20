@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
 import { auth } from "@/auth";
-import { prisma } from "@repo/database";
-import { hashPassword, verifyPassword } from "@repo/auth";
-import { changePassword } from "@repo/shared";
+import { prisma } from "@/lib/database";
+import { hashPassword, verifyPassword } from "@/lib/auth/config";
+import { changePassword } from "@/lib";
 
 export const dynamic = "force-dynamic";
 

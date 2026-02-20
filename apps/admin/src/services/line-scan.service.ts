@@ -5,7 +5,7 @@
  */
 
 import { PrismaClient } from '@prisma/client';
-import { LineScanInput, LineScanResult } from '@repo/entities';
+import { LineScanInput, LineScanResult } from '@/entities';
 import { logger } from '../shared/utils/logger';
 import { NotFoundError, ValidationError } from '../shared/errors/custom-errors';
 
@@ -63,7 +63,6 @@ export class LineScanService {
     });
 
     const simMap = new Map(sims.map((s) => [s.iccid, s]));
-    const errors: string[] = [];
     const warnings: string[] = [];
 
     for (const iccid of uniqueIccids) {
@@ -71,14 +70,7 @@ export class LineScanService {
       if (!sim) {
         // SIMが存在しない場合は警告のみ（エラーにしない）
         warnings.push(`ICCID ${iccid} はSIMマスタに未登録です`);
-      } else if (sim.status !== 'IN_STOCK') {
-        // SIMが存在するが在庫状態でない場合はエラー
-        errors.push(`ICCID ${iccid} は在庫状態ではありません (${sim.status})`);
       }
-    }
-
-    if (errors.length > 0) {
-      throw new ValidationError(errors.join('\n'));
     }
 
     // 4. ビジネスルール: 割当数の確認
@@ -107,65 +99,92 @@ export class LineScanService {
       }
     }
 
-    // 6. トランザクションで一括更新（大量件数対応のため30秒タイムアウト）
-    const results = await this.prisma.$transaction(
-      async (tx) => {
-        const updatedLines = [];
+    // 6. トランザクションで一括更新（updateMany で N+1 を解消）
+    const assignedLineIds = notActivatedLines
+      .slice(0, uniqueIccids.length)
+      .map((l) => l.id);
 
-        for (let i = 0; i < uniqueIccids.length; i++) {
-          const iccid = uniqueIccids[i];
-          const line = notActivatedLines[i];
-          const sim = simMap.get(iccid);
+    // ICCID → 回線ID のマッピングを構築（iccidフィールドも保持して失敗時に特定できるようにする）
+    const lineUpdateData = uniqueIccids.map((iccid, i) => {
+      const line = notActivatedLines[i];
+      const sim = simMap.get(iccid);
+      return {
+        iccid,
+        lineId: line.id,
+        simId: sim ? iccid : null,
+        msisdn: sim?.msisdn || null,
+      };
+    });
 
-          // 回線にSIMを割当（SIMが存在する場合のみsimIdを設定）
-          const updatedLine = await tx.applicationLine.update({
-            where: { id: line.id },
-            data: {
-              simId: sim ? iccid : null,
-              msisdn: sim?.msisdn || null,
-              status: 'ACTIVATED',
-              contractMonth: input.contractMonth,
-              lineTagId: input.lineTagId,
-              lineReserveTagId: input.lineReserveTagId,
-            },
-            include: {
-              sim: {
-                include: {
-                  simLocationTag: true,
-                },
-              },
-              lineTag: true,
-              lineReserveTag: true,
-            },
-          });
+    // 100件チャンクに分けてトランザクション実行（Supabaseタイムアウト対策）
+    // チャンクごとに独立したトランザクションにすることで、1チャンク失敗しても他は成功を維持
+    const CHUNK_SIZE = 100;
+    const successLineIds: string[] = [];
+    const failedIccids: string[] = [];
 
-          // SIMが存在する場合のみステータスを更新
-          if (sim) {
-            await tx.sim.update({
-              where: { iccid },
-              data: { status: 'ACTIVE' },
-            });
-          }
+    for (let i = 0; i < lineUpdateData.length; i += CHUNK_SIZE) {
+      const chunk = lineUpdateData.slice(i, i + CHUNK_SIZE);
+      try {
+        await this.prisma.$transaction(
+          async (tx) => {
+            await Promise.all(
+              chunk.map(({ lineId, simId, msisdn }) =>
+                tx.applicationLine.update({
+                  where: { id: lineId },
+                  data: {
+                    simId,
+                    msisdn,
+                    status: 'ACTIVATED',
+                    contractMonth: input.contractMonth,
+                    lineTagId: input.lineTagId,
+                    lineReserveTagId: input.lineReserveTagId,
+                  },
+                })
+              )
+            );
+          },
+          { timeout: 30_000 }
+        );
+        successLineIds.push(...chunk.map(({ lineId }) => lineId));
+      } catch (err) {
+        // このチャンクは失敗 → 対象ICCIDを失敗リストに追加（次の中間登録で再送可能）
+        logger.error('チャンク登録失敗', { chunkStart: i, chunkSize: chunk.length, err });
+        failedIccids.push(...chunk.map(({ iccid }) => iccid));
+      }
+    }
 
-          updatedLines.push(updatedLine);
-        }
-
-        return updatedLines;
+    // 更新後の回線データを取得（include 付き）
+    const results = await this.prisma.applicationLine.findMany({
+      where: { id: { in: successLineIds } },
+      include: {
+        sim: {
+          include: {
+            simLocationTag: true,
+          },
+        },
+        lineTag: true,
+        lineReserveTag: true,
       },
-      { timeout: 30000 }
-    );
+      orderBy: { lineNumber: 'asc' },
+    });
 
     logger.info('ICCID一括割当完了', {
       applicationId,
       assignedCount: results.length,
+      failedCount: failedIccids.length,
       warningCount: warnings.length,
     });
 
+    const message = failedIccids.length > 0
+      ? `${results.length}件登録成功、${failedIccids.length}件失敗しました`
+      : `${results.length}件の回線にICCIDを割り当てました`;
+
     return {
-      message: `${results.length}件の回線にICCIDを割り当てました`,
+      message,
       assignedCount: results.length,
       lines: results,
       warnings: warnings.length > 0 ? warnings : undefined,
+      failedIccids: failedIccids.length > 0 ? failedIccids : undefined,
     };
   }
 }

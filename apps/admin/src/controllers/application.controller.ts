@@ -1,3 +1,4 @@
+import { PrismaClient } from '@prisma/client';
 /**
  * Application Controller
  *
@@ -9,7 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { ApplicationService } from '../services/application.service';
 import { ApplicationRepository } from '../repositories/application.repository';
-import { ApplicationUpdateInput, CustomerApplicationInput, CustomerInfo } from '@repo/entities';
+import { ApplicationUpdateInput, CustomerApplicationInput, CustomerInfo } from '@/entities';
 import { parsePaginationParams, parseBooleanParam } from '../shared/validators/validation';
 import { NotFoundError, ValidationError } from '../shared/errors/custom-errors';
 import { logger } from '../shared/utils/logger';
@@ -26,7 +27,7 @@ type AssertServiceAccess = (
  */
 export async function getAllApplications(
   request: NextRequest,
-  prisma: any,
+  prisma: PrismaClient,
   getAdminSession: GetAdminSession
 ): Promise<NextResponse> {
   // 1. 認証チェック
@@ -43,6 +44,9 @@ export async function getAllApplications(
     customerType: searchParams.get('customerType') || undefined,
     includeArchived: parseBooleanParam(searchParams.get('includeArchived')),
     archivedOnly: parseBooleanParam(searchParams.get('archivedOnly')),
+    addressStatus: searchParams.get('addressStatus') || undefined,
+    inoueCheck: searchParams.get('inoueCheck') || undefined,
+    assignedUserId: searchParams.get('assignedUserId') || undefined,
   };
 
   const pagination = parsePaginationParams(searchParams);
@@ -70,7 +74,7 @@ export async function getAllApplications(
  */
 export async function getApplicationById(
   id: string,
-  prisma: any,
+  prisma: PrismaClient,
   getAdminSession: GetAdminSession,
   assertServiceAccess: AssertServiceAccess,
   getSignedUrl?: (bucket: string, path: string) => Promise<string>
@@ -110,10 +114,19 @@ export async function getApplicationById(
     );
   }
 
-  // 5. レスポンス
+  // 5. 申込自身のkycImagesから有効期限を取得
+  const expiryDates = (application.kycImages ?? [])
+    .map((k) => k.expiryDate)
+    .filter((d): d is Date => d != null);
+  const latestExpiryDate = expiryDates.length > 0
+    ? expiryDates.reduce((a, b) => (a > b ? a : b))
+    : null;
+
+  // 6. レスポンス
   return NextResponse.json({
     ...application,
     kycImages: kycImagesWithUrls,
+    latestExpiryDate,
   });
 }
 
@@ -138,12 +151,20 @@ const updateApplicationSchema = z.object({
   comment2: z.string().max(1000).optional().nullable(),
   note: z.string().optional().nullable(),
   isArchived: z.boolean().optional(),
+  noReferral: z.boolean().optional(),
+  invoiceUrl: z.string().max(500).optional().nullable(),
+  inoueCheck: z.enum(['IN_PROGRESS', 'COMPLETED']).optional().nullable(),
+  assignedUserId: z.string().optional().nullable(),
+  lineCount: z.number().int().positive().optional(),
+  unitPrice: z.number().int().min(0).optional(),
+  couponCode: z.string().optional().nullable(),
+  couponId: z.string().optional().nullable(),
 });
 
 export async function updateApplication(
   id: string,
   request: NextRequest,
-  prisma: any,
+  prisma: PrismaClient,
   getAdminSession: GetAdminSession,
   assertServiceAccess: AssertServiceAccess
 ): Promise<NextResponse> {
@@ -154,7 +175,14 @@ export async function updateApplication(
 
   // 2. バリデーション
   const body = await request.json();
-  const validated = updateApplicationSchema.parse(body);
+  const appParseResult = updateApplicationSchema.safeParse(body);
+  if (!appParseResult.success) {
+    return NextResponse.json(
+      { error: 'バリデーションエラー', details: appParseResult.error.flatten() },
+      { status: 400 }
+    );
+  }
+  const validated = appParseResult.data;
 
   // 3. 存在確認と権限チェック
   const applicationService = new ApplicationService(
@@ -212,7 +240,7 @@ const customerInfoSchema = z.object({
 export async function createCustomerApplication(
   serviceCode: string,
   request: NextRequest,
-  prisma: any,
+  prisma: PrismaClient,
   hashPasswordFn: (password: string) => Promise<string>,
   uploadFileFn: (bucket: string, path: string, buffer: Buffer, contentType: string) => Promise<void>
 ): Promise<NextResponse> {
@@ -307,16 +335,11 @@ export async function createCustomerApplication(
       new ApplicationRepository(prisma)
     );
 
-    // @ts-expect-error createCustomerApplication is not implemented in ApplicationService
-    const result = await applicationService.createCustomerApplication(
-      serviceCode,
-      input,
-      hashPasswordFn,
-      uploadFileFn
+    // TODO: createCustomerApplication は未実装
+    return NextResponse.json(
+      { error: 'この機能は現在実装されていません' },
+      { status: 501 }
     );
-
-    // 6. レスポンス
-    return NextResponse.json(result, { status: 201 });
   } catch (error) {
     logger.logError('顧客申込作成エラー', error);
 
@@ -335,6 +358,133 @@ export async function createCustomerApplication(
   }
 }
 
+// ─── 紹介者 ───────────────────────────────────────────
+
+/**
+ * 紹介者追加コントローラー
+ */
+export async function addReferral(
+  id: string,
+  request: NextRequest,
+  prisma: PrismaClient,
+  getAdminSession: GetAdminSession
+): Promise<NextResponse> {
+  const sessionResult = await getAdminSession();
+  if (sessionResult instanceof NextResponse) return sessionResult;
+
+  const body = await request.json();
+  const { referrerName, fee } = body;
+
+  if (!referrerName || fee === undefined) {
+    return NextResponse.json({ error: 'referrerName と fee は必須です' }, { status: 400 });
+  }
+
+  const service = new ApplicationService(new ApplicationRepository(prisma));
+  const referral = await service.addReferral(id, String(referrerName), Number(fee));
+  return NextResponse.json(referral, { status: 201 });
+}
+
+/**
+ * 紹介者削除コントローラー
+ */
+export async function deleteReferral(
+  referralId: string,
+  prisma: PrismaClient,
+  getAdminSession: GetAdminSession
+): Promise<NextResponse> {
+  const sessionResult = await getAdminSession();
+  if (sessionResult instanceof NextResponse) return sessionResult;
+
+  const service = new ApplicationService(new ApplicationRepository(prisma));
+  await service.deleteReferral(referralId);
+  return new NextResponse(null, { status: 204 });
+}
+
+// ─── 追跡番号 ─────────────────────────────────────────
+
+/**
+ * 追跡番号追加コントローラー
+ */
+export async function addTracking(
+  id: string,
+  request: NextRequest,
+  prisma: PrismaClient,
+  getAdminSession: GetAdminSession
+): Promise<NextResponse> {
+  const sessionResult = await getAdminSession();
+  if (sessionResult instanceof NextResponse) return sessionResult;
+
+  const body = await request.json();
+  const { carrier, trackingNumber } = body;
+
+  if (!carrier || !trackingNumber) {
+    return NextResponse.json({ error: 'carrier と trackingNumber は必須です' }, { status: 400 });
+  }
+
+  const service = new ApplicationService(new ApplicationRepository(prisma));
+  const tracking = await service.addTracking(id, String(carrier), String(trackingNumber));
+  return NextResponse.json(tracking, { status: 201 });
+}
+
+/**
+ * 追跡番号削除コントローラー
+ */
+export async function deleteTracking(
+  trackingId: string,
+  prisma: PrismaClient,
+  getAdminSession: GetAdminSession
+): Promise<NextResponse> {
+  const sessionResult = await getAdminSession();
+  if (sessionResult instanceof NextResponse) return sessionResult;
+
+  const service = new ApplicationService(new ApplicationRepository(prisma));
+  await service.deleteTracking(trackingId);
+  return new NextResponse(null, { status: 204 });
+}
+
+// ─── ワークフロー画像 ─────────────────────────────────
+
+/**
+ * ワークフロー画像URL取得コントローラー
+ */
+export async function getWorkflowImageUrls(
+  id: string,
+  prisma: PrismaClient,
+  getAdminSession: GetAdminSession
+): Promise<NextResponse> {
+  const sessionResult = await getAdminSession();
+  if (sessionResult instanceof NextResponse) return sessionResult;
+
+  const service = new ApplicationService(new ApplicationRepository(prisma));
+  const urls = await service.getWorkflowImageUrls(id);
+  return NextResponse.json(urls);
+}
+
+/**
+ * ワークフロー画像アップロードコントローラー
+ */
+export async function uploadWorkflowImage(
+  id: string,
+  request: NextRequest,
+  prisma: PrismaClient,
+  getAdminSession: GetAdminSession
+): Promise<NextResponse> {
+  const sessionResult = await getAdminSession();
+  if (sessionResult instanceof NextResponse) return sessionResult;
+
+  const formData = await request.formData();
+  const file = formData.get('file') as File | null;
+  const imageType = formData.get('imageType') as string | null;
+
+  if (!file || !imageType) {
+    return NextResponse.json({ error: 'file と imageType は必須です' }, { status: 400 });
+  }
+
+  const service = new ApplicationService(new ApplicationRepository(prisma));
+  const result = await service.uploadWorkflowImage(id, imageType, file);
+  return NextResponse.json(result);
+}
+
 /**
  * 顧客申込一覧取得コントローラー
  *
@@ -343,7 +493,7 @@ export async function createCustomerApplication(
  * @returns 申込一覧
  */
 export async function getCustomerApplications(
-  prisma: any,
+  prisma: PrismaClient,
   getSessionFn: () => Promise<{ user?: { id?: string } } | null>
 ): Promise<NextResponse> {
   try {
@@ -359,13 +509,11 @@ export async function getCustomerApplications(
       new ApplicationRepository(prisma)
     );
 
-    // @ts-expect-error getCustomerApplications is not implemented in ApplicationService
-    const applications = await applicationService.getCustomerApplications(
-      session.user.id
+    // TODO: getCustomerApplications は未実装
+    return NextResponse.json(
+      { error: 'この機能は現在実装されていません' },
+      { status: 501 }
     );
-
-    // 3. レスポンス
-    return NextResponse.json({ applications });
   } catch (error) {
     logger.logError('顧客申込一覧取得エラー', error);
 

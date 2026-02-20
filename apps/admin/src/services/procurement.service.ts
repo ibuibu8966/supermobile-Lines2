@@ -7,7 +7,7 @@
 import { PrismaClient } from '@prisma/client';
 import { logger } from '../shared/utils/logger';
 import { ValidationError, NotFoundError } from '../shared/errors/custom-errors';
-import { ProcurementRepository } from '../repositories/procurement.repository';
+import { ProcurementRepository, PurchaseOrderWithRelations } from '../repositories/procurement.repository';
 
 export interface CreatePurchaseOrderInput {
   supplierId: number;
@@ -40,7 +40,7 @@ export class ProcurementService {
   /**
    * 発注一覧を取得
    */
-  async getAllPurchaseOrders(): Promise<any[]> {
+  async getAllPurchaseOrders(): Promise<PurchaseOrderWithRelations[]> {
     logger.info('発注一覧取得開始');
 
     const orders = await this.repository.findMany();
@@ -57,7 +57,7 @@ export class ProcurementService {
    * - 各lineにcarrierType, quantity, unitPriceが必要
    * - totalAmountが未指定の場合は自動計算
    */
-  async createPurchaseOrder(input: CreatePurchaseOrderInput): Promise<any> {
+  async createPurchaseOrder(input: CreatePurchaseOrderInput): Promise<PurchaseOrderWithRelations> {
     logger.info('発注作成開始', { supplierId: input.supplierId });
 
     // バリデーション
@@ -102,7 +102,7 @@ export class ProcurementService {
   /**
    * 発注を取得
    */
-  async getPurchaseOrderById(id: string): Promise<any> {
+  async getPurchaseOrderById(id: string): Promise<PurchaseOrderWithRelations> {
     logger.info('発注取得', { id });
 
     const order = await this.repository.findById(id);
@@ -119,7 +119,7 @@ export class ProcurementService {
    * ビジネスルール:
    * - status, invoiceDate, deliveryDate, totalAmountのみ更新可能
    */
-  async updatePurchaseOrder(id: string, input: UpdatePurchaseOrderInput): Promise<any> {
+  async updatePurchaseOrder(id: string, input: UpdatePurchaseOrderInput): Promise<PurchaseOrderWithRelations> {
     logger.info('発注更新開始', { id });
 
     // 存在確認
@@ -128,7 +128,12 @@ export class ProcurementService {
       throw new NotFoundError('発注', id);
     }
 
-    const updateData: any = {};
+    const updateData: {
+      status?: string;
+      invoiceDate?: Date | null;
+      deliveryDate?: Date | null;
+      totalAmount?: number;
+    } = {};
 
     if (input.status !== undefined) {
       updateData.status = input.status;
@@ -156,7 +161,7 @@ export class ProcurementService {
   /**
    * 発注の画像パスを更新
    */
-  async updateImagePath(id: string, fieldName: string, url: string): Promise<any> {
+  async updateImagePath(id: string, fieldName: string, url: string): Promise<PurchaseOrderWithRelations> {
     logger.info('発注画像パス更新', { id, fieldName });
 
     // 存在確認

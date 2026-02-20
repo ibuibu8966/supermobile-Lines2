@@ -4,9 +4,10 @@
  * KYC確認に関するビジネスロジックを担当
  */
 
-import { KycListResult } from '@repo/entities';
+import { KycListResult } from '@/entities';
 import { NotFoundError } from '../shared/errors/custom-errors';
 import { logger } from '../shared/utils/logger';
+import { KycImageStatus } from '@prisma/client';
 import type { PrismaClient } from '@prisma/client';
 
 export class KycService {
@@ -57,7 +58,7 @@ export class KycService {
           customer: true,
           plan: true,
           kycImages: {
-            where: statusParam ? { status: statusParam as any } : undefined,
+            where: statusParam ? { status: statusParam as KycImageStatus } : undefined,
             orderBy: { createdAt: 'desc' },
           },
         },

@@ -4,7 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { Button, cn } from "@repo/ui";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/components/ui/lib/utils";
 import { DashboardProvider } from "./context";
 import {
   LayoutDashboard,

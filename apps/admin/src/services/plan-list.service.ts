@@ -2,8 +2,8 @@
  * Plan list service
  */
 
-import { PrismaClient } from "@repo/database";
-import { PlanListResult } from "@repo/entities";
+import { PrismaClient } from "@/lib/database";
+import { PlanListResult } from "@/entities";
 import { NotFoundError } from "@/shared/errors/custom-errors";
 import { logger } from "@/shared/utils/logger";
 

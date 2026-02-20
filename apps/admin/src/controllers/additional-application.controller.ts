@@ -3,7 +3,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient } from "@repo/database";
+import { PrismaClient } from "@/lib/database";
 import { ApplicationService } from "@/services/application.service";
 import { ApplicationRepository } from "@/repositories/application.repository";
 import { z } from "zod";
@@ -41,12 +41,11 @@ export async function createAdditionalApplication(
 
     const data = validation.data;
 
-    // Create additional application
-    const service = new ApplicationService(new ApplicationRepository(prisma));
-    // @ts-expect-error createAdditionalApplication is not implemented in ApplicationService
-    const result = await service.createAdditionalApplication(session.user.id, data);
-
-    return NextResponse.json(result);
+    // TODO: createAdditionalApplication は未実装
+    return NextResponse.json(
+      { error: 'この機能は現在実装されていません' },
+      { status: 501 }
+    );
   } catch (error) {
     return handleApiError(error);
   }

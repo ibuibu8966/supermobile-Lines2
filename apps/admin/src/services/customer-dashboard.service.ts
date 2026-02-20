@@ -2,8 +2,8 @@
  * Customer dashboard service
  */
 
-import { PrismaClient } from "@repo/database";
-import { CustomerDashboardResult } from "@repo/entities";
+import { PrismaClient } from "@/lib/database";
+import { CustomerDashboardResult } from "@/entities";
 import { logger } from "@/shared/utils/logger";
 
 export class CustomerDashboardService {
@@ -58,9 +58,31 @@ export class CustomerDashboardService {
     });
 
     return {
-      customer: customer as any,
-      applications: applications as any,
+      customer: {
+        id: customer.id,
+        companyName: customer.companyName ?? null,
+        email: customer.email,
+        phone: customer.phone,
+      },
+      applications: applications.map((app) => ({
+        id: app.id,
+        applicationNumber: app.applicationNumber,
+        status: app.status,
+        lineCount: app.lineCount,
+        totalAmount: app.totalAmount,
+        createdAt: app.createdAt,
+        updatedAt: app.updatedAt,
+        plan: {
+          id: app.plan.id,
+          name: app.plan.name,
+        },
+        lines: app.lines.map((l) => ({
+          id: l.id,
+          msisdn: l.msisdn ?? null,
+          status: l.status,
+        })),
+      })),
       lineStats,
-    };
+    } as CustomerDashboardResult;
   }
 }

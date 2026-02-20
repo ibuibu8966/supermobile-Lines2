@@ -2,8 +2,8 @@
  * Coupon validation service
  */
 
-import { PrismaClient } from "@repo/database";
-import { CouponValidationRequest, CouponValidationResult } from "@repo/entities";
+import { PrismaClient } from "@/lib/database";
+import { CouponValidationRequest, CouponValidationResult } from "@/entities";
 import { logger } from "@/shared/utils/logger";
 
 export class CouponValidationService {

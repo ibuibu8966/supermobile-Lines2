@@ -1,33 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  Button,
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  Textarea,
-} from "@repo/ui";
-import { Phone, AlertTriangle, Loader2 } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Phone, Loader2 } from "lucide-react";
 
 interface Line {
   id: string;
@@ -48,10 +25,6 @@ export default function LinesPage() {
   const [lines, setLines] = useState<Line[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("all");
-  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
-  const [selectedLine, setSelectedLine] = useState<Line | null>(null);
-  const [cancelReason, setCancelReason] = useState("");
-  const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
     fetchLines();
@@ -71,63 +44,42 @@ export default function LinesPage() {
     }
   };
 
-  const handleCancelRequest = async () => {
-    if (!selectedLine) return;
-
-    setCancelling(true);
-    try {
-      const res = await fetch("/api/customer/cancel", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          lineId: selectedLine.id,
-          reason: cancelReason,
-        }),
-      });
-
-      if (res.ok) {
-        await fetchLines();
-        setCancelDialogOpen(false);
-        setSelectedLine(null);
-        setCancelReason("");
-      } else {
-        const data = await res.json();
-        alert(data.error || "解約申請に失敗しました");
-      }
-    } catch (error) {
-      alert("解約申請に失敗しました");
-    } finally {
-      setCancelling(false);
-    }
-  };
-
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "ACTIVATED":
-      case "SHIPPED":
         return (
           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
-            契約中
+            開通済み
           </span>
         );
-      case "PENDING":
+      case "SHIPPED":
+        return (
+          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+            発送済み
+          </span>
+        );
+      case "SHIPPING_INSTRUCTED":
+        return (
+          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border border-muted text-muted-foreground">
+            発送指示済み
+          </span>
+        );
       case "NOT_ACTIVATED":
         return (
           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">
-            処理中
+            未開通
+          </span>
+        );
+      case "RETURNED":
+        return (
+          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">
+            返却済み
           </span>
         );
       case "CANCELLED":
-      case "RETURNED":
         return (
           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">
-            解約済み
-          </span>
-        );
-      case "CANCEL_REQUESTED":
-        return (
-          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
-            解約申請中
+            解約
           </span>
         );
       default:
@@ -142,15 +94,11 @@ export default function LinesPage() {
   const filteredLines = lines.filter((line) => {
     if (activeTab === "all") return true;
     if (activeTab === "active")
-      return line.status === "ACTIVATED" || line.status === "SHIPPED";
+      return line.status === "ACTIVATED" || line.status === "SHIPPED" || line.status === "SHIPPING_INSTRUCTED";
     if (activeTab === "cancelled")
       return line.status === "CANCELLED" || line.status === "RETURNED";
     return true;
   });
-
-  const canCancel = (status: string) => {
-    return status === "ACTIVATED" || status === "SHIPPED";
-  };
 
   if (loading) {
     return (
@@ -198,9 +146,8 @@ export default function LinesPage() {
                         <TableHead className="min-w-[110px]">電話番号</TableHead>
                         <TableHead className="min-w-[100px]">プラン</TableHead>
                         <TableHead className="min-w-[100px]">申込番号</TableHead>
-                        <TableHead className="min-w-[90px]">契約日</TableHead>
-                        <TableHead className="min-w-[90px]">ステータス</TableHead>
-                        <TableHead className="min-w-[80px]"></TableHead>
+                        <TableHead className="min-w-[90px]">申込日</TableHead>
+                        <TableHead className="min-w-[100px]">ステータス</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -214,101 +161,9 @@ export default function LinesPage() {
                             {line.application.applicationNumber}
                           </TableCell>
                           <TableCell className="text-muted-foreground">
-                            {line.shippedAt
-                              ? new Date(line.shippedAt).toLocaleDateString(
-                                  "ja-JP"
-                                )
-                              : new Date(
-                                  line.application.createdAt
-                                ).toLocaleDateString("ja-JP")}
+                            {new Date(line.application.createdAt).toLocaleDateString("ja-JP")}
                           </TableCell>
                           <TableCell>{getStatusBadge(line.status)}</TableCell>
-                          <TableCell>
-                            {canCancel(line.status) && (
-                              <Dialog
-                                open={
-                                  cancelDialogOpen && selectedLine?.id === line.id
-                                }
-                                onOpenChange={(open) => {
-                                  setCancelDialogOpen(open);
-                                  if (open) {
-                                    setSelectedLine(line);
-                                  } else {
-                                    setSelectedLine(null);
-                                    setCancelReason("");
-                                  }
-                                }}
-                              >
-                                <DialogTrigger asChild>
-                                  <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50">
-                                    解約申請
-                                  </Button>
-                                </DialogTrigger>
-                                <DialogContent>
-                                  <DialogHeader>
-                                    <DialogTitle className="flex items-center gap-2">
-                                      <AlertTriangle className="h-5 w-5 text-yellow-500" />
-                                      解約申請
-                                    </DialogTitle>
-                                    <DialogDescription>
-                                      以下の回線の解約を申請します。
-                                    </DialogDescription>
-                                  </DialogHeader>
-                                  <div className="space-y-4 py-4">
-                                    <div className="p-4 bg-muted rounded-lg">
-                                      <p className="text-sm text-muted-foreground">
-                                        電話番号
-                                      </p>
-                                      <p className="font-medium">
-                                        {line.msisdn || "-"}
-                                      </p>
-                                      <p className="text-sm text-muted-foreground mt-2">
-                                        プラン
-                                      </p>
-                                      <p className="font-medium">
-                                        {line.application.plan.name}
-                                      </p>
-                                    </div>
-                                    <div>
-                                      <label className="text-sm font-medium">
-                                        解約理由（任意）
-                                      </label>
-                                      <Textarea
-                                        value={cancelReason}
-                                        onChange={(e) =>
-                                          setCancelReason(e.target.value)
-                                        }
-                                        placeholder="解約理由をご記入ください"
-                                        className="mt-1"
-                                      />
-                                    </div>
-                                  </div>
-                                  <DialogFooter>
-                                    <Button
-                                      variant="outline"
-                                      onClick={() => setCancelDialogOpen(false)}
-                                    >
-                                      キャンセル
-                                    </Button>
-                                    <Button
-                                      variant="destructive"
-                                      onClick={handleCancelRequest}
-                                      disabled={cancelling}
-                                    >
-                                      {cancelling ? (
-                                        <>
-                                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                          処理中...
-                                        </>
-                                      ) : (
-                                        "解約を申請する"
-                                      )}
-                                    </Button>
-                                  </DialogFooter>
-                                </DialogContent>
-                              </Dialog>
-                            )}
-                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

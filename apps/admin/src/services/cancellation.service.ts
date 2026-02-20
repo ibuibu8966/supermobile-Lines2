@@ -4,7 +4,7 @@
  * 解約申請に関するビジネスロジックを担当
  */
 
-import { CancellationRequest, CancellationResult } from '@repo/entities';
+import { CancellationRequest, CancellationResult } from '@/entities';
 import { ValidationError, NotFoundError } from '../shared/errors/custom-errors';
 import { logger } from '../shared/utils/logger';
 import type { PrismaClient } from '@prisma/client';

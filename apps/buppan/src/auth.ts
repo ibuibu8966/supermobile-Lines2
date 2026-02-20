@@ -2,8 +2,8 @@ import NextAuth from "next-auth";
 import type { NextAuthConfig } from "next-auth";
 import type { Session } from "next-auth";
 import type { NextURL } from "next/dist/server/web/next-url";
-import { createAuthConfig } from "@repo/auth";
-import { prisma } from "@repo/database";
+import { createAuthConfig } from "@/lib/auth/config";
+import { prisma } from "@/lib/database";
 
 const authConfig = createAuthConfig(prisma);
 
@@ -48,7 +48,7 @@ const buppanAuthConfig: NextAuthConfig = {
 
       if (isAdminPage || isAdminApi) {
         if (!isLoggedIn) {
-          return false;
+          return Response.redirect(new URL(`/login?callbackUrl=${encodeURIComponent(nextUrl.pathname)}`, nextUrl));
         }
         const user = auth?.user;
         // ADMIN または SUPER_ADMIN のみアクセス可能
@@ -63,7 +63,10 @@ const buppanAuthConfig: NextAuthConfig = {
       const isCustomerApi = pathname.startsWith("/api/customer");
 
       if (isCustomerPage || isCustomerApi) {
-        return isLoggedIn;
+        if (!isLoggedIn) {
+          return Response.redirect(new URL(`/login?callbackUrl=${encodeURIComponent(nextUrl.pathname)}`, nextUrl));
+        }
+        return true;
       }
 
       // 認証ページ
@@ -75,7 +78,10 @@ const buppanAuthConfig: NextAuthConfig = {
       }
 
       // その他のページは認証必須
-      return isLoggedIn;
+      if (!isLoggedIn) {
+        return Response.redirect(new URL(`/login?callbackUrl=${encodeURIComponent(nextUrl.pathname)}`, nextUrl));
+      }
+      return true;
     },
   },
 };

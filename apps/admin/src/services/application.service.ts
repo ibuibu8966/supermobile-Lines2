@@ -6,7 +6,10 @@
  */
 
 import { ApplicationRepository, ApplicationFilters } from '../repositories/application.repository';
-import { ApplicationWithRelations, ApplicationCreateInput, ApplicationUpdateInput } from '@repo/entities';
+import { ApplicationWithRelations, ApplicationCreateInput, ApplicationUpdateInput } from '@/entities';
+import { supabaseAdmin } from '../lib/supabase/client';
+import { STORAGE_CONFIG } from '../lib/storage/constants';
+import { supabaseStorage } from '../lib/storage/supabase-storage';
 import { PaginationInfo, createPaginationInfo } from '../shared/utils/helpers';
 import { logger } from '../shared/utils/logger';
 import { NotFoundError, ValidationError } from '../shared/errors/custom-errors';
@@ -46,16 +49,57 @@ export class ApplicationService {
 
     logger.debug('Repository取得完了', { count: applications.length, total });
 
+    // 顧客ごとの申込順番・KYC要確認判定を計算（全申込をcreatedAt昇順で取得）
+    const customerIds = [...new Set(applications.map((a) => a.customerId))];
+    const allCustomerApps = await this.applicationRepo.findByCustomerIds(customerIds);
+
+    const ordinalMap: Record<string, number> = {};
+    const appExpiryMap: Record<string, Date | null> = {};
+    const needsKycCheckMap: Record<string, boolean> = {};
+    const customerSeq: Record<string, number> = {};
+    const prevExpiryMap: Record<string, Date | null> = {};
+
+    for (const app of allCustomerApps) {
+      const cid = app.customerId;
+      customerSeq[cid] = (customerSeq[cid] || 0) + 1;
+      ordinalMap[app.id] = customerSeq[cid];
+
+      // この申込自身のkycImagesから最新の有効期限を取得
+      const appExpiry = app.kycImages
+        .map((k) => k.expiryDate)
+        .filter((d): d is Date => d != null)
+        .sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
+      appExpiryMap[app.id] = appExpiry;
+
+      // 要確認判定: 初回 or 前回とexpiryDateが変わった
+      const isFirst = customerSeq[cid] === 1;
+      const prevExpiry = prevExpiryMap[cid] ?? null;
+      needsKycCheckMap[app.id] = isFirst
+        || (appExpiry !== null && prevExpiry !== null && appExpiry.getTime() !== prevExpiry.getTime())
+        || (appExpiry !== null && prevExpiry === null);
+
+      if (appExpiry) prevExpiryMap[cid] = appExpiry;
+    }
+
     // 統計情報を計算
-    const applicationsWithStats = applications.map((app: any) => {
-      const lines = app.lines || [];
-      const stats = {
-        lineCount: lines.length,
-        shippedCount: lines.filter((l: any) => l.status === 'SHIPPED' || l.status === 'ARRIVED' || l.status === 'ACTIVATED').length,
-        notActivatedCount: lines.filter((l: any) => l.status === 'SHIPPED' || l.status === 'ARRIVED').length,
-        returnedCount: lines.filter((l: any) => l.status === 'RETURNED').length,
+    const applicationsWithStats = applications.map((app: ApplicationWithRelations) => {
+      const lines: { status: string }[] = (app.lines as { status: string }[]) || [];
+      const statuses = lines.map((l) => l.status);
+      const uniqueStatuses = [...new Set(statuses)];
+      const lineStatus = lines.length > 0 && uniqueStatuses.length === 1 ? uniqueStatuses[0] : null;
+      return {
+        ...app,
+        stats: {
+          lineCount: lines.length,
+          shippedCount: lines.filter((l) => l.status === 'SHIPPED' || l.status === 'ARRIVED' || l.status === 'ACTIVATED').length,
+          notActivatedCount: lines.filter((l) => l.status === 'SHIPPED' || l.status === 'ARRIVED').length,
+          returnedCount: lines.filter((l) => l.status === 'RETURNED').length,
+          lineStatus,
+        },
+        applicationOrdinal: ordinalMap[app.id] ?? 1,
+        latestExpiryDate: appExpiryMap[app.id] ?? null,
+        needsKycCheck: needsKycCheckMap[app.id] ?? true,
       };
-      return { ...app, stats };
     });
 
     // ページネーション情報生成
@@ -118,17 +162,103 @@ export class ApplicationService {
   ): Promise<ApplicationWithRelations> {
     logger.info('申込更新開始', { id, data });
 
-    // 存在確認
-    const existing = await this.applicationRepo.findById(id);
-    if (!existing) {
-      throw new NotFoundError('申し込み');
-    }
-
-    // 更新実行
+    // 更新実行（存在確認はコントローラー側で実施済み）
     const updated = await this.applicationRepo.update(id, data);
 
     logger.info('申込更新完了', { id });
 
     return updated;
+  }
+
+  // ─── 紹介者 ───────────────────────────────────────────
+
+  async addReferral(applicationId: string, referrerName: string, fee: number) {
+    return await this.applicationRepo.addReferral(applicationId, referrerName, fee);
+  }
+
+  async deleteReferral(referralId: string) {
+    return await this.applicationRepo.deleteReferral(referralId);
+  }
+
+  // ─── 追跡番号 ─────────────────────────────────────────
+
+  async addTracking(applicationId: string, carrier: string, trackingNumber: string) {
+    return await this.applicationRepo.addTracking(applicationId, carrier, trackingNumber);
+  }
+
+  async deleteTracking(trackingId: string) {
+    return await this.applicationRepo.deleteTracking(trackingId);
+  }
+
+  // ─── ワークフロー画像 ─────────────────────────────────
+
+  /**
+   * ワークフロー画像のpublicURLを取得
+   */
+  async getWorkflowImageUrls(applicationId: string): Promise<{
+    invoicePdf: string | null;
+    invoiceEmail: string | null;
+    payment: string | null;
+    shipping: string | null;
+  }> {
+    const paths = await this.applicationRepo.findWorkflowImagePaths(applicationId);
+    if (!paths) throw new NotFoundError('申し込み');
+
+    const toUrl = (path: string | null): string | null => {
+      if (!path) return null;
+      const { data } = supabaseAdmin.storage
+        .from(STORAGE_CONFIG.BUCKET_NAME)
+        .getPublicUrl(path);
+      return data.publicUrl;
+    };
+
+    return {
+      invoicePdf: toUrl(paths.invoicePdfPath),
+      invoiceEmail: toUrl(paths.invoiceEmailPath),
+      payment: toUrl(paths.paymentImagePath),
+      shipping: toUrl(paths.shippingImagePath),
+    };
+  }
+
+  /**
+   * ワークフロー画像をアップロードしてDBパスを更新
+   */
+  async uploadWorkflowImage(
+    applicationId: string,
+    imageType: string,
+    file: File
+  ): Promise<{ path: string; url: string }> {
+    const fieldMap: Record<string, string> = {
+      invoicePdf: 'invoicePdfPath',
+      invoiceEmail: 'invoiceEmailPath',
+      payment: 'paymentImagePath',
+      shipping: 'shippingImagePath',
+    };
+
+    const dbField = fieldMap[imageType];
+    if (!dbField) throw new ValidationError('無効な imageType です');
+
+    // 既存パスを取得して古いファイルを削除
+    const existing = await this.applicationRepo.findWorkflowImagePaths(applicationId);
+    if (!existing) throw new NotFoundError('申し込み');
+
+    const existingPath = (existing as Record<string, string | null>)[dbField];
+    if (existingPath) {
+      try { await supabaseStorage.deleteFile(existingPath); } catch { /* 削除失敗は無視 */ }
+    }
+
+    // アップロード
+    const filePath = supabaseStorage.generateFilePath(applicationId, imageType, file.name);
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const uploadResult = await supabaseStorage.uploadFile(filePath, buffer, file.type);
+
+    if (!uploadResult.success || !uploadResult.url) {
+      throw new Error(uploadResult.error || 'アップロード失敗');
+    }
+
+    // DBに保存
+    await this.applicationRepo.updateWorkflowImagePath(applicationId, dbField, filePath);
+
+    return { path: filePath, url: uploadResult.url };
   }
 }

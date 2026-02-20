@@ -1,3 +1,4 @@
+import { PrismaClient } from '@prisma/client';
 /**
  * KYC Image Controller
  *
@@ -25,7 +26,7 @@ const updateKycImageSchema = z.object({
  */
 export async function getKycImageDetail(
   id: string,
-  prisma: any,
+  prisma: PrismaClient,
   getSignedUrlFn: (bucket: string, path: string) => Promise<string>
 ): Promise<NextResponse> {
   try {
@@ -67,13 +68,20 @@ export async function getKycImageDetail(
 export async function updateKycImage(
   id: string,
   request: NextRequest,
-  prisma: any
+  prisma: PrismaClient
 ): Promise<NextResponse> {
   logger.info('KYC画像更新開始', { id });
 
   // 1. バリデーション
   const body = await request.json();
-  const validated = updateKycImageSchema.parse(body);
+  const parseResult = updateKycImageSchema.safeParse(body);
+  if (!parseResult.success) {
+    return NextResponse.json(
+      { error: 'バリデーションエラー', details: parseResult.error.flatten() },
+      { status: 400 }
+    );
+  }
+  const validated = parseResult.data;
 
   // 2. Service呼び出し
   const kycImageService = new KycImageService(new KycImageRepository(prisma));
@@ -89,7 +97,7 @@ export async function updateKycImage(
  */
 export async function getKycImages(
   applicationId: string,
-  prisma: any
+  prisma: PrismaClient
 ): Promise<NextResponse> {
   try {
     const application = await prisma.application.findUnique({
@@ -132,12 +140,19 @@ const kycImageSchema = z.object({
 export async function createKycImage(
   applicationId: string,
   request: NextRequest,
-  prisma: any
+  prisma: PrismaClient
 ): Promise<NextResponse> {
-  try {
-    const body = await request.json();
-    const validated = kycImageSchema.parse(body);
+  const body = await request.json();
+  const kycParseResult = kycImageSchema.safeParse(body);
+  if (!kycParseResult.success) {
+    return NextResponse.json(
+      { error: 'バリデーションエラー', details: kycParseResult.error.flatten() },
+      { status: 400 }
+    );
+  }
+  const validated = kycParseResult.data;
 
+  try {
     // 申込の存在確認
     const application = await prisma.application.findUnique({
       where: { id: applicationId },
@@ -182,12 +197,6 @@ export async function createKycImage(
 
     return NextResponse.json(kycImage, { status: existingImage ? 200 : 201 });
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: error.issues.map((e) => e.message).join(', ') },
-        { status: 400 }
-      );
-    }
     logger.logError('KYC画像登録エラー', error);
     return NextResponse.json(
       { error: 'KYC画像の登録に失敗しました' },

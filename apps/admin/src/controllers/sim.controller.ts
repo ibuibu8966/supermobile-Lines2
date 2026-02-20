@@ -1,3 +1,4 @@
+import { PrismaClient } from '@prisma/client';
 /**
  * Sim Controller
  *
@@ -7,8 +8,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { SimService } from '../services/sim.service';
-import { SimRepository, SimFilters } from '../repositories/sim.repository';
-import { SimUpdateInput } from '@repo/entities';
+import { SimRepository, SimFilters, SimIccidValidation } from '../repositories/sim.repository';
+import { SimUpdateInput } from '@/entities';
 import { parsePaginationParams, safeParseInt } from '../shared/validators/validation';
 import { logger } from '../shared/utils/logger';
 import { NotFoundError } from '../shared/errors/custom-errors';
@@ -23,9 +24,6 @@ const updateSimSchema = z.object({
   isMnpEligible: z.boolean().optional(),
   isAutoCancel: z.boolean().optional(),
   autoCancelDate: z.coerce.date().optional().nullable(),
-  mnpReservationNumber: z.string().max(20).optional().nullable(),
-  mnpExpiryDate: z.coerce.date().optional().nullable(),
-  status: z.enum(['IN_STOCK', 'ACTIVE', 'RETURNING', 'RETIRED', 'CANCELLED']).optional(),
   simLocationTagId: z.number().int().positive().optional().nullable(),
   eligibleTagIds: z.array(z.number().int()).optional(),
 });
@@ -35,7 +33,7 @@ const updateSimSchema = z.object({
  */
 export async function getAllSims(
   request: NextRequest,
-  prisma: any
+  prisma: PrismaClient
 ): Promise<NextResponse> {
   // 1. パラメータパース
   const searchParams = request.nextUrl.searchParams;
@@ -76,7 +74,7 @@ export async function getAllSims(
  */
 export async function getSimDetail(
   iccid: string,
-  prisma: any
+  prisma: PrismaClient
 ): Promise<NextResponse> {
   logger.info('SIM詳細取得開始', { iccid });
 
@@ -98,13 +96,20 @@ export async function getSimDetail(
 export async function updateSim(
   iccid: string,
   request: NextRequest,
-  prisma: any
+  prisma: PrismaClient
 ): Promise<NextResponse> {
   logger.info('SIM更新開始', { iccid });
 
   // 1. リクエストボディのパース & バリデーション
   const body = await request.json();
-  const validated = updateSimSchema.parse(body);
+  const parseResult = updateSimSchema.safeParse(body);
+  if (!parseResult.success) {
+    return NextResponse.json(
+      { error: 'バリデーションエラー', details: parseResult.error.flatten() },
+      { status: 400 }
+    );
+  }
+  const validated = parseResult.data;
 
   // 2. Service呼び出し
   const simService = new SimService(new SimRepository(prisma), prisma);
@@ -113,4 +118,32 @@ export async function updateSim(
   // 3. レスポンス
   logger.info('SIM更新完了', { iccid });
   return NextResponse.json(updated);
+}
+
+/**
+ * IN_STOCK SIM ICCIDリスト取得（IccidScanModal用プリフェッチ）
+ */
+export async function getInStockIccids(
+  prisma: PrismaClient
+): Promise<NextResponse> {
+  const repo = new SimRepository(prisma);
+  const iccids = await repo.findInStockIccids();
+  return NextResponse.json({ iccids });
+}
+
+/**
+ * GET /api/sims/in-stock-iccids?planId=xxx
+ * プランの用途タグに基づいてIN_STOCK SIMの検証情報を返す
+ */
+export async function getInStockIccidsWithValidation(
+  request: NextRequest,
+  prisma: PrismaClient
+): Promise<NextResponse> {
+  const planId = request.nextUrl.searchParams.get('planId');
+  if (!planId) {
+    return NextResponse.json({ error: 'planIdが必要です' }, { status: 400 });
+  }
+  const repo = new SimRepository(prisma);
+  const validation: Record<string, SimIccidValidation> = await repo.findInStockIccidsWithValidation(planId);
+  return NextResponse.json({ validation });
 }

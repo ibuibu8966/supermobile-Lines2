@@ -5,8 +5,8 @@
  * Prismaを使ってデータベース操作のみを担当
  */
 
-import { PrismaClient } from '@prisma/client';
-import { PlanWithRelations, PlanUpdateInput } from '@repo/entities';
+import { PrismaClient, Prisma } from '@prisma/client';
+import { PlanWithRelations, PlanUpdateInput } from '@/entities';
 import { logger } from '../shared/utils/logger';
 
 export interface PlanFilters {
@@ -88,7 +88,7 @@ export class PlanRepository {
 
     await this.prisma.plan.update({
       where: { id },
-      data: data as any,
+      data: data as Prisma.PlanUpdateInput,
     });
   }
 
@@ -202,7 +202,7 @@ export class PlanRepository {
   /**
    * プランを作成
    */
-  async create(data: any): Promise<PlanWithRelations> {
+  async create(data: Prisma.PlanUncheckedCreateInput): Promise<PlanWithRelations> {
     logger.debug('PlanRepository.create', { data });
 
     return await this.prisma.plan.create({

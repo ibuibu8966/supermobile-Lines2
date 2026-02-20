@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { prisma } from "@repo/database";
+import { prisma } from "@/lib/database";
 import { getServiceDetail, updateService, deleteService } from "@/controllers/service.controller";
 
 export const dynamic = "force-dynamic";

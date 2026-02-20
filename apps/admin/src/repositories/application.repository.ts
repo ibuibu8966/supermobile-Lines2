@@ -5,13 +5,13 @@
  * Prismaクエリのみを担当し、ビジネスロジックは含まない
  */
 
-import { Prisma } from '@prisma/client';
+import { PrismaClient, Prisma, $Enums } from '@prisma/client';
 import {
   ApplicationEntity,
   ApplicationWithRelations,
   ApplicationCreateInput,
   ApplicationUpdateInput,
-} from '@repo/entities';
+} from '@/entities';
 import { NotFoundError } from '../shared/errors/custom-errors';
 
 export interface ApplicationFilters {
@@ -21,10 +21,13 @@ export interface ApplicationFilters {
   customerType?: string;
   includeArchived?: boolean;
   archivedOnly?: boolean;
+  addressStatus?: string;
+  inoueCheck?: string;
+  assignedUserId?: string;
 }
 
 export class ApplicationRepository {
-  constructor(private prisma: any) {} // PrismaClientの型は実行時に注入
+  constructor(private prisma: PrismaClient) {}
 
   /**
    * フィルタ条件からWhereクエリを構築
@@ -56,7 +59,7 @@ export class ApplicationRepository {
 
     // ステータスフィルタ
     if (filters.status) {
-      where.status = filters.status as any;
+      where.status = filters.status as $Enums.ApplicationStatus;
     }
 
     // サービススコープ（ADMIN権限の場合）
@@ -69,8 +72,23 @@ export class ApplicationRepository {
     if (filters.customerType) {
       where.customer = {
         ...((where.customer as Record<string, unknown>) || {}),
-        type: filters.customerType as any,
+        type: filters.customerType as $Enums.CustomerType,
       };
+    }
+
+    // 住所確認フィルタ
+    if (filters.addressStatus) {
+      where.addressStatus = filters.addressStatus as $Enums.KycVerificationStatus;
+    }
+
+    // 井上確認フィルタ
+    if (filters.inoueCheck) {
+      where.inoueCheck = filters.inoueCheck;
+    }
+
+    // 担当者フィルタ
+    if (filters.assignedUserId) {
+      where.assignedUserId = filters.assignedUserId;
     }
 
     return where;
@@ -92,6 +110,9 @@ export class ApplicationRepository {
         select: {
           id: true,
           applicationNumber: true,
+          serviceId: true,
+          planId: true,
+          customerId: true,
           status: true,
           kycStatus: true,
           paymentStatus: true,
@@ -99,6 +120,7 @@ export class ApplicationRepository {
           lineCount: true,
           unitPrice: true,
           totalAmount: true,
+          note: true,
           comment1: true,
           comment2: true,
           isArchived: true,
@@ -135,6 +157,7 @@ export class ApplicationRepository {
           },
           lines: {
             select: {
+              id: true,
               status: true,
             },
           },
@@ -147,6 +170,39 @@ export class ApplicationRepository {
               expiryDate: true,
             },
           },
+          noReferral: true,
+          invoicePdfPath: true,
+          invoiceUrl: true,
+          invoiceEmailPath: true,
+          paymentImagePath: true,
+          shippingImagePath: true,
+          referrals: {
+            select: {
+              id: true,
+              referrerName: true,
+              fee: true,
+            },
+          },
+          trackings: {
+            select: {
+              id: true,
+              carrier: true,
+              trackingNumber: true,
+            },
+          },
+          inoueCheck: true,
+          assignedUserId: true,
+          assignedUser: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          _count: {
+            select: {
+              comments: true,
+            },
+          },
         },
         orderBy: {
           createdAt: 'desc',
@@ -157,7 +213,7 @@ export class ApplicationRepository {
       this.prisma.application.count({ where }),
     ]);
 
-    return { applications, total };
+    return { applications: applications as unknown as ApplicationWithRelations[], total };
   }
 
   /**
@@ -173,7 +229,9 @@ export class ApplicationRepository {
         lines: {
           include: {
             sim: {
-              include: {
+              select: {
+                iccid: true,
+                msisdn: true,
                 simLocationTag: true,
               },
             },
@@ -185,10 +243,16 @@ export class ApplicationRepository {
           },
         },
         kycImages: true,
+        referrals: {
+          orderBy: { createdAt: 'asc' },
+        },
+        trackings: {
+          orderBy: { createdAt: 'asc' },
+        },
       },
     });
 
-    return application;
+    return application as unknown as ApplicationWithRelations | null;
   }
 
   /**
@@ -199,7 +263,7 @@ export class ApplicationRepository {
       data,
     });
 
-    return application;
+    return application as unknown as ApplicationEntity;
   }
 
   /**
@@ -207,11 +271,24 @@ export class ApplicationRepository {
    */
   async update(id: string, data: ApplicationUpdateInput): Promise<ApplicationEntity> {
     // アーカイブ時にarchivedAtを自動設定
-    const updateData: typeof data & { archivedAt?: Date | null } = { ...data };
+    const updateData: typeof data & { archivedAt?: Date | null; totalAmount?: number } = { ...data };
     if (data.isArchived === true) {
       updateData.archivedAt = new Date();
     } else if (data.isArchived === false) {
       updateData.archivedAt = null;
+    }
+
+    // lineCount または unitPrice が変更された場合、totalAmount を再計算
+    if (data.lineCount !== undefined || data.unitPrice !== undefined) {
+      const current = await this.prisma.application.findUnique({
+        where: { id },
+        select: { lineCount: true, unitPrice: true },
+      });
+      if (current) {
+        const newLineCount = data.lineCount ?? current.lineCount;
+        const newUnitPrice = data.unitPrice ?? current.unitPrice;
+        updateData.totalAmount = newLineCount * newUnitPrice;
+      }
     }
 
     const application = await this.prisma.application.update({
@@ -219,7 +296,7 @@ export class ApplicationRepository {
       data: updateData,
     });
 
-    return application;
+    return application as unknown as ApplicationEntity;
   }
 
   /**
@@ -245,11 +322,70 @@ export class ApplicationRepository {
   /**
    * 顧客IDから申込一覧を取得（申込順序計算用）
    */
-  async findByCustomerIds(customerIds: string[]): Promise<Array<{ id: string; customerId: string; createdAt: Date }>> {
+  async findByCustomerIds(customerIds: string[]): Promise<Array<{
+    id: string;
+    customerId: string;
+    createdAt: Date;
+    kycImages: { expiryDate: Date | null }[];
+  }>> {
     return await this.prisma.application.findMany({
       where: { customerId: { in: customerIds } },
-      select: { id: true, customerId: true, createdAt: true },
+      select: {
+        id: true,
+        customerId: true,
+        createdAt: true,
+        kycImages: { select: { expiryDate: true } },
+      },
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    });
+  }
+
+  // ─── 紹介者 ───────────────────────────────────────────
+
+  async addReferral(applicationId: string, referrerName: string, fee: number) {
+    return await this.prisma.applicationReferral.create({
+      data: { applicationId, referrerName, fee },
+    });
+  }
+
+  async deleteReferral(referralId: string) {
+    return await this.prisma.applicationReferral.delete({
+      where: { id: referralId },
+    });
+  }
+
+  // ─── 追跡番号 ─────────────────────────────────────────
+
+  async addTracking(applicationId: string, carrier: string, trackingNumber: string) {
+    return await this.prisma.applicationTracking.create({
+      data: { applicationId, carrier, trackingNumber },
+    });
+  }
+
+  async deleteTracking(trackingId: string) {
+    return await this.prisma.applicationTracking.delete({
+      where: { id: trackingId },
+    });
+  }
+
+  // ─── ワークフロー画像パス ─────────────────────────────
+
+  async findWorkflowImagePaths(id: string) {
+    return await this.prisma.application.findUnique({
+      where: { id },
+      select: {
+        invoicePdfPath: true,
+        invoiceEmailPath: true,
+        paymentImagePath: true,
+        shippingImagePath: true,
+      },
+    });
+  }
+
+  async updateWorkflowImagePath(id: string, field: string, path: string) {
+    return await this.prisma.application.update({
+      where: { id },
+      data: { [field]: path },
     });
   }
 }

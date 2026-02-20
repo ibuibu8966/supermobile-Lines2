@@ -6,7 +6,7 @@
  */
 
 import { UserRepository, UserFilters } from '../repositories/user.repository';
-import { UserWithRelations, UserCreateInput, UserUpdateInput } from '@repo/entities';
+import { UserWithRelations, UserCreateInput, UserUpdateInput } from '@/entities';
 import { logger } from '../shared/utils/logger';
 import { ConflictError, ForbiddenError, NotFoundError } from '../shared/errors/custom-errors';
 import bcrypt from 'bcryptjs';
@@ -84,7 +84,7 @@ export class UserService {
   /**
    * ユーザーIDからユーザーを取得（詳細版：customers含む）
    */
-  async getUserDetail(id: string): Promise<any> {
+  async getUserDetail(id: string): Promise<UserWithRelations | null> {
     logger.info('ユーザー詳細取得', { userId: id });
 
     const user = await this.userRepo.findByIdWithDetails(id);
@@ -94,12 +94,9 @@ export class UserService {
       return null;
     }
 
-    // パスワードを除外
-    const { password, ...sanitizedUser } = user;
-
     logger.debug('ユーザー詳細取得完了', { userId: id });
 
-    return sanitizedUser;
+    return user;
   }
 
   /**
@@ -151,12 +148,9 @@ export class UserService {
 
     const user = await this.userRepo.update(id, finalUpdateData);
 
-    // パスワードを除外
-    const { password, ...sanitizedUser } = user;
-
     logger.info('ユーザー更新完了', { userId: id });
 
-    return sanitizedUser;
+    return user;
   }
 
   /**

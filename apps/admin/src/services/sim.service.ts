@@ -6,7 +6,7 @@
  */
 
 import { SimRepository, SimFilters } from '../repositories/sim.repository';
-import { SimWithRelations, SimUpdateInput } from '@repo/entities';
+import { SimWithRelations, SimUpdateInput } from '@/entities';
 import { PaginationInfo, createPaginationInfo } from '../shared/utils/helpers';
 import { logger } from '../shared/utils/logger';
 import { NotFoundError, ValidationError } from '../shared/errors/custom-errors';
@@ -44,12 +44,27 @@ export class SimService {
     logger.info('SIM一覧取得開始', { filters, pagination });
 
     // 1. Repository経由でデータ取得
-    const { sims, total } = await this.simRepo.findMany(
-      filters,
-      { skip: pagination.skip, take: pagination.pageSize }
+    // ステータスフィルターはDBにstatusカラムがないため除外して全件取得後にポストフィルタ
+    const { sims: allSims, total: dbTotal } = await this.simRepo.findMany(
+      { ...filters, status: undefined },
+      // ステータスフィルタがある場合は全件取得してポストフィルタリング
+      filters.status
+        ? { skip: 0, take: 100000 }
+        : { skip: pagination.skip, take: pagination.pageSize }
     );
 
-    logger.debug('Repository取得完了', { count: sims.length, total });
+    logger.debug('Repository取得完了', { count: allSims.length, dbTotal });
+
+    // ステータスフィルター（ポストフィルタリング）
+    const filteredSims = filters.status
+      ? allSims.filter((sim) => sim.status === filters.status)
+      : allSims;
+
+    // ページネーション（ポストフィルタ後に適用）
+    const total = filters.status ? filteredSims.length : dbTotal;
+    const sims = filters.status
+      ? filteredSims.slice(pagination.skip, pagination.skip + pagination.pageSize)
+      : filteredSims;
 
     // 2. ビジネスロジック: 消費済みタグIDからタグ名を取得
     const simsWithTags = await this.enrichWithConsumedTags(sims);

@@ -2,8 +2,8 @@
  * Customer lines service
  */
 
-import { PrismaClient } from "@repo/database";
-import { CustomerLinesResult } from "@repo/entities";
+import { PrismaClient } from "@/lib/database";
+import { CustomerLinesResult, CustomerLine } from "@/entities";
 import { NotFoundError } from "@/shared/errors/custom-errors";
 import { logger } from "@/shared/utils/logger";
 
@@ -48,6 +48,6 @@ export class CustomerLinesService {
       lineCount: lines.length 
     });
 
-    return { lines: lines as any };
+    return { lines: lines as unknown as CustomerLine[] };
   }
 }

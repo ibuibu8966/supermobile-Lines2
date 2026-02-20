@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Input } from "@repo/ui";
-import { formatCurrency, parseCurrency } from "@repo/utils";
+import { Input } from "@/components/ui/input";
+import { formatCurrency, parseCurrency } from "@/lib/utils/formatters";
 
 interface EditableAmountFieldProps {
   orderId: string;

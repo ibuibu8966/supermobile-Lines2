@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
-import { prisma } from "@repo/database";
-import { scanBarcode } from "@repo/shared";
+import { prisma } from "@/lib/database";
+import { scanBarcode } from "@/lib";
 
 export const dynamic = "force-dynamic";
 

@@ -6,7 +6,7 @@
  */
 
 import { ServiceRepository, ServiceFilters } from '../repositories/service.repository';
-import { ServiceWithRelations, ServiceCreateInput, ServiceUpdateInput } from '@repo/entities';
+import { ServiceWithRelations, ServiceCreateInput, ServiceUpdateInput } from '@/entities';
 import { logger } from '../shared/utils/logger';
 import { ConflictError, NotFoundError } from '../shared/errors/custom-errors';
 
@@ -50,7 +50,7 @@ export class ServiceService {
   /**
    * サービスIDからサービスを取得（詳細版：プラン詳細含む）
    */
-  async getServiceDetail(id: string): Promise<any> {
+  async getServiceDetail(id: string): Promise<ServiceWithRelations | null> {
     logger.info('サービス詳細取得', { serviceId: id });
 
     const service = await this.serviceRepo.findByIdWithDetails(id);
@@ -114,16 +114,18 @@ export class ServiceService {
     }
 
     // 関連データの合計を計算
-    const totalRelated =
-      service._count.plans + service._count.applications + service._count.users;
+    const count = service._count;
+    const totalRelated = count
+      ? (count.plans ?? 0) + (count.applications ?? 0) + (count.users ?? 0)
+      : 0;
 
     // 関連データがある場合は論理削除
     if (totalRelated > 0) {
       logger.info('関連データが存在するため論理削除', {
         serviceId: id,
-        plans: service._count.plans,
-        applications: service._count.applications,
-        users: service._count.users,
+        plans: count?.plans ?? 0,
+        applications: count?.applications ?? 0,
+        users: count?.users ?? 0,
       });
       await this.serviceRepo.deactivate(id);
       return {

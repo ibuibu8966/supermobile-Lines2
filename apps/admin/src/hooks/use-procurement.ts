@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { queryKeys, STALE_TIMES } from "@/lib/api/query-keys";
 import type { PurchaseOrder } from "@/types/procurement";
+import type { PurchaseOrderUpdateInput } from "@/repositories/procurement.repository";
 
 /**
  * Procurement管理用カスタムフック
@@ -20,7 +21,7 @@ export function useProcurement() {
 
   // 発注データの更新
   const updateMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+    mutationFn: async ({ id, data }: { id: string; data: PurchaseOrderUpdateInput }) => {
       const res = await fetch(`/api/procurement/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -41,7 +42,16 @@ export function useProcurement() {
         if (!old) return old;
         return old.map((order) => {
           if (order.id === id) {
-            return { ...order, ...data };
+            const normalizedData = {
+              ...data,
+              invoiceDate: data.invoiceDate instanceof Date
+                ? data.invoiceDate.toISOString()
+                : (data.invoiceDate ?? order.invoiceDate),
+              deliveryDate: data.deliveryDate instanceof Date
+                ? data.deliveryDate.toISOString()
+                : (data.deliveryDate ?? order.deliveryDate),
+            };
+            return { ...order, ...normalizedData };
           }
           return order;
         });

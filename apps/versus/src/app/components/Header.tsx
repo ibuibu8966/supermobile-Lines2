@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Button } from "@repo/ui";
+import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
 
 export function Header() {

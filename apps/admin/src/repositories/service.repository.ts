@@ -5,7 +5,8 @@
  * Prismaとの直接的なやり取りを担当
  */
 
-import { ServiceWithRelations, ServiceCreateInput } from '@repo/entities';
+import { PrismaClient, Prisma } from '@prisma/client';
+import { ServiceWithRelations, ServiceCreateInput } from '@/entities';
 import { logger } from '../shared/utils/logger';
 
 export interface ServiceFilters {
@@ -13,7 +14,7 @@ export interface ServiceFilters {
 }
 
 export class ServiceRepository {
-  constructor(private prisma: any) {}
+  constructor(private prisma: PrismaClient) {}
 
   /**
    * サービス一覧を取得（プランを含む）
@@ -58,7 +59,7 @@ export class ServiceRepository {
   async findByCode(code: string): Promise<ServiceWithRelations | null> {
     logger.debug('ServiceRepository.findByCode', { code });
 
-    return await this.prisma.service.findUnique({
+    const service = await this.prisma.service.findUnique({
       where: { code },
       include: {
         plans: {
@@ -66,6 +67,7 @@ export class ServiceRepository {
         },
       },
     });
+    return service as unknown as ServiceWithRelations | null;
   }
 
   /**
@@ -74,7 +76,7 @@ export class ServiceRepository {
   async findById(id: string): Promise<ServiceWithRelations | null> {
     logger.debug('ServiceRepository.findById', { id });
 
-    return await this.prisma.service.findUnique({
+    const service = await this.prisma.service.findUnique({
       where: { id },
       include: {
         _count: {
@@ -87,15 +89,16 @@ export class ServiceRepository {
         plans: true,
       },
     });
+    return service as unknown as ServiceWithRelations | null;
   }
 
   /**
    * IDからサービスを取得（詳細版：プラン詳細含む）
    */
-  async findByIdWithDetails(id: string): Promise<any> {
+  async findByIdWithDetails(id: string): Promise<ServiceWithRelations | null> {
     logger.debug('ServiceRepository.findByIdWithDetails', { id });
 
-    return await this.prisma.service.findUnique({
+    const service = await this.prisma.service.findUnique({
       where: { id },
       include: {
         _count: {
@@ -120,6 +123,7 @@ export class ServiceRepository {
         },
       },
     });
+    return service as unknown as ServiceWithRelations | null;
   }
 
   /**
@@ -128,13 +132,14 @@ export class ServiceRepository {
   async create(data: ServiceCreateInput): Promise<ServiceWithRelations> {
     logger.debug('ServiceRepository.create', { code: data.code, name: data.name });
 
-    return await this.prisma.service.create({
+    const service = await this.prisma.service.create({
       data: {
         code: data.code,
         name: data.name,
         isActive: data.isActive ?? true,
       },
     });
+    return service as unknown as ServiceWithRelations;
   }
 
   /**
@@ -160,13 +165,14 @@ export class ServiceRepository {
   /**
    * サービスを更新
    */
-  async update(id: string, data: any): Promise<any> {
+  async update(id: string, data: Prisma.ServiceUpdateInput): Promise<ServiceWithRelations> {
     logger.debug('ServiceRepository.update', { id, data });
 
-    return await this.prisma.service.update({
+    const service = await this.prisma.service.update({
       where: { id },
       data,
     });
+    return service as unknown as ServiceWithRelations;
   }
 
   /**
@@ -195,14 +201,15 @@ export class ServiceRepository {
   /**
    * コードの重複チェック（自分以外）
    */
-  async findByCodeExcept(code: string, excludeId: string): Promise<any> {
+  async findByCodeExcept(code: string, excludeId: string): Promise<ServiceWithRelations | null> {
     logger.debug('ServiceRepository.findByCodeExcept', { code, excludeId });
 
-    return await this.prisma.service.findFirst({
+    const service = await this.prisma.service.findFirst({
       where: {
         code,
         id: { not: excludeId },
       },
     });
+    return service as unknown as ServiceWithRelations | null;
   }
 }

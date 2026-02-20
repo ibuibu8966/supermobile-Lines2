@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { prisma } from "@repo/database";
+import { prisma } from "@/lib/database";
 import bcrypt from "bcryptjs";
 import { getAdminSession } from "@/lib/auth/admin-session";
 import { getAllUsers, createUser } from "@/controllers/user.controller";

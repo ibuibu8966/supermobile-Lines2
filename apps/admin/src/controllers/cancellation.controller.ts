@@ -1,3 +1,4 @@
+import { PrismaClient } from '@prisma/client';
 /**
  * Cancellation Controller
  *
@@ -19,8 +20,8 @@ import { logger } from '../shared/utils/logger';
  */
 export async function requestCancellation(
   request: NextRequest,
-  prisma: any,
-  authFn: () => Promise<any>
+  prisma: PrismaClient,
+  authFn: () => Promise<{ user?: { id?: string } } | null>
 ): Promise<NextResponse> {
   try {
     // 認証チェック

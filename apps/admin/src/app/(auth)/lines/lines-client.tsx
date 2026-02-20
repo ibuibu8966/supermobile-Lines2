@@ -2,13 +2,16 @@
 
 import { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@repo/ui";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Filter, ChevronDown, ChevronUp, Loader2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryState } from "nuqs";
 import { CustomerDetailModal } from "@/components/customer-detail-modal";
 import { queryKeys, STALE_TIMES } from "@/lib/api/query-keys";
 import { api } from "@/lib/api/client";
+import type { LineUpdateInput, LineStatus } from "@/entities";
 
 interface ApplicationLine {
   id: string;
@@ -97,6 +100,7 @@ interface LinesWithTagsResponse {
 const STATUS_LABELS: Record<string, string> = {
   NOT_ACTIVATED: "未開通",
   ACTIVATED: "開通済み",
+  SHIPPING_INSTRUCTED: "発送指示済み",
   SHIPPED: "発送済み",
   RETURNED: "返却済み",
   CANCELLED: "解約",
@@ -105,6 +109,7 @@ const STATUS_LABELS: Record<string, string> = {
 const STATUS_VARIANTS: Record<string, "default" | "success" | "destructive" | "secondary" | "outline"> = {
   NOT_ACTIVATED: "secondary",
   ACTIVATED: "success",
+  SHIPPING_INSTRUCTED: "outline",
   SHIPPED: "default",
   RETURNED: "destructive",
   CANCELLED: "destructive",
@@ -225,12 +230,12 @@ export function LinesClient() {
       return;
     }
 
-    const updates: any = {};
+    const updates: Partial<LineUpdateInput & { simLocationTagId: number | null }> = {};
     if (bulkSimLocationTagId !== null) updates.simLocationTagId = bulkSimLocationTagId;
     if (bulkLineReserveTagId !== null) updates.lineReserveTagId = bulkLineReserveTagId;
     if (bulkShippedAt) updates.shippedAt = bulkShippedAt;
     if (bulkReturnedAt) updates.returnedAt = bulkReturnedAt;
-    if (bulkStatus) updates.status = bulkStatus;
+    if (bulkStatus) updates.status = bulkStatus as LineStatus;
 
     if (Object.keys(updates).length === 0) {
       toast.error("更新する項目を選択してください");
@@ -281,7 +286,7 @@ export function LinesClient() {
   };
 
   // 編集用ヘルパー関数
-  const handleFieldChange = (lineId: string, field: string, value: any) => {
+  const handleFieldChange = (lineId: string, field: string, value: string | number | null) => {
     setEditedLines((prev) => ({
       ...prev,
       [lineId]: { ...prev[lineId], [field]: value },

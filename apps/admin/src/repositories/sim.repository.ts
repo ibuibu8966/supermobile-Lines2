@@ -5,8 +5,38 @@
  * Prismaとの直接的なやり取りを担当
  */
 
-import { SimWithRelations } from '@repo/entities';
+import { PrismaClient, Prisma, $Enums } from '@prisma/client';
+import { SimWithRelations, SimUpdateInput } from '@/entities';
 import { logger } from '../shared/utils/logger';
+
+/**
+ * SIMステータスをApplicationLineの最新ステータスから導出
+ * - 回線なし or 最新が CANCELLED/RETURNED → IN_STOCK
+ * - 最新が ACTIVATED/SHIPPED → ACTIVE
+ * - その他（NOT_ACTIVATED等）→ IN_STOCK
+ */
+export function computeSimStatus(
+  applicationLines: Array<{ status: string; createdAt?: Date | null; updatedAt?: Date | null }>
+): 'IN_STOCK' | 'ACTIVE' {
+  if (!applicationLines || applicationLines.length === 0) return 'IN_STOCK';
+  // updatedAt降順で最新を取得
+  const sorted = [...applicationLines].sort((a, b) => {
+    const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+    const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+    return bTime - aTime;
+  });
+  const latest = sorted[0];
+  if (latest.status === 'ACTIVATED' || latest.status === 'SHIPPED') return 'ACTIVE';
+  return 'IN_STOCK';
+}
+
+/** ICCID連続登録の検証情報 */
+export interface SimIccidValidation {
+  isInStock: boolean;       // IN_STOCK状態か
+  hasEligibleTag: boolean;  // SIMがプランの用途タグを持つか
+  isConsumed: boolean;      // プランの用途タグが既に消費済みか
+  planTagNames: string[];   // プランの用途タグ名（エラー表示用）
+}
 
 export interface SimFilters {
   search?: string;
@@ -20,7 +50,7 @@ export interface SimFilters {
 }
 
 export class SimRepository {
-  constructor(private prisma: any) {}
+  constructor(private prisma: PrismaClient) {}
 
   /**
    * SIM一覧を取得（フィルタリング・ページネーション対応）
@@ -41,7 +71,6 @@ export class SimRepository {
           msisdn: true,
           simType: true,
           carrierType: true,
-          status: true,
           autoCancelDate: true,
           updatedAt: true,
           supplierId: true,
@@ -83,6 +112,8 @@ export class SimRepository {
           applicationLines: {
             select: {
               id: true,
+              status: true,
+              updatedAt: true,
               application: {
                 select: {
                   id: true,
@@ -101,8 +132,8 @@ export class SimRepository {
       this.prisma.sim.count({ where }),
     ]);
 
-    // 契約から消費済みタグIDを動的に計算
-    const simsWithComputedTags = sims.map((sim: any) => {
+    // 契約から消費済みタグIDを動的に計算、回線ステータスからSIMステータスを導出
+    const simsWithComputedTags = sims.map((sim) => {
       const consumedTagIds = new Set<number>();
       for (const contract of sim.contracts || []) {
         for (const ut of contract.usageTags || []) {
@@ -114,10 +145,11 @@ export class SimRepository {
       return {
         ...sim,
         consumedTagIds: Array.from(consumedTagIds),
+        status: computeSimStatus(sim.applicationLines || []),
       };
     });
 
-    return { sims: simsWithComputedTags, total };
+    return { sims: simsWithComputedTags as unknown as SimWithRelations[], total };
   }
 
   /**
@@ -164,7 +196,7 @@ export class SimRepository {
 
     if (!sim) return null;
 
-    // 契約から消費済みタグIDを動的に計算
+    // 契約から消費済みタグIDを動的に計算、回線ステータスからSIMステータスを導出
     const consumedTagIds = new Set<number>();
     for (const contract of sim.contracts || []) {
       for (const ut of contract.usageTags || []) {
@@ -177,18 +209,25 @@ export class SimRepository {
     return {
       ...sim,
       consumedTagIds: Array.from(consumedTagIds),
-    };
+      status: computeSimStatus(sim.applicationLines || []),
+    } as unknown as SimWithRelations;
   }
 
   /**
    * SIMを更新
    */
-  async update(iccid: string, data: any): Promise<SimWithRelations> {
+  async update(iccid: string, data: SimUpdateInput): Promise<SimWithRelations> {
     logger.debug('SimRepository.update', { iccid, data });
 
-    return await this.prisma.sim.update({
+    const { status: _status, ...dataWithoutStatus } = data as SimUpdateInput & { status?: unknown };
+    const prismaData: Prisma.SimUpdateInput = {
+      ...dataWithoutStatus,
+      carrierType: data.carrierType ? (data.carrierType as $Enums.CarrierType) : undefined,
+    };
+
+    const sim = await this.prisma.sim.update({
       where: { iccid },
-      data,
+      data: prismaData,
       include: {
         supplier: true,
         simLocationTag: true,
@@ -209,6 +248,10 @@ export class SimRepository {
         },
       },
     });
+    return {
+      ...sim,
+      status: computeSimStatus(sim.applicationLines || []),
+    } as unknown as SimWithRelations;
   }
 
   /**
@@ -222,10 +265,107 @@ export class SimRepository {
   }
 
   /**
+   * IN_STOCK状態のSIM ICCIDリストを取得（IccidScanModal用プリフェッチ）
+   * SIMステータスはApplicationLineの最新ステータスから導出:
+   * - 回線なし → IN_STOCK
+   * - 最新回線が CANCELLED/RETURNED/NOT_ACTIVATED → IN_STOCK
+   * - 最新回線が ACTIVATED/SHIPPED → ACTIVE（除外）
+   */
+  async findInStockIccids(): Promise<string[]> {
+    logger.debug('SimRepository.findInStockIccids');
+
+    // 全SIMを回線ステータス付きで取得（軽量）
+    const sims = await this.prisma.sim.findMany({
+      select: {
+        iccid: true,
+        applicationLines: {
+          select: { status: true, updatedAt: true },
+        },
+      },
+    });
+
+    return sims
+      .filter((sim) => computeSimStatus(sim.applicationLines) === 'IN_STOCK')
+      .map((sim) => sim.iccid);
+  }
+
+  /**
+   * プランの用途タグに基づいてIN_STOCK SIMの検証情報を取得
+   * ICCIDをキーとし、各SIMが登録可能かどうかの理由を返す
+   */
+  async findInStockIccidsWithValidation(planId: string): Promise<Record<string, SimIccidValidation>> {
+    logger.debug('SimRepository.findInStockIccidsWithValidation', { planId });
+
+    // プランの用途タグを取得
+    const plan = await this.prisma.plan.findUnique({
+      where: { id: planId },
+      select: {
+        usageTags: {
+          select: { usageTag: { select: { id: true, name: true } } },
+        },
+      },
+    });
+
+    const planTagIds = plan?.usageTags.map((ut) => ut.usageTag.id) ?? [];
+    const planTagNames = plan?.usageTags.map((ut) => ut.usageTag.name) ?? [];
+
+    // SIMを取得（プランにタグがある場合はeligibeTagIdsで絞り込んでパフォーマンス改善）
+    const simWhere = planTagIds.length > 0
+      ? { eligibleTagIds: { hasSome: planTagIds } }
+      : {};
+    const sims = await this.prisma.sim.findMany({
+      where: simWhere,
+      select: {
+        iccid: true,
+        eligibleTagIds: true,
+        contracts: {
+          select: {
+            usageTags: {
+              select: { usageTag: { select: { id: true } } },
+            },
+          },
+        },
+        applicationLines: {
+          select: { status: true, updatedAt: true },
+        },
+      },
+    });
+
+    const result: Record<string, SimIccidValidation> = {};
+
+    for (const sim of sims) {
+      const isInStock = computeSimStatus(sim.applicationLines) === 'IN_STOCK';
+
+      // 消費済みタグIDを計算
+      const consumedTagIds = new Set<number>();
+      for (const contract of sim.contracts) {
+        for (const ut of contract.usageTags) {
+          if (ut.usageTag?.id) consumedTagIds.add(ut.usageTag.id);
+        }
+      }
+
+      // プランの用途タグ照合（プランにタグがなければ制限なし）
+      let hasEligibleTag = true;
+      let isConsumed = false;
+
+      if (planTagIds.length > 0) {
+        // SIMがプランの用途タグを1つ以上持つか
+        hasEligibleTag = planTagIds.some((tid) => sim.eligibleTagIds.includes(tid));
+        // プランの用途タグのいずれか1つでも消費済みであれば使用不可
+        isConsumed = planTagIds.some((tid) => consumedTagIds.has(tid));
+      }
+
+      result[sim.iccid] = { isInStock, hasEligibleTag, isConsumed, planTagNames };
+    }
+
+    return result;
+  }
+
+  /**
    * フィルタ条件からWhere句を構築
    */
-  private buildWhereClause(filters: SimFilters): any {
-    const where: any = {};
+  private buildWhereClause(filters: SimFilters): Prisma.SimWhereInput {
+    const where: Prisma.SimWhereInput = {};
 
     // Search filter (ICCID, MSISDN)
     if (filters.search) {
@@ -235,23 +375,21 @@ export class SimRepository {
       ];
     }
 
-    // Status filter
-    if (filters.status) {
-      where.status = filters.status;
-    }
+    // Status filter は廃止（SIMステータスはApplicationLineから導出するためDBフィルタ不可）
+    // ステータスフィルタはService層でポストフィルタリングする
 
     // Carrier filter
     if (filters.carrier) {
       if (filters.carrier === 'NULL') {
         where.carrierType = null;
       } else {
-        where.carrierType = filters.carrier;
+        where.carrierType = filters.carrier as $Enums.CarrierType;
       }
     }
 
     // SIM type filter
     if (filters.simType) {
-      where.simType = filters.simType;
+      where.simType = filters.simType as $Enums.SimType;
     }
 
     // Auto cancel date range filter
