@@ -6,7 +6,7 @@
  */
 
 import { PrismaClient, Prisma } from '@prisma/client';
-import { CouponWithRelations, CouponCreateInput } from '@/entities';
+import { CouponWithRelations, CouponCreateInput, CouponPricingInput } from '@/entities';
 import { logger } from '../shared/utils/logger';
 
 export interface CouponFilters {
@@ -27,6 +27,7 @@ export class CouponRepository {
     const coupons = await this.prisma.coupon.findMany({
       where,
       include: {
+        pricings: { orderBy: { minQuantity: 'asc' } },
         plan: {
           include: {
             service: true,
@@ -52,6 +53,7 @@ export class CouponRepository {
     const coupon = await this.prisma.coupon.findUnique({
       where: { code },
       include: {
+        pricings: { orderBy: { minQuantity: 'asc' } },
         plan: {
           include: {
             service: true,
@@ -71,6 +73,7 @@ export class CouponRepository {
     const coupon = await this.prisma.coupon.findUnique({
       where: { id },
       include: {
+        pricings: { orderBy: { minQuantity: 'asc' } },
         plan: {
           include: {
             service: true,
@@ -96,14 +99,24 @@ export class CouponRepository {
       data: {
         code: data.code,
         planId: data.planId,
-        unitPrice: data.unitPrice,
+        unitPrice: data.unitPrice ?? null,
         description: data.description ?? null,
         maxUsages: data.maxUsages ?? null,
         validFrom: data.validFrom,
         validUntil: data.validUntil,
         isActive: data.isActive ?? true,
+        ...(data.pricings && data.pricings.length > 0 ? {
+          pricings: {
+            create: data.pricings.map((p) => ({
+              minQuantity: p.minQuantity,
+              maxQuantity: p.maxQuantity,
+              unitPrice: p.unitPrice,
+            })),
+          },
+        } : {}),
       },
       include: {
+        pricings: { orderBy: { minQuantity: 'asc' } },
         plan: {
           include: {
             service: true,
@@ -174,6 +187,7 @@ export class CouponRepository {
       where: { id },
       data,
       include: {
+        pricings: { orderBy: { minQuantity: 'asc' } },
         plan: {
           include: {
             service: true,
@@ -210,5 +224,26 @@ export class CouponRepository {
     await this.prisma.coupon.delete({
       where: { id },
     });
+  }
+
+  /**
+   * クーポンのpricingsを全削除して再作成（トランザクション内で使用）
+   */
+  async replacePricings(couponId: string, pricings: CouponPricingInput[]): Promise<void> {
+    logger.debug('CouponRepository.replacePricings', { couponId, count: pricings.length });
+
+    await this.prisma.$transaction([
+      this.prisma.couponPricing.deleteMany({ where: { couponId } }),
+      ...pricings.map((p) =>
+        this.prisma.couponPricing.create({
+          data: {
+            couponId,
+            minQuantity: p.minQuantity,
+            maxQuantity: p.maxQuantity,
+            unitPrice: p.unitPrice,
+          },
+        })
+      ),
+    ]);
   }
 }

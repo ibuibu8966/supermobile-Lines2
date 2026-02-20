@@ -61,6 +61,7 @@ export class CouponService {
       ...input,
       validFrom,
       validUntil,
+      pricings: input.pricings,
     });
 
     logger.info('クーポン作成完了', { couponId: coupon.id, code: coupon.code });
@@ -124,7 +125,7 @@ export class CouponService {
     const updateData: {
       code?: string;
       planId?: string;
-      unitPrice?: number;
+      unitPrice?: number | null;
       description?: string | null;
       maxUsages?: number | null;
       validFrom?: Date;
@@ -152,6 +153,17 @@ export class CouponService {
     if (input.isActive !== undefined) updateData.isActive = input.isActive;
 
     const coupon = await this.couponRepo.update(id, updateData);
+
+    // pricingsが送られてきた場合、削除→再作成
+    if (input.pricings !== undefined) {
+      await this.couponRepo.replacePricings(id, input.pricings);
+      // 最新のデータを返す
+      const updated = await this.couponRepo.findById(id);
+      if (updated) {
+        logger.info('クーポン更新完了（pricings含む）', { couponId: id });
+        return updated;
+      }
+    }
 
     logger.info('クーポン更新完了', { couponId: id });
 

@@ -1,26 +1,42 @@
 "use client";
 
-import { useState, Suspense, useMemo } from "react";
+import { useState, Suspense, useMemo, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Pencil, Trash2, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 import { queryKeys } from "@/lib/api/query-keys";
 import { api } from "@/lib/api/client";
 
+interface PlanPricing {
+  id: string;
+  minQuantity: number;
+  maxQuantity: number | null;
+  unitPrice: number;
+}
+
+interface CouponPricing {
+  id: string;
+  minQuantity: number;
+  maxQuantity: number | null;
+  unitPrice: number;
+}
+
 interface Coupon {
   id: string;
   code: string;
   planId: string;
-  unitPrice: number;
+  unitPrice: number | null;
   description: string | null;
   maxUsages: number | null;
   usageCount: number;
   validFrom: string;
   validUntil: string;
   isActive: boolean;
+  pricings: CouponPricing[];
   plan: {
     id: string;
     name: string;
@@ -35,6 +51,7 @@ interface Plan {
   serviceId: string;
   isActive: boolean;
   service: { id: string; code: string; name: string };
+  pricings: PlanPricing[];
 }
 
 interface Service {
@@ -49,13 +66,21 @@ interface CouponsWithRelations {
   coupons: Coupon[];
 }
 
+// ティア料金の編集用state型
+interface PricingTierForm {
+  minQuantity: number;
+  maxQuantity: number | null;
+  originalPrice: number; // プランの元価格
+  discountType: "discount" | "markup"; // 割引 or 割増
+  discountAmount: number; // 割引/割増額
+}
+
 function CouponsContent() {
   const queryClient = useQueryClient();
 
-  const [showInactive, setShowInactive] = useState(false);
+  const [activeTab, setActiveTab] = useState<"active" | "inactive">("active");
   const [filterServiceId, setFilterServiceId] = useState<string>("");
 
-  // 最適化: 1リクエストでcoupons, services, plansを取得
   const { data, isLoading: loading } = useQuery<CouponsWithRelations>({
     queryKey: queryKeys.couponsWithRelations,
     queryFn: api.getCouponsWithRelations as () => Promise<CouponsWithRelations>,
@@ -66,17 +91,15 @@ function CouponsContent() {
   const couponsData = data?.coupons ?? [];
 
   const coupons = useMemo(() => {
-    let filtered = couponsData;
-    if (!showInactive) {
-      filtered = filtered.filter((c) => c.isActive);
-    }
+    let filtered = couponsData.filter((c) =>
+      activeTab === "active" ? c.isActive : !c.isActive
+    );
     if (filterServiceId) {
       filtered = filtered.filter((c) => c.plan.service.id === filterServiceId);
     }
     return filtered;
-  }, [couponsData, showInactive, filterServiceId]);
+  }, [couponsData, activeTab, filterServiceId]);
 
-  // モーダルのサービス選択に応じたプランフィルタ
   const [modalServiceId, setModalServiceId] = useState<string>("");
   const filteredPlans = useMemo(() => {
     if (!modalServiceId) return plansData.filter((p) => p.isActive);
@@ -89,14 +112,97 @@ function CouponsContent() {
   const [formData, setFormData] = useState({
     code: "",
     planId: "",
-    unitPrice: 0,
     description: "",
     maxUsages: "" as string | number,
     validFrom: "",
     validUntil: "",
   });
+  const [pricingTiers, setPricingTiers] = useState<PricingTierForm[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // プラン選択時にPlanPricingをデフォルトのティアとして設定
+  const handlePlanChange = useCallback((planId: string) => {
+    setFormData((prev) => ({ ...prev, planId }));
+    if (!planId) {
+      setPricingTiers([]);
+      return;
+    }
+    const plan = plansData.find((p) => p.id === planId);
+    if (!plan || !plan.pricings || plan.pricings.length === 0) {
+      setPricingTiers([{
+        minQuantity: 1,
+        maxQuantity: null,
+        originalPrice: 0,
+        discountType: "discount",
+        discountAmount: 0,
+      }]);
+      return;
+    }
+    setPricingTiers(
+      plan.pricings.map((pp) => ({
+        minQuantity: pp.minQuantity,
+        maxQuantity: pp.maxQuantity,
+        originalPrice: pp.unitPrice,
+        discountType: "discount" as const,
+        discountAmount: 0,
+      }))
+    );
+  }, [plansData]);
+
+  // 編集時にクーポンのpricingsを復元
+  const loadEditPricings = useCallback((coupon: Coupon) => {
+    const plan = plansData.find((p) => p.id === coupon.planId);
+    if (coupon.pricings && coupon.pricings.length > 0) {
+      setPricingTiers(
+        coupon.pricings.map((cp) => {
+          const planPricing = plan?.pricings?.find(
+            (pp) => pp.minQuantity === cp.minQuantity
+          );
+          const originalPrice = planPricing?.unitPrice ?? 0;
+          const diff = cp.unitPrice - originalPrice;
+          return {
+            minQuantity: cp.minQuantity,
+            maxQuantity: cp.maxQuantity,
+            originalPrice,
+            discountType: diff >= 0 ? ("markup" as const) : ("discount" as const),
+            discountAmount: Math.abs(diff),
+          };
+        })
+      );
+    } else {
+      // 旧形式: unitPriceのみ
+      if (plan?.pricings && plan.pricings.length > 0) {
+        setPricingTiers(
+          plan.pricings.map((pp) => {
+            const diff = (coupon.unitPrice ?? 0) - pp.unitPrice;
+            return {
+              minQuantity: pp.minQuantity,
+              maxQuantity: pp.maxQuantity,
+              originalPrice: pp.unitPrice,
+              discountType: diff >= 0 ? ("markup" as const) : ("discount" as const),
+              discountAmount: Math.abs(diff),
+            };
+          })
+        );
+      } else {
+        setPricingTiers([{
+          minQuantity: 1,
+          maxQuantity: null,
+          originalPrice: 0,
+          discountType: "discount",
+          discountAmount: coupon.unitPrice ?? 0,
+        }]);
+      }
+    }
+  }, [plansData]);
+
+  const calcCouponPrice = (tier: PricingTierForm) => {
+    if (tier.discountType === "discount") {
+      return tier.originalPrice - tier.discountAmount;
+    }
+    return tier.originalPrice + tier.discountAmount;
+  };
 
   const openCreateModal = () => {
     setEditingCoupon(null);
@@ -104,12 +210,12 @@ function CouponsContent() {
     setFormData({
       code: "",
       planId: "",
-      unitPrice: 0,
       description: "",
       maxUsages: "",
       validFrom: "",
       validUntil: "",
     });
+    setPricingTiers([]);
     setError(null);
     setIsModalOpen(true);
   };
@@ -120,12 +226,12 @@ function CouponsContent() {
     setFormData({
       code: coupon.code,
       planId: coupon.planId,
-      unitPrice: coupon.unitPrice,
       description: coupon.description || "",
       maxUsages: coupon.maxUsages ?? "",
       validFrom: coupon.validFrom.slice(0, 10),
       validUntil: coupon.validUntil.slice(0, 10),
     });
+    loadEditPricings(coupon);
     setError(null);
     setIsModalOpen(true);
   };
@@ -147,14 +253,20 @@ function CouponsContent() {
         : "/api/coupons";
       const method = editingCoupon ? "PATCH" : "POST";
 
+      const pricings = pricingTiers.map((tier) => ({
+        minQuantity: tier.minQuantity,
+        maxQuantity: tier.maxQuantity,
+        unitPrice: calcCouponPrice(tier),
+      }));
+
       const payload = {
         code: formData.code,
         planId: formData.planId,
-        unitPrice: formData.unitPrice,
         description: formData.description || null,
         maxUsages: formData.maxUsages !== "" ? Number(formData.maxUsages) : null,
         validFrom: formData.validFrom,
         validUntil: formData.validUntil,
+        pricings,
       };
 
       const res = await fetch(url, {
@@ -163,14 +275,14 @@ function CouponsContent() {
         body: JSON.stringify(payload),
       });
 
-      const data = await res.json();
+      const resData = await res.json();
 
       if (res.ok) {
         closeModal();
         toast.success(editingCoupon ? "クーポンを更新しました" : "クーポンを作成しました");
-        queryClient.invalidateQueries({ queryKey: queryKeys.coupons });
+        queryClient.invalidateQueries({ queryKey: queryKeys.couponsWithRelations });
       } else {
-        setError(data.error || "保存に失敗しました");
+        setError(resData.error || "保存に失敗しました");
       }
     } catch (err) {
       console.error("保存エラー:", err);
@@ -186,16 +298,13 @@ function CouponsContent() {
     }
 
     try {
-      const res = await fetch("/api/coupons/" + coupon.id, {
-        method: "DELETE",
-      });
-
+      const res = await fetch("/api/coupons/" + coupon.id, { method: "DELETE" });
       if (res.ok) {
         toast.success("クーポンを削除しました");
-        queryClient.invalidateQueries({ queryKey: queryKeys.coupons });
+        queryClient.invalidateQueries({ queryKey: queryKeys.couponsWithRelations });
       } else {
-        const data = await res.json();
-        toast.error(data.error || "削除に失敗しました");
+        const resData = await res.json();
+        toast.error(resData.error || "削除に失敗しました");
       }
     } catch (err) {
       console.error("削除エラー:", err);
@@ -204,75 +313,83 @@ function CouponsContent() {
   };
 
   const toggleActive = async (coupon: Coupon) => {
-    queryClient.setQueryData<Coupon[]>(queryKeys.coupons, (old) => {
-      if (!old) return old;
-      return old.map((c) =>
-        c.id === coupon.id ? { ...c, isActive: !c.isActive } : c
-      );
-    });
-
     try {
       const res = await fetch("/api/coupons/" + coupon.id, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isActive: !coupon.isActive }),
       });
-
       if (res.ok) {
         toast.success(coupon.isActive ? "クーポンを無効化しました" : "クーポンを有効化しました");
+        queryClient.invalidateQueries({ queryKey: queryKeys.couponsWithRelations });
       } else {
         throw new Error("更新に失敗しました");
       }
     } catch (err) {
       console.error("ステータス変更エラー:", err);
       toast.error("ステータスの変更に失敗しました");
-      queryClient.invalidateQueries({ queryKey: queryKeys.coupons });
     }
   };
 
-  const formatPrice = (price: number) => {
-    return "¥" + price.toLocaleString();
+  const formatPrice = (price: number) => "¥" + price.toLocaleString();
+
+  const formatDate = (dateStr: string) =>
+    new Date(dateStr).toLocaleDateString("ja-JP");
+
+  const isExpired = (validUntil: string) =>
+    new Date(validUntil) < new Date();
+
+  const addTier = () => {
+    const lastTier = pricingTiers[pricingTiers.length - 1];
+    const newMin = lastTier ? (lastTier.maxQuantity ?? lastTier.minQuantity) + 1 : 1;
+    setPricingTiers([
+      ...pricingTiers,
+      {
+        minQuantity: newMin,
+        maxQuantity: null,
+        originalPrice: lastTier?.originalPrice ?? 0,
+        discountType: "discount",
+        discountAmount: 0,
+      },
+    ]);
   };
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString("ja-JP");
+  const removeTier = (index: number) => {
+    if (pricingTiers.length <= 1) return;
+    setPricingTiers(pricingTiers.filter((_, i) => i !== index));
   };
 
-  const isExpired = (validUntil: string) => {
-    return new Date(validUntil) < new Date();
+  const updateTier = (index: number, updates: Partial<PricingTierForm>) => {
+    setPricingTiers(
+      pricingTiers.map((tier, i) => (i === index ? { ...tier, ...updates } : tier))
+    );
+  };
+
+  // 一覧の料金表示用ヘルパー
+  const getCouponPriceDisplay = (coupon: Coupon) => {
+    if (coupon.pricings && coupon.pricings.length > 0) {
+      if (coupon.pricings.length === 1) {
+        return formatPrice(coupon.pricings[0].unitPrice);
+      }
+      const prices = coupon.pricings.map((p) => p.unitPrice);
+      return formatPrice(Math.min(...prices)) + "〜" + formatPrice(Math.max(...prices));
+    }
+    if (coupon.unitPrice != null) {
+      return formatPrice(coupon.unitPrice);
+    }
+    return "-";
   };
 
   return (
     <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">クーポン管理</h1>
-      </div>
-
       <div className="max-w-6xl">
         <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center gap-4">
-            <select
-              value={filterServiceId}
-              onChange={(e) => setFilterServiceId(e.target.value)}
-              className="px-3 py-2 border rounded-md text-sm"
-            >
-              <option value="">全サービス</option>
-              {services.map((service) => (
-                <option key={service.id} value={service.id}>
-                  {service.name}
-                </option>
-              ))}
-            </select>
-            <label className="flex items-center gap-2 text-sm text-gray-600">
-              <input
-                type="checkbox"
-                checked={showInactive}
-                onChange={(e) => setShowInactive(e.target.checked)}
-                className="rounded"
-              />
-              無効なクーポンも表示
-            </label>
-          </div>
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "active" | "inactive")}>
+            <TabsList>
+              <TabsTrigger value="active">有効</TabsTrigger>
+              <TabsTrigger value="inactive">無効</TabsTrigger>
+            </TabsList>
+          </Tabs>
           <Button onClick={openCreateModal}>
             <Plus className="h-4 w-4 mr-2" />
             新規クーポン作成
@@ -281,12 +398,21 @@ function CouponsContent() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">
-              クーポン一覧
-              <span className="text-sm font-normal text-gray-500 ml-2">
-                {coupons.length}件
-              </span>
-            </CardTitle>
+            <div className="flex justify-between items-center">
+              <select
+                value={filterServiceId}
+                onChange={(e) => setFilterServiceId(e.target.value)}
+                className="px-3 py-2 border rounded-md text-sm"
+              >
+                <option value="">全サービス</option>
+                {services.map((service) => (
+                  <option key={service.id} value={service.id}>
+                    {service.name}
+                  </option>
+                ))}
+              </select>
+              <span className="text-sm text-gray-500">{coupons.length}件</span>
+            </div>
           </CardHeader>
           <CardContent>
             {coupons.length === 0 && !loading ? (
@@ -324,7 +450,7 @@ function CouponsContent() {
                         )}
                       </td>
                       <td className="py-2 px-4 text-right font-medium">
-                        {formatPrice(coupon.unitPrice)}
+                        {getCouponPriceDisplay(coupon)}
                       </td>
                       <td className="py-2 px-4">
                         <div className="text-xs">
@@ -346,18 +472,10 @@ function CouponsContent() {
                       </td>
                       <td className="py-2 px-4 text-right">
                         <div className="flex justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openEditModal(coupon)}
-                          >
+                          <Button variant="ghost" size="sm" onClick={() => openEditModal(coupon)}>
                             <Pencil className="h-4 w-4" />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(coupon)}
-                          >
+                          <Button variant="ghost" size="sm" onClick={() => handleDelete(coupon)}>
                             <Trash2 className="h-4 w-4 text-red-500" />
                           </Button>
                         </div>
@@ -374,20 +492,17 @@ function CouponsContent() {
       {/* モーダル */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 overflow-y-auto">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 my-8">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 my-8">
             <div className="flex items-center justify-between px-6 py-4 border-b">
               <h2 className="text-lg font-semibold">
                 {editingCoupon ? "クーポン編集" : "新規クーポン作成"}
               </h2>
-              <button
-                onClick={closeModal}
-                className="text-gray-400 hover:text-gray-600"
-              >
+              <button onClick={closeModal} className="text-gray-400 hover:text-gray-600">
                 <X className="h-5 w-5" />
               </button>
             </div>
             <form onSubmit={handleSubmit}>
-              <div className="px-6 py-4 space-y-4 max-h-[60vh] overflow-y-auto">
+              <div className="px-6 py-4 space-y-4 max-h-[70vh] overflow-y-auto">
                 {error && (
                   <div className="bg-red-50 text-red-600 px-4 py-2 rounded text-sm">
                     {error}
@@ -419,6 +534,7 @@ function CouponsContent() {
                       onChange={(e) => {
                         setModalServiceId(e.target.value);
                         setFormData({ ...formData, planId: "" });
+                        setPricingTiers([]);
                       }}
                       className="w-full px-3 py-2 border rounded-md"
                       required
@@ -437,7 +553,7 @@ function CouponsContent() {
                     </label>
                     <select
                       value={formData.planId}
-                      onChange={(e) => setFormData({ ...formData, planId: e.target.value })}
+                      onChange={(e) => handlePlanChange(e.target.value)}
                       className="w-full px-3 py-2 border rounded-md"
                       required
                       disabled={!modalServiceId}
@@ -452,19 +568,81 @@ function CouponsContent() {
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    クーポン適用後の単価（円/回線/月）
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.unitPrice}
-                    onChange={(e) => setFormData({ ...formData, unitPrice: parseInt(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 border rounded-md"
-                    min="0"
-                    required
-                  />
-                </div>
+                {/* 料金条件設定 */}
+                {!formData.planId && (
+                  <div className="bg-gray-50 border border-dashed rounded-md px-4 py-3 text-sm text-gray-500">
+                    サービス・プランを選択すると料金条件が表示されます
+                  </div>
+                )}
+                {formData.planId && pricingTiers.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      料金条件
+                    </label>
+                    {/* ヘッダー */}
+                    <div className="grid grid-cols-[1fr_1fr_auto_auto_1fr_auto_24px] gap-2 text-xs text-gray-500 mb-1 px-1">
+                      <span>最低</span>
+                      <span>最大</span>
+                      <span>元価格</span>
+                      <span></span>
+                      <span>金額</span>
+                      <span>適用後</span>
+                      <span></span>
+                    </div>
+                    <div className="space-y-1">
+                      {pricingTiers.map((tier, index) => (
+                        <div key={index} className="grid grid-cols-[1fr_1fr_auto_auto_1fr_auto_24px] gap-2 items-center">
+                          <input
+                            type="number"
+                            value={tier.minQuantity}
+                            onChange={(e) => updateTier(index, { minQuantity: parseInt(e.target.value) || 1 })}
+                            className="w-full px-2 py-1 border rounded text-sm text-center"
+                            min="1"
+                          />
+                          <input
+                            type="number"
+                            value={tier.maxQuantity ?? ""}
+                            onChange={(e) => updateTier(index, { maxQuantity: e.target.value ? parseInt(e.target.value) : null })}
+                            className="w-full px-2 py-1 border rounded text-sm text-center"
+                            min="1"
+                            placeholder="∞"
+                          />
+                          <span className="text-sm text-gray-600 whitespace-nowrap px-1">{formatPrice(tier.originalPrice)}</span>
+                          <select
+                            value={tier.discountType}
+                            onChange={(e) => updateTier(index, { discountType: e.target.value as "discount" | "markup" })}
+                            className="px-1.5 py-1 border rounded text-sm"
+                          >
+                            <option value="discount">割引</option>
+                            <option value="markup">割増</option>
+                          </select>
+                          <input
+                            type="number"
+                            value={tier.discountAmount}
+                            onChange={(e) => updateTier(index, { discountAmount: parseInt(e.target.value) || 0 })}
+                            className="w-full px-2 py-1 border rounded text-sm text-center"
+                            min="0"
+                          />
+                          <span className={"text-sm font-bold text-right whitespace-nowrap " + (calcCouponPrice(tier) < tier.originalPrice ? "text-green-600" : calcCouponPrice(tier) > tier.originalPrice ? "text-red-600" : "")}>
+                            {formatPrice(calcCouponPrice(tier))}
+                          </span>
+                          {pricingTiers.length > 1 ? (
+                            <button type="button" onClick={() => removeTier(index)} className="text-red-400 hover:text-red-600">
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          ) : <span />}
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={addTier}
+                      className="mt-1.5 text-xs text-blue-600 hover:text-blue-800"
+                    >
+                      + 条件追加
+                    </button>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">

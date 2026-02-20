@@ -7,8 +7,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ==================== ENUMS ====================
@@ -525,7 +526,7 @@ model Coupon {
   id          String   @id @default(cuid())
   code        String   @unique @db.VarChar(50)
   planId      String
-  unitPrice   Int
+  unitPrice   Int?
   description String?  @db.VarChar(200)
   maxUsages   Int?
   usageCount  Int      @default(0)
@@ -535,12 +536,27 @@ model Coupon {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  plan         Plan          @relation(fields: [planId], references: [id])
+  plan         Plan            @relation(fields: [planId], references: [id])
   applications Application[]
+  pricings     CouponPricing[]
 
   @@index([code])
   @@index([planId])
   @@index([isActive])
+}
+
+model CouponPricing {
+  id          String   @id @default(cuid())
+  couponId    String
+  minQuantity Int      @default(1)
+  maxQuantity Int?
+  unitPrice   Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  coupon Coupon @relation(fields: [couponId], references: [id], onDelete: Cascade)
+
+  @@index([couponId])
 }
 
 model ApplicationLine {

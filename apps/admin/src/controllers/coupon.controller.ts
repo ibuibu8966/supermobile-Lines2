@@ -37,15 +37,22 @@ export async function getAllCoupons(
 /**
  * クーポン作成コントローラー
  */
+const pricingSchema = z.object({
+  minQuantity: z.number().int().min(1),
+  maxQuantity: z.number().int().min(1).nullable(),
+  unitPrice: z.number().int().min(0),
+});
+
 const couponSchema = z.object({
   code: z.string().min(1, 'コードは必須です').max(50),
   planId: z.string().cuid('プランを選択してください'),
-  unitPrice: z.number().int().min(0, '単価は0以上で入力してください'),
+  unitPrice: z.number().int().min(0).optional().nullable(),
   description: z.string().max(200).optional().nullable(),
   maxUsages: z.number().int().min(1).optional().nullable(),
   validFrom: z.coerce.date({ error: '有効開始日は必須です' }),
   validUntil: z.coerce.date({ error: '有効終了日は必須です' }),
   isActive: z.boolean().optional().default(true),
+  pricings: z.array(pricingSchema).optional(),
 });
 
 export async function createCoupon(
@@ -77,12 +84,13 @@ export async function createCoupon(
 const updateCouponSchema = z.object({
   code: z.string().min(1).max(50).optional(),
   planId: z.string().cuid().optional(),
-  unitPrice: z.number().int().min(0).optional(),
+  unitPrice: z.number().int().min(0).optional().nullable(),
   description: z.string().max(200).optional().nullable(),
   maxUsages: z.number().int().min(1).optional().nullable(),
   validFrom: z.string().optional(),
   validUntil: z.string().optional(),
   isActive: z.boolean().optional(),
+  pricings: z.array(pricingSchema).optional(),
 });
 
 export async function updateCoupon(

@@ -7,11 +7,21 @@
 /**
  * 基本Coupon Entity
  */
+export interface CouponPricingEntity {
+  id: string;
+  couponId: string;
+  minQuantity: number;
+  maxQuantity: number | null;
+  unitPrice: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface CouponEntity {
   id: string;
   code: string;
   planId: string;
-  unitPrice: number;
+  unitPrice: number | null;
   description: string | null;
   maxUsages: number | null;
   usageCount: number;
@@ -26,6 +36,7 @@ export interface CouponEntity {
  * Coupon with Relations (API response用)
  */
 export interface CouponWithRelations extends CouponEntity {
+  pricings?: CouponPricingEntity[];
   plan?: {
     id: string;
     code: string;
@@ -45,15 +56,22 @@ export interface CouponWithRelations extends CouponEntity {
 /**
  * Coupon Create Input
  */
+export interface CouponPricingInput {
+  minQuantity: number;
+  maxQuantity: number | null;
+  unitPrice: number;
+}
+
 export interface CouponCreateInput {
   code: string;
   planId: string;
-  unitPrice: number;
+  unitPrice?: number | null;
   description?: string | null;
   maxUsages?: number | null;
   validFrom: Date;
   validUntil: Date;
   isActive?: boolean;
+  pricings?: CouponPricingInput[];
 }
 
 /**
@@ -62,10 +80,11 @@ export interface CouponCreateInput {
 export interface CouponUpdateInput {
   code?: string;
   planId?: string;
-  unitPrice?: number;
+  unitPrice?: number | null;
   description?: string | null;
   maxUsages?: number | null;
   validFrom?: Date | string;
   validUntil?: Date | string;
   isActive?: boolean;
+  pricings?: CouponPricingInput[];
 }

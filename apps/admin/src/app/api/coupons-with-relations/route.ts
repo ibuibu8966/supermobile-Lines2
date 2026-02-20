@@ -11,9 +11,10 @@ export async function GET(request: NextRequest) {
   try {
     // 並列実行で高速化
     const [coupons, services, plans] = await Promise.all([
-      // クーポン取得（プラン・サービス情報を含む）
+      // クーポン取得（プラン・サービス情報・料金テーブルを含む）
       prisma.coupon.findMany({
         include: {
+          pricings: { orderBy: { minQuantity: "asc" } },
           plan: {
             include: {
               service: {
@@ -46,7 +47,7 @@ export async function GET(request: NextRequest) {
         },
         orderBy: { name: "asc" },
       }),
-      // プラン一覧（モーダル用）
+      // プラン一覧（モーダル用、料金テーブル含む）
       prisma.plan.findMany({
         where: { isActive: true },
         include: {
@@ -56,6 +57,9 @@ export async function GET(request: NextRequest) {
               code: true,
               name: true,
             },
+          },
+          pricings: {
+            orderBy: { minQuantity: "asc" },
           },
         },
         orderBy: { name: "asc" },

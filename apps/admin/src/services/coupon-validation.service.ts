@@ -44,7 +44,7 @@ export class CouponValidationService {
 
     return {
       valid: true,
-      unitPrice: coupon.unitPrice,
+      unitPrice: coupon.unitPrice ?? undefined,
       description: coupon.description || undefined,
     };
   }
