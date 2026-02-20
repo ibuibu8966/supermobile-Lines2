@@ -2,7 +2,8 @@
 
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { Button, Badge } from "@repo/ui";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   LayoutDashboard,
   FileText,
@@ -39,8 +40,8 @@ const ROLE_LABELS: Record<string, string> = {
 
 const menuItems = [
   { title: "ダッシュボード", href: "/", icon: LayoutDashboard, superAdminOnly: true },
-  { title: "申し込み一覧", href: "/applications", icon: FileText },
-  { title: "アーカイブ", href: "/applications/archived", icon: Archive, superAdminOnly: true },
+  { title: "申込管理", href: "/applications", icon: FileText },
+
   { title: "総合回線管理", href: "/lines", icon: ListChecks, superAdminOnly: true },
   { title: "SIM管理", href: "/sims", icon: Smartphone, superAdminOnly: true },
   { title: "仕入れ管理", href: "/procurement", icon: ShoppingCart, superAdminOnly: true },
