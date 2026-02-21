@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { logger } from "@/shared/utils/logger";
 
 // サーバーサイド用（Storage操作 - Service Role Key使用）
 export const createServerClient = () => {
@@ -31,13 +32,13 @@ export const getSignedUrl = async (
   expiresIn: number = 3600
 ): Promise<string | null> => {
   const supabase = createServerClient();
-  console.log(`getSignedUrl: bucket=${bucket}, path=${path}`);
+  logger.debug(`getSignedUrl: bucket=${bucket}, path=${path}`);
   const { data, error } = await supabase.storage
     .from(bucket)
     .createSignedUrl(path, expiresIn);
 
   if (error) {
-    console.error("Error creating signed URL:", error, `bucket=${bucket}, path=${path}`);
+    logger.error("Error creating signed URL", { error, bucket, path });
     return null;
   }
 
@@ -60,7 +61,7 @@ export const uploadFile = async (
     });
 
   if (error) {
-    console.error("Error uploading file:", error);
+    logger.error("Error uploading file", { error });
     return null;
   }
 
@@ -78,7 +79,7 @@ export const createSignedUploadUrl = async (
     .createSignedUploadUrl(path);
 
   if (error) {
-    console.error("Error creating signed upload URL:", error);
+    logger.error("Error creating signed upload URL", { error });
     return null;
   }
 
@@ -94,7 +95,7 @@ export const deleteFile = async (
   const { error } = await supabase.storage.from(bucket).remove([path]);
 
   if (error) {
-    console.error("Error deleting file:", error);
+    logger.error("Error deleting file", { error });
     return false;
   }
 

@@ -146,7 +146,7 @@ export function Sidebar({ user }: SidebarProps) {
       {/* Desktop sidebar */}
       <aside
         className={`
-          hidden lg:flex flex-col bg-white border-r transition-all duration-300
+          hidden lg:flex flex-col bg-white border-r transition-all duration-300 sticky top-0 h-screen
           ${isCollapsed ? "w-16" : "w-64"}
         `}
       >

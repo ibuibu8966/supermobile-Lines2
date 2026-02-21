@@ -191,11 +191,7 @@ export function ProcurementClient() {
   }
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">仕入れ管理</h1>
-      </div>
-
+    <div className="p-6 h-full flex flex-col">
       <NewProcurementDialog open={dialogOpen} onOpenChange={setDialogOpen} />
 
       {selectedOrderForImport && (
@@ -207,7 +203,7 @@ export function ProcurementClient() {
         />
       )}
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 min-h-0 flex flex-col">
         <div className="flex items-center justify-between mb-6">
           <TabsList>
             <TabsTrigger value="procurement">
@@ -247,12 +243,12 @@ export function ProcurementClient() {
           </div>
         </div>
 
-        <TabsContent value="procurement" className="mt-0">
+        <TabsContent value="procurement" className="mt-0 flex-1 min-h-0 flex flex-col">
 
-          <Card>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
+          <Card className="flex-1 min-h-0 flex flex-col">
+            <CardContent className="p-0 flex-1 min-h-0 overflow-auto">
+              <Table wrapperClassName="overflow-visible">
+                <TableHeader className="sticky top-0 z-10 bg-white">
                   <TableRow>
                     <TableHead className="w-12"></TableHead>
                     <TableHead>仕入れ先</TableHead>

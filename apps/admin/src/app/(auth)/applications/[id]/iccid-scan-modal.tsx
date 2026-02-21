@@ -185,8 +185,7 @@ export function IccidScanModal({
         setError(data.error || "割り当てに失敗しました");
         return { ok: false, failedIccids: [] as string[] };
       }
-    } catch (err) {
-      console.error("ICCID割当エラー:", err);
+    } catch {
       setError("割り当てに失敗しました");
       return { ok: false, failedIccids: [] as string[] };
     } finally {

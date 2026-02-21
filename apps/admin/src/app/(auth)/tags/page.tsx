@@ -127,10 +127,6 @@ export default function TagsPage() {
 
   return (
     <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">タグ管理</h1>
-      </div>
-
       <div className="max-w-4xl">
         <Tabs value={activeTab} onValueChange={handleTabChange}>
           {/* Underlined tabs with icons + Create button */}

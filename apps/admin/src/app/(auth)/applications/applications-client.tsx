@@ -17,6 +17,7 @@ import dynamic from "next/dynamic";
 import { WorkflowRows } from "@/components/applications/workflow-rows";
 import type { WorkflowAppData } from "@/components/applications/workflow-rows";
 import { CommentModal } from "@/components/applications/comment-modal";
+import { TableSkeleton } from "@/components/ui/table-skeleton";
 
 const KycModal = dynamic(
   () => import("@/components/kyc-modal").then((m) => ({ default: m.KycModal })),
@@ -360,11 +361,7 @@ export function ApplicationsClient() {
   };
 
   return (
-    <div className="p-6">
-      <div className="mb-4">
-        <h1 className="text-2xl font-bold text-gray-900">申し込み一覧</h1>
-      </div>
-
+    <div className="p-6 h-full flex flex-col">
       {error && (
         <div className="bg-red-50 text-red-600 px-4 py-3 rounded-md text-sm flex items-center gap-2 mb-4">
           <AlertCircle className="h-4 w-4" />
@@ -386,7 +383,7 @@ export function ApplicationsClient() {
         </TabsList>
       </Tabs>
 
-      <Card>
+      <Card className="flex-1 min-h-0 flex flex-col">
         <CardHeader>
           <div className="flex justify-between items-center">
             <CardTitle className="text-base flex items-center gap-2">
@@ -490,19 +487,17 @@ export function ApplicationsClient() {
             </div>
           )}
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex-1 min-h-0 p-0 overflow-auto">
           {applications.length === 0 && !isLoadingApplications ? (
-            <div className="text-center py-12 text-gray-500">
+            <div className="text-center py-12 px-6 text-gray-500">
               申し込みが見つかりません
             </div>
           ) : applications.length === 0 && isLoadingApplications ? (
-            <div className="flex justify-center items-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-            </div>
+            <TableSkeleton rows={10} cols={7} />
           ) : (
-            <div className="overflow-x-auto">
+            <>
               <table className="w-full text-sm">
-                <thead>
+                <thead className="sticky top-0 z-10 bg-white">
                   <tr className="border-b bg-gray-50">
                     <th className="text-left py-2 px-2 whitespace-nowrap min-w-[32px]"></th>
                     <th className="text-left py-2 px-2 whitespace-nowrap min-w-[50px]">詳細</th>
@@ -522,10 +517,10 @@ export function ApplicationsClient() {
                     <th className="text-left py-2 px-2 whitespace-nowrap min-w-[100px]">本人確認</th>
                     <th className="text-left py-2 px-2 whitespace-nowrap min-w-[120px]">決済確認</th>
                     <th className="text-left py-2 px-2 whitespace-nowrap min-w-[100px]">住所確認</th>
-                    <th className="text-left py-2 px-2 whitespace-nowrap min-w-[100px]">井上コメント</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap min-w-[12em]">井上コメント</th>
                     <th className="text-left py-2 px-2 whitespace-nowrap min-w-[100px]">井上確認</th>
                     <th className="text-left py-2 px-2 whitespace-nowrap min-w-[120px]">担当者</th>
-                    <th className="text-left py-2 px-2 whitespace-nowrap min-w-[100px]">全体コメント</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap min-w-[100px]">備考</th>
                     <th className="text-left py-2 px-2 whitespace-nowrap min-w-[80px]">従業員質問</th>
                   </tr>
                 </thead>
@@ -730,7 +725,7 @@ export function ApplicationsClient() {
                         ) : (
                           <input
                             type="text"
-                            className="px-2 py-1 border rounded text-xs w-24"
+                            className="px-2 py-1 border rounded text-xs w-[12em]"
                             defaultValue={app.comment1 || ""}
                             onBlur={(e) => {
                               if (e.target.value !== (app.comment1 || "")) {
@@ -815,11 +810,11 @@ export function ApplicationsClient() {
                   })}
                 </tbody>
               </table>
-            </div>
+            </>
           )}
 
           {pagination && pagination.totalPages > 1 && (
-            <div className="mt-4 flex justify-between items-center text-sm text-gray-500">
+            <div className="px-6 py-4 border-t flex justify-between items-center text-sm text-gray-500">
               <span>
                 {pagination.total}件中{" "}
                 {(pagination.page - 1) * pagination.pageSize + 1}-

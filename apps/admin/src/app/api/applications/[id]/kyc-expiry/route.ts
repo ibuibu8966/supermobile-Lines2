@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/database";
 import { KycImageService } from "@/services/kyc-image.service";
 import { KycImageRepository } from "@/repositories/kyc-image.repository";
+import { getAdminSession } from "@/lib/auth/admin-session";
 import { logger } from "@/shared/utils/logger";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +17,9 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const session = await getAdminSession();
+  if (session instanceof NextResponse) return session;
+
   const { id } = await params;
 
   try {

@@ -6,9 +6,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Pencil, Trash2, Loader2, X, Settings } from "lucide-react";
 import { toast } from "sonner";
-import { queryKeys } from "@/lib/api/query-keys";
+import { queryKeys, STALE_TIMES } from "@/lib/api/query-keys";
 import { api } from "@/lib/api/client";
 
 interface UsageTag {
@@ -52,22 +53,21 @@ interface Service {
 
 export default function ServicesPage() {
   const queryClient = useQueryClient();
-  const [showInactive, setShowInactive] = useState(false);
+  const [activeTab, setActiveTab] = useState<"active" | "inactive">("active");
 
   // TanStack Query
   const { data: servicesData = [], isLoading: loading } = useQuery<Service[]>({
     queryKey: queryKeys.services,
     queryFn: api.getServices as unknown as () => Promise<Service[]>,
+    staleTime: STALE_TIMES.MASTER,
   });
 
   // フィルター適用
   const services = useMemo(() => {
-    let filtered = servicesData;
-    if (!showInactive) {
-      filtered = filtered.filter((s) => s.isActive);
-    }
-    return filtered;
-  }, [servicesData, showInactive]);
+    return servicesData.filter((s) =>
+      activeTab === "active" ? s.isActive : !s.isActive
+    );
+  }, [servicesData, activeTab]);
 
   // モーダル状態
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -131,8 +131,7 @@ export default function ServicesPage() {
       } else {
         setError(data.error || "保存に失敗しました");
       }
-    } catch (err) {
-      console.error("保存エラー:", err);
+    } catch {
       setError("保存に失敗しました");
     } finally {
       setSaving(false);
@@ -156,8 +155,7 @@ export default function ServicesPage() {
         const data = await res.json();
         toast.error(data.error || "削除に失敗しました");
       }
-    } catch (err) {
-      console.error("削除エラー:", err);
+    } catch {
       toast.error("削除に失敗しました");
     }
   };
@@ -183,8 +181,7 @@ export default function ServicesPage() {
       } else {
         throw new Error("更新に失敗しました");
       }
-    } catch (err) {
-      console.error("ステータス変更エラー:", err);
+    } catch {
       toast.error("ステータスの変更に失敗しました");
       queryClient.invalidateQueries({ queryKey: queryKeys.services });
     }
@@ -208,21 +205,14 @@ export default function ServicesPage() {
 
   return (
     <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">サービス・プラン管理</h1>
-      </div>
-
       <div className="max-w-6xl">
         <div className="flex justify-between items-center mb-6">
-          <label className="flex items-center gap-2 text-sm text-gray-600">
-            <input
-              type="checkbox"
-              checked={showInactive}
-              onChange={(e) => setShowInactive(e.target.checked)}
-              className="rounded"
-            />
-            無効なサービスも表示
-          </label>
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "active" | "inactive")}>
+            <TabsList>
+              <TabsTrigger value="active">有効</TabsTrigger>
+              <TabsTrigger value="inactive">無効</TabsTrigger>
+            </TabsList>
+          </Tabs>
           <Button onClick={openCreateModal}>
             <Plus className="h-4 w-4 mr-2" />
             新規サービス登録
@@ -245,16 +235,19 @@ export default function ServicesPage() {
               <Card key={service.id} className={!service.isActive ? "opacity-60" : ""}>
                 <CardHeader>
                   <div className="flex justify-between items-center">
-                    <div>
-                      <CardTitle>{service.name}</CardTitle>
-                      <p className="text-sm text-muted-foreground mt-1">コード: {service.code}</p>
-                    </div>
+                    <CardTitle>{service.name}</CardTitle>
                     <div className="flex gap-2 items-center">
                       <button onClick={() => toggleActive(service)}>
                         <Badge variant={service.isActive ? "success" : "secondary"}>
                           {service.isActive ? "有効" : "無効"}
                         </Badge>
                       </button>
+                      <Link href={"/plans?serviceId=" + service.id}>
+                        <Button variant="outline" size="sm">
+                          <Plus className="h-4 w-4 mr-2" />
+                          プラン追加
+                        </Button>
+                      </Link>
                       <Button variant="outline" size="sm" onClick={() => openEditModal(service)}>
                         <Pencil className="h-4 w-4 mr-2" />
                         編集
@@ -266,22 +259,13 @@ export default function ServicesPage() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex justify-between items-center mb-4">
-                    <h4 className="font-medium">プラン一覧</h4>
-                    <Link href={"/plans?serviceId=" + service.id}>
-                      <Button variant="outline" size="sm">
-                        <Plus className="h-4 w-4 mr-2" />
-                        プラン追加
-                      </Button>
-                    </Link>
-                  </div>
                   {service.plans.length === 0 ? (
                     <div className="text-center py-8 text-gray-500 text-sm">
                       プランが登録されていません
                     </div>
                   ) : (
                     <table className="w-full text-sm">
-                      <thead>
+                      <thead className="sticky top-0 z-10 bg-white">
                         <tr className="border-b">
                           <th className="text-left py-2 px-4">プラン名</th>
                           <th className="text-left py-2 px-4">用途タグ</th>

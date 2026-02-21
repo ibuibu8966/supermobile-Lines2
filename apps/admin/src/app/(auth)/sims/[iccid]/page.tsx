@@ -137,8 +137,7 @@ export default function SimDetailPage({ params }: { params: Promise<{ iccid: str
         } else {
           setError(data.error || "SIMの取得に失敗しました");
         }
-      } catch (err) {
-        console.error("SIM取得エラー:", err);
+      } catch {
         setError("SIMの取得に失敗しました");
       } finally {
         setLoading(false);
@@ -222,8 +221,7 @@ export default function SimDetailPage({ params }: { params: Promise<{ iccid: str
         const data = await res.json();
         alert(data.error || '更新に失敗しました');
       }
-    } catch (err) {
-      console.error('更新エラー:', err);
+    } catch {
       alert('更新に失敗しました');
     } finally {
       setSaving(false);
@@ -261,8 +259,7 @@ export default function SimDetailPage({ params }: { params: Promise<{ iccid: str
         const data = await res.json();
         alert(data.error || '更新に失敗しました');
       }
-    } catch (err) {
-      console.error('更新エラー:', err);
+    } catch {
       alert('更新に失敗しました');
     }
   };

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/database";
+import { getAdminSession } from "@/lib/auth/admin-session";
 
 export const dynamic = "force-dynamic";
 
@@ -8,6 +9,9 @@ export const dynamic = "force-dynamic";
  * GET /api/coupons/by-code?code=XXXX
  */
 export async function GET(request: NextRequest) {
+  const session = await getAdminSession();
+  if (session instanceof NextResponse) return session;
+
   const code = request.nextUrl.searchParams.get("code");
   if (!code) {
     return NextResponse.json({ error: "コードが必要です" }, { status: 400 });

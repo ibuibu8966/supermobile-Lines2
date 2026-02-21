@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Pencil, Trash2, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
-import { queryKeys } from "@/lib/api/query-keys";
+import { queryKeys, STALE_TIMES } from "@/lib/api/query-keys";
 import { api } from "@/lib/api/client";
 
 interface PlanPricing {
@@ -84,6 +84,7 @@ function CouponsContent() {
   const { data, isLoading: loading } = useQuery<CouponsWithRelations>({
     queryKey: queryKeys.couponsWithRelations,
     queryFn: api.getCouponsWithRelations as () => Promise<CouponsWithRelations>,
+    staleTime: STALE_TIMES.MASTER,
   });
 
   const services = data?.services ?? [];
@@ -284,8 +285,7 @@ function CouponsContent() {
       } else {
         setError(resData.error || "保存に失敗しました");
       }
-    } catch (err) {
-      console.error("保存エラー:", err);
+    } catch {
       setError("保存に失敗しました");
     } finally {
       setSaving(false);
@@ -306,8 +306,7 @@ function CouponsContent() {
         const resData = await res.json();
         toast.error(resData.error || "削除に失敗しました");
       }
-    } catch (err) {
-      console.error("削除エラー:", err);
+    } catch {
       toast.error("削除に失敗しました");
     }
   };
@@ -325,8 +324,7 @@ function CouponsContent() {
       } else {
         throw new Error("更新に失敗しました");
       }
-    } catch (err) {
-      console.error("ステータス変更エラー:", err);
+    } catch {
       toast.error("ステータスの変更に失敗しました");
     }
   };
@@ -381,8 +379,8 @@ function CouponsContent() {
   };
 
   return (
-    <div className="p-6">
-      <div className="max-w-6xl">
+    <div className="p-6 h-full flex flex-col">
+      <div className="max-w-6xl flex-1 min-h-0 flex flex-col">
         <div className="flex justify-between items-center mb-6">
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "active" | "inactive")}>
             <TabsList>
@@ -396,7 +394,7 @@ function CouponsContent() {
           </Button>
         </div>
 
-        <Card>
+        <Card className="flex-1 min-h-0 flex flex-col">
           <CardHeader>
             <div className="flex justify-between items-center">
               <select
@@ -414,18 +412,18 @@ function CouponsContent() {
               <span className="text-sm text-gray-500">{coupons.length}件</span>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex-1 min-h-0 p-0 overflow-auto">
             {coupons.length === 0 && !loading ? (
-              <div className="text-center py-12 text-gray-500">
+              <div className="text-center py-12 px-6 text-gray-500">
                 クーポンが登録されていません
               </div>
             ) : coupons.length === 0 && loading ? (
-              <div className="flex justify-center py-12">
+              <div className="flex justify-center py-12 px-6">
                 <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
               </div>
             ) : (
               <table className="w-full text-sm">
-                <thead>
+                <thead className="sticky top-0 z-10 bg-white">
                   <tr className="border-b">
                     <th className="text-left py-2 px-4">コード</th>
                     <th className="text-left py-2 px-4">プラン</th>

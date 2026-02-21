@@ -10,6 +10,7 @@ import {
   parseBooleanParam,
   parseDateRange,
 } from "@/shared/validators/validation";
+import { logger } from "@/shared/utils/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -64,7 +65,7 @@ export async function GET(request: NextRequest) {
       lineReserveTags,
     });
   } catch (error) {
-    console.error("Error fetching lines with tags:", error);
+    logger.logError("回線+タグ取得エラー", error);
     return NextResponse.json(
       { error: "回線データの取得に失敗しました" },
       { status: 500 }

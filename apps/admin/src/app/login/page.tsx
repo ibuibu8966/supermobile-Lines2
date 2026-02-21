@@ -42,8 +42,7 @@ function LoginForm() {
         router.push(callbackUrl);
         router.refresh();
       }
-    } catch (err) {
-      console.error("ログインエラー:", err);
+    } catch {
       setError("ログインに失敗しました");
     } finally {
       setLoading(false);

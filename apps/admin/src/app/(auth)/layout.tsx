@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { SidebarProvider } from "@/contexts/sidebar-context";
 import { Sidebar, MobileMenuButton } from "@/components/sidebar/sidebar";
+import { ErrorBoundary } from "@/components/error-boundary";
 
 export default async function AuthLayout({
   children,
@@ -11,7 +12,7 @@ export default async function AuthLayout({
 
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen bg-gray-50">
+      <div className="flex h-screen bg-gray-50">
         <Sidebar user={session?.user} />
         <div className="flex-1 flex flex-col min-w-0">
           {/* Mobile header */}
@@ -21,7 +22,7 @@ export default async function AuthLayout({
           </header>
           {/* Main content */}
           <main className="flex-1 overflow-auto">
-            {children}
+            <ErrorBoundary>{children}</ErrorBoundary>
           </main>
         </div>
       </div>

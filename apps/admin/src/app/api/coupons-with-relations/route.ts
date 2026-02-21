@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/database";
+import { logger } from "@/shared/utils/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -72,7 +73,7 @@ export async function GET(request: NextRequest) {
       plans,
     });
   } catch (error) {
-    console.error("Error fetching coupons with relations:", error);
+    logger.logError("クーポン+リレーション取得エラー", error);
     return NextResponse.json(
       { error: "クーポンデータの取得に失敗しました" },
       { status: 500 }

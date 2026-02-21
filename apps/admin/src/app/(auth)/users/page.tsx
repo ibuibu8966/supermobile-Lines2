@@ -5,7 +5,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Pencil, Trash2, Loader2, X, Eye, EyeOff, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryState } from "nuqs";
@@ -51,33 +52,33 @@ export default function UsersPage() {
     queryFn: api.getServices as () => Promise<{ id: string; code: string; name: string }[]>,
   });
 
-  // URL状態管理
-  const [showInactive, setShowInactive] = useQueryState("inactive", {
-    defaultValue: "false",
-    parse: (v) => v,
-    serialize: (v) => v,
-  });
+  const [activeTab, setActiveTab] = useState<"active" | "inactive">("active");
   const [filterRole, setFilterRole] = useQueryState("role", { defaultValue: "" });
   const [filterServiceId, setFilterServiceId] = useQueryState("service", { defaultValue: "" });
 
-  // クエリパラメータ生成（フィルター変更時に queryKey も変わるので再フェッチが走る）
-  const queryParams = useMemo(() => {
-    const params: Record<string, string> = {};
-    if (showInactive === "true") params.includeInactive = "true";
-    if (filterRole) params.role = filterRole;
-    if (filterServiceId) params.serviceId = filterServiceId;
-    return params;
-  }, [showInactive, filterRole, filterServiceId]);
-
-  // Users data — フィルターを queryKey に含めてキャッシュを正しく分離
-  const { data: users = [], isLoading: isLoadingUsers, error: fetchError } = useQuery<User[]>({
-    queryKey: Object.keys(queryParams).length === 0 ? queryKeys.users : ["users", queryParams],
+  // 全ユーザー取得（有効・無効両方）
+  const { data: allUsers = [], isLoading: isLoadingUsers, error: fetchError } = useQuery<User[]>({
+    queryKey: ["users", { includeInactive: "true" }],
     queryFn: () => {
-      const params = new URLSearchParams(queryParams);
+      const params = new URLSearchParams({ includeInactive: "true" });
       return api.getUsers(params) as unknown as Promise<User[]>;
     },
     staleTime: STALE_TIMES.LIST,
   });
+
+  // クライアントサイドフィルタリング
+  const users = useMemo(() => {
+    let filtered = allUsers.filter((u) =>
+      activeTab === "active" ? u.isActive : !u.isActive
+    );
+    if (filterRole) {
+      filtered = filtered.filter((u) => u.role === filterRole);
+    }
+    if (filterServiceId) {
+      filtered = filtered.filter((u) => u.service?.id === filterServiceId);
+    }
+    return filtered;
+  }, [allUsers, activeTab, filterRole, filterServiceId]);
 
   // モーダル状態
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -229,11 +230,7 @@ export default function UsersPage() {
   };
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">ユーザー管理</h1>
-      </div>
-
+    <div className="p-6 h-full flex flex-col">
       {fetchError && (
         <div className="bg-red-50 text-red-600 px-4 py-3 rounded-md text-sm flex items-center gap-2 mb-4">
           <AlertCircle className="h-4 w-4" />
@@ -241,77 +238,67 @@ export default function UsersPage() {
         </div>
       )}
 
-      <div className="max-w-6xl">
+      <div className="max-w-6xl flex-1 min-h-0 flex flex-col">
         <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center gap-4">
-            {isSuperAdmin && (
-              <>
-                <select
-                  value={filterRole}
-                  onChange={(e) => setFilterRole(e.target.value)}
-                  className="px-3 py-2 border rounded-md text-sm"
-                >
-                  <option value="">全ロール</option>
-                  <option value="SUPER_ADMIN">スーパー管理者</option>
-                  <option value="ADMIN">管理者</option>
-                  <option value="EMPLOYEE">従業員</option>
-                  <option value="CUSTOMER">顧客</option>
-                </select>
-                <select
-                  value={filterServiceId}
-                  onChange={(e) => setFilterServiceId(e.target.value)}
-                  className="px-3 py-2 border rounded-md text-sm"
-                >
-                  <option value="">全サービス</option>
-                  {services.map((service) => (
-                    <option key={service.id} value={service.id}>
-                      {service.name}
-                    </option>
-                  ))}
-                </select>
-              </>
-            )}
-            <label className="flex items-center gap-2 text-sm text-gray-600">
-              <input
-                type="checkbox"
-                checked={showInactive === "true"}
-                onChange={(e) => setShowInactive(e.target.checked ? "true" : "false")}
-                className="rounded"
-              />
-              無効ユーザーも表示
-            </label>
-          </div>
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "active" | "inactive")}>
+            <TabsList>
+              <TabsTrigger value="active">有効</TabsTrigger>
+              <TabsTrigger value="inactive">無効</TabsTrigger>
+            </TabsList>
+          </Tabs>
           <Button onClick={openCreateModal}>
             <Plus className="h-4 w-4 mr-2" />
             新規ユーザー作成
           </Button>
         </div>
 
-        <Card>
+        <Card className="flex-1 min-h-0 flex flex-col">
           <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              ユーザー一覧
-              <span className="text-sm font-normal text-gray-500">
-                {users.length}件
-              </span>
-              {isLoadingUsers && (
-                <Loader2 className="h-4 w-4 animate-spin text-blue-400" />
-              )}
-            </CardTitle>
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                {isSuperAdmin && (
+                  <>
+                    <select
+                      value={filterRole}
+                      onChange={(e) => setFilterRole(e.target.value)}
+                      className="px-3 py-2 border rounded-md text-sm"
+                    >
+                      <option value="">全ロール</option>
+                      <option value="SUPER_ADMIN">スーパー管理者</option>
+                      <option value="ADMIN">管理者</option>
+                      <option value="EMPLOYEE">従業員</option>
+                      <option value="CUSTOMER">顧客</option>
+                    </select>
+                    <select
+                      value={filterServiceId}
+                      onChange={(e) => setFilterServiceId(e.target.value)}
+                      className="px-3 py-2 border rounded-md text-sm"
+                    >
+                      <option value="">全サービス</option>
+                      {services.map((service) => (
+                        <option key={service.id} value={service.id}>
+                          {service.name}
+                        </option>
+                      ))}
+                    </select>
+                  </>
+                )}
+              </div>
+              <span className="text-sm text-gray-500">{users.length}件</span>
+            </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex-1 min-h-0 p-0 overflow-auto">
             {users.length === 0 && !isLoadingUsers ? (
-              <div className="text-center py-12 text-gray-500">
+              <div className="text-center py-12 px-6 text-gray-500">
                 ユーザーが登録されていません
               </div>
             ) : users.length === 0 && isLoadingUsers ? (
-              <div className="flex justify-center py-12">
+              <div className="flex justify-center py-12 px-6">
                 <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
               </div>
             ) : (
-              <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead>
+                  <thead className="sticky top-0 z-10 bg-white">
                     <tr className="border-b">
                       <th className="text-left py-3 px-4">メールアドレス</th>
                       <th className="text-left py-3 px-4">名前</th>
@@ -384,7 +371,6 @@ export default function UsersPage() {
                     ))}
                   </tbody>
                 </table>
-              </div>
             )}
           </CardContent>
         </Card>

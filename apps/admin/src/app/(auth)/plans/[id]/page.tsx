@@ -154,8 +154,7 @@ export default function PlanDetailPage({
       } else {
         setError(data.error || "保存に失敗しました");
       }
-    } catch (err) {
-      console.error("保存エラー:", err);
+    } catch {
       setError("保存に失敗しました");
     } finally {
       setSaving(false);
@@ -179,8 +178,7 @@ export default function PlanDetailPage({
         const data = await res.json();
         alert(data.error || "削除に失敗しました");
       }
-    } catch (err) {
-      console.error("削除エラー:", err);
+    } catch {
       alert("削除に失敗しました");
     }
   };
@@ -634,9 +632,9 @@ export default function PlanDetailPage({
               </CardHeader>
               <CardContent>
                 {plan.pricings.length > 0 ? (
-                  <div className="overflow-x-auto">
+                  <div>
                     <table className="w-full text-sm">
-                      <thead>
+                      <thead className="sticky top-0 z-10 bg-white">
                         <tr className="border-b">
                           <th className="text-left py-2 px-4">回線数</th>
                           <th className="text-right py-2 px-4">単価</th>

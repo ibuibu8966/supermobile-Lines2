@@ -122,8 +122,7 @@ export function SupplierManager({
       } else {
         setError(data.error || "保存に失敗しました");
       }
-    } catch (err) {
-      console.error("保存エラー:", err);
+    } catch {
       setError("保存に失敗しました");
     } finally {
       setSaving(false);
@@ -147,8 +146,7 @@ export function SupplierManager({
         const data = await res.json();
         toast.error(data.error || "削除に失敗しました");
       }
-    } catch (err) {
-      console.error("削除エラー:", err);
+    } catch {
       toast.error("削除に失敗しました");
     }
   };
@@ -174,8 +172,7 @@ export function SupplierManager({
       } else {
         throw new Error("更新に失敗しました");
       }
-    } catch (err) {
-      console.error("ステータス変更エラー:", err);
+    } catch {
       toast.error("ステータスの変更に失敗しました");
       queryClient.invalidateQueries({ queryKey: queryKeys.suppliers });
     }
@@ -221,7 +218,7 @@ export function SupplierManager({
             </div>
           ) : (
             <table className="w-full text-sm">
-              <thead>
+              <thead className="sticky top-0 z-10 bg-white">
                 <tr className="border-b">
                   <th className="text-left py-3 px-4">仕入れ先名</th>
                   <th className="text-left py-3 px-4">SIM数</th>

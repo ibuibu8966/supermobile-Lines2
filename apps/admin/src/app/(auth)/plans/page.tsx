@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus, Pencil, Trash2, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
-import { queryKeys } from "@/lib/api/query-keys";
+import { queryKeys, STALE_TIMES } from "@/lib/api/query-keys";
 import { api } from "@/lib/api/client";
 
 interface PlanPricing {
@@ -51,16 +51,19 @@ function PlansContent() {
   const { data: services = [] } = useQuery<{ id: string; code: string; name: string }[]>({
     queryKey: queryKeys.services,
     queryFn: api.getServices as () => Promise<{ id: string; code: string; name: string }[]>,
+    staleTime: STALE_TIMES.MASTER,
   });
 
   const { data: usageTags = [] } = useQuery<{ id: number; code: string; name: string }[]>({
     queryKey: queryKeys.usageTags,
     queryFn: api.getUsageTags as () => Promise<{ id: number; code: string; name: string }[]>,
+    staleTime: STALE_TIMES.MASTER,
   });
 
   const { data: plansData = [], isLoading: loading } = useQuery<Plan[]>({
     queryKey: queryKeys.plans,
     queryFn: api.getPlans as unknown as () => Promise<Plan[]>,
+    staleTime: STALE_TIMES.MASTER,
   });
 
   // フィルター適用
@@ -164,8 +167,7 @@ function PlansContent() {
       } else {
         setError(data.error || "保存に失敗しました");
       }
-    } catch (err) {
-      console.error("保存エラー:", err);
+    } catch {
       setError("保存に失敗しました");
     } finally {
       setSaving(false);
@@ -189,8 +191,7 @@ function PlansContent() {
         const data = await res.json();
         toast.error(data.error || "削除に失敗しました");
       }
-    } catch (err) {
-      console.error("削除エラー:", err);
+    } catch {
       toast.error("削除に失敗しました");
     }
   };
@@ -216,8 +217,7 @@ function PlansContent() {
       } else {
         throw new Error("更新に失敗しました");
       }
-    } catch (err) {
-      console.error("ステータス変更エラー:", err);
+    } catch {
       toast.error("ステータスの変更に失敗しました");
       queryClient.invalidateQueries({ queryKey: queryKeys.plans });
     }
@@ -268,12 +268,8 @@ function PlansContent() {
   };
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">プラン管理</h1>
-      </div>
-
-      <div className="max-w-6xl">
+    <div className="p-6 h-full flex flex-col">
+      <div className="max-w-6xl flex-1 min-h-0 flex flex-col">
         <div className="flex justify-between items-center mb-6">
           <div className="flex items-center gap-4">
             <select
@@ -304,7 +300,7 @@ function PlansContent() {
           </Button>
         </div>
 
-        <Card>
+        <Card className="flex-1 min-h-0 flex flex-col">
           <CardHeader>
             <CardTitle className="text-base">
               プラン一覧
@@ -313,18 +309,18 @@ function PlansContent() {
               </span>
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex-1 min-h-0 p-0 overflow-auto">
             {plans.length === 0 && !loading ? (
-              <div className="text-center py-12 text-gray-500">
+              <div className="text-center py-12 px-6 text-gray-500">
                 プランが登録されていません
               </div>
             ) : plans.length === 0 && loading ? (
-              <div className="flex justify-center py-12">
+              <div className="flex justify-center py-12 px-6">
                 <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
               </div>
             ) : (
               <table className="w-full text-sm">
-                <thead>
+                <thead className="sticky top-0 z-10 bg-white">
                   <tr className="border-b">
                     <th className="text-left py-2 px-4">サービス</th>
                     <th className="text-left py-2 px-4">プラン名</th>

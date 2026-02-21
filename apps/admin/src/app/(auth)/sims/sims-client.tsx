@@ -21,6 +21,7 @@ import type { SimUpdateInput } from "@/entities";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";
 import { cn } from "@/components/ui/lib/utils";
+import { TableSkeleton } from "@/components/ui/table-skeleton";
 
 interface Contract {
   id: string;
@@ -317,8 +318,7 @@ export function SimsClient() {
         const data = await res.json();
         toast.error(data.error || '更新に失敗しました');
       }
-    } catch (err) {
-      console.error('更新エラー:', err);
+    } catch {
       toast.error('更新に失敗しました');
     }
   };
@@ -355,8 +355,7 @@ export function SimsClient() {
         const data = await res.json();
         toast.error(data.error || '更新に失敗しました');
       }
-    } catch (err) {
-      console.error('更新エラー:', err);
+    } catch {
       toast.error('更新に失敗しました');
     } finally {
       setSaving(false);
@@ -365,11 +364,7 @@ export function SimsClient() {
 
   // Tab state
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">SIM管理</h1>
-      </div>
-
+    <div className="p-6 h-full flex flex-col">
       {error && (
         <div className="bg-red-50 text-red-600 px-4 py-3 rounded-md text-sm flex items-center gap-2 mb-4">
           <AlertCircle className="h-4 w-4" />
@@ -377,7 +372,7 @@ export function SimsClient() {
         </div>
       )}
 
-          <Card>
+          <Card className="flex-1 min-h-0 flex flex-col">
             <CardHeader>
               <div className="flex justify-between items-center mb-4">
                 <CardTitle className="text-base flex items-center gap-2">
@@ -585,19 +580,17 @@ export function SimsClient() {
                 </div>
               )}
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex-1 min-h-0 p-0 overflow-auto">
               {sims.length === 0 && !isLoadingSims ? (
-                <div className="text-center py-12 text-gray-500">
+                <div className="text-center py-12 px-6 text-gray-500">
                   SIMが見つかりません
                 </div>
               ) : sims.length === 0 && isLoadingSims ? (
-                <div className="flex justify-center items-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-                </div>
+                <TableSkeleton rows={10} cols={8} />
               ) : (
-                <div className="overflow-x-auto">
+                <>
                   <table className="w-full text-sm">
-                    <thead>
+                    <thead className="sticky top-0 z-10 bg-white">
                       <tr className="border-b">
                         {bulkEditMode && <th className="text-left py-3 px-4 w-8"></th>}
                         <th className="text-left py-3 px-4 w-8"></th>
@@ -816,11 +809,11 @@ export function SimsClient() {
                       ))}
                     </tbody>
                   </table>
-                </div>
+                </>
               )}
 
               {pagination && pagination.totalPages > 1 && (
-                <div className="mt-4 flex justify-between items-center text-sm text-gray-500">
+                <div className="px-6 py-4 border-t flex justify-between items-center text-sm text-gray-500">
                   <span>
                     {pagination.totalCount}件中{" "}
                     {(pagination.currentPage - 1) * pagination.limit + 1}-
@@ -999,8 +992,7 @@ export function SimsClient() {
                   setSelectedSimIds(new Set());
                   setBulkEditMode(false);
                   queryClient.invalidateQueries({ queryKey: queryKeys.sims(queryParams) });
-                } catch (err) {
-                  console.error('一括更新エラー:', err);
+                } catch {
                   toast.error('一括更新に失敗しました');
                 } finally {
                   setSaving(false);

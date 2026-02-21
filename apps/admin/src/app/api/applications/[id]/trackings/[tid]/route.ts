@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/database";
 import { getAdminSession } from "@/lib/auth/admin-session";
 import { deleteTracking } from "@/controllers/application.controller";
+import { logger } from "@/shared/utils/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,7 @@ export async function DELETE(
     const { tid } = await params;
     return await deleteTracking(tid, prisma, getAdminSession);
   } catch (error) {
-    console.error("DELETE /trackings/[tid] error:", error);
+    logger.logError("DELETE /trackings/[tid] error", error);
     return NextResponse.json({ error: "追跡番号の削除に失敗しました" }, { status: 500 });
   }
 }

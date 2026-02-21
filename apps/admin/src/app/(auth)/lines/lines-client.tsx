@@ -12,6 +12,7 @@ import { CustomerDetailModal } from "@/components/customer-detail-modal";
 import { queryKeys, STALE_TIMES } from "@/lib/api/query-keys";
 import { api } from "@/lib/api/client";
 import type { LineUpdateInput, LineStatus } from "@/entities";
+import { TableSkeleton } from "@/components/ui/table-skeleton";
 
 interface ApplicationLine {
   id: string;
@@ -372,11 +373,8 @@ export function LinesClient() {
   };
 
   return (
-    <div className="p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">総合回線管理</h1>
-        </div>
+    <div className="p-6 h-full flex flex-col">
+      <div className="mb-6 flex items-center justify-end">
         <div className="flex items-center gap-2">
           {pagination?.total && (
             <span className="text-sm text-gray-500">
@@ -728,7 +726,7 @@ export function LinesClient() {
       )}
 
       {/* Table */}
-      <Card>
+      <Card className="flex-1 min-h-0 flex flex-col">
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             回線一覧
@@ -742,19 +740,17 @@ export function LinesClient() {
             )}
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex-1 min-h-0 p-0 overflow-auto">
           {lines.length === 0 && !isLoadingLines ? (
-            <div className="text-center py-12 text-gray-500">
+            <div className="text-center py-12 px-6 text-gray-500">
               回線が見つかりません
             </div>
           ) : lines.length === 0 && isLoadingLines ? (
-            <div className="flex justify-center items-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-            </div>
+            <TableSkeleton rows={10} cols={6} />
           ) : (
-            <div className="overflow-x-auto">
+            <>
               <table className="w-full text-sm">
-                <thead>
+                <thead className="sticky top-0 z-10 bg-white">
                   <tr className="border-b">
                     <th className="text-left py-3 px-4 w-8">
                       <input
@@ -899,12 +895,12 @@ export function LinesClient() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </>
           )}
 
           {/* Pagination */}
           {pagination && pagination.totalPages > 1 && (
-            <div className="mt-4 flex justify-between items-center text-sm text-gray-500">
+            <div className="px-6 py-4 border-t flex justify-between items-center text-sm text-gray-500">
               <span>
                 {pagination.total}件中{" "}
                 {(pagination.page - 1) * pagination.pageSize + 1}-

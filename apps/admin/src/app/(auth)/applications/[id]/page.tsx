@@ -1343,9 +1343,9 @@ export default function ApplicationDetailPage() {
                 </Button>
               </div>
             )}
-            <div className="overflow-x-auto">
+            <div>
               <table className="w-full text-sm">
-                <thead>
+                <thead className="sticky top-0 z-10 bg-white">
                   <tr className="border-b bg-gray-50">
                     <th className="text-left py-2 px-2 w-8">
                       <input
