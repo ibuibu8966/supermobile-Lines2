@@ -64,16 +64,11 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">設定</h1>
-        <p className="text-muted-foreground">アカウント設定を変更できます</p>
-      </div>
-
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Lock className="h-5 w-5" />
-            パスワード変更
+            パスワード設定
           </CardTitle>
           <CardDescription>
             セキュリティのため、定期的にパスワードを変更することをお勧めします
