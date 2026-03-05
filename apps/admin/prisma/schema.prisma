@@ -119,6 +119,14 @@ enum SimplePaymentStatus {
   PAID // 支払済
 }
 
+enum SimStatus {
+  IN_STOCK // 在庫
+  ACTIVE // 利用中
+  RETURNING // 返却中
+  RETIRED // 廃棄
+  CANCELLED // キャンセル
+}
+
 // ==================== SIM管理 ====================
 
 model Supplier {
@@ -138,7 +146,7 @@ model Supplier {
 model Sim {
   iccid           String       @id @db.VarChar(20)
   msisdn          String?      @db.VarChar(20)
-  supplierId      Int
+  supplierId      Int?
   purchaseOrderId String?      @db.VarChar(30)
   simType         SimType      @default(INDIVIDUAL)
   carrierType     CarrierType?
@@ -148,12 +156,18 @@ model Sim {
   supplierContractStart DateTime?
   supplierContractEnd   DateTime?
 
+  // MNP
+  isMnpEligible        Boolean   @default(false)
+  mnpReservationNumber String?   @db.VarChar(50)
+  mnpExpiryDate        DateTime?
+
   // 自動解約
   isAutoCancel   Boolean   @default(false)
   autoCancelDate DateTime?
 
   // 現在の状態
   currentContractId String? @db.VarChar(30)
+  status            SimStatus @default(IN_STOCK)
 
   // 消費済み用途タグ（高速検索用）
   consumedTagIds Int[] @default([])
@@ -166,7 +180,7 @@ model Sim {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  supplier         Supplier          @relation(fields: [supplierId], references: [id])
+  supplier         Supplier?         @relation(fields: [supplierId], references: [id])
   purchaseOrder    PurchaseOrder?    @relation(fields: [purchaseOrderId], references: [id])
   simLocationTag   SimLocationTag?   @relation(fields: [simLocationTagId], references: [id])
   contracts        Contract[]
@@ -225,9 +239,31 @@ model UsageTag {
 
   contractTags ContractUsageTag[]
   planTags     PlanUsageTag[]
+  usageRules   UsageRule[]
 
   @@index([isActive])
   @@index([category])
+}
+
+model UsageRule {
+  id             Int          @id @default(autoincrement())
+  usageTagId     Int
+  supplierFilter String?      @db.VarChar(200)
+  carrierFilter  CarrierType?
+  planFilter     String?      @db.VarChar(200)
+  excludedTagIds Int[]        @default([])
+  minContractDays Int         @default(0)
+  requiresMnp    Boolean      @default(false)
+  conditions     Json         @default("{}")
+  priority       Int          @default(0)
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  usageTag UsageTag @relation(fields: [usageTagId], references: [id])
+
+  @@index([usageTagId])
+  @@index([isActive])
 }
 
 model ContractUsageTag {
