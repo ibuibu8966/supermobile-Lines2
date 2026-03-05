@@ -33,7 +33,7 @@ export default auth((req) => {
 
   // 管理者権限チェック（ADMINまたはSUPER_ADMIN）
   const userRole = req.auth?.user?.role;
-  if (userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
+  if (userRole !== "ADMIN" && userRole !== "SUPER_ADMIN" && userRole !== "EMPLOYEE") {
     return NextResponse.redirect(new URL("/login?error=AccessDenied", req.url));
   }
 

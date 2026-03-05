@@ -1,6 +1,6 @@
 import { dehydrate, HydrationBoundary, QueryClient } from "@tanstack/react-query";
 import { STALE_TIMES } from "@/lib/api/query-keys";
-import { prisma } from "@/infrastructure/database/prisma";
+import { prisma } from "@/lib/database";
 import { ProfitLossRepository } from "@/repositories/profit-loss.repository";
 import { ProfitLossService } from "@/services/profit-loss.service";
 import { ProfitLossClient } from "./profit-loss-client";
