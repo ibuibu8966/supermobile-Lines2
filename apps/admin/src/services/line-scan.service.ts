@@ -4,8 +4,8 @@
  * 回線へのICCID一括割当に関するビジネスロジックを担当
  */
 
-import { PrismaClient } from '@prisma/client';
-import { LineScanInput, LineScanResult } from '@/entities';
+import { PrismaClient, Prisma } from '@prisma/client';
+import { LineScanInput, LineScanResult, SingleLineScanInput, SingleLineScanResult, ForceReassignInput, LineScanConflict } from '@/entities';
 import { logger } from '../shared/utils/logger';
 import { NotFoundError, ValidationError } from '../shared/errors/custom-errors';
 
@@ -186,5 +186,188 @@ export class LineScanService {
       warnings: warnings.length > 0 ? warnings : undefined,
       failedIccids: failedIccids.length > 0 ? failedIccids : undefined,
     };
+  }
+
+  /**
+   * ICCID 1件登録（バックグラウンドキュー用）
+   *
+   * SELECT FOR UPDATE SKIP LOCKED で行ロック → 同時操作でも安全
+   * SIM競合チェック → 他の申込で使用中ならconflictレスポンス
+   */
+  async scanSingleIccid(
+    applicationId: string,
+    input: SingleLineScanInput
+  ): Promise<SingleLineScanResult> {
+    logger.info('ICCID 1件登録開始', { applicationId, iccid: input.iccid });
+
+    return await this.prisma.$transaction(async (tx) => {
+      // 1. 次の未割当回線を取得 + 行ロック
+      //    SKIP LOCKED: 他のトランザクションがロック中の行をスキップ → 同時スキャンでも安全に次の行を取得
+      const lines = await tx.$queryRaw<{ id: string; lineNumber: number }[]>(
+        Prisma.sql`
+          SELECT id, "lineNumber" FROM "ApplicationLine"
+          WHERE "applicationId" = ${applicationId} AND status = 'NOT_ACTIVATED'::"ApplicationLineStatus"
+          ORDER BY "lineNumber" ASC LIMIT 1
+          FOR UPDATE SKIP LOCKED
+        `
+      );
+
+      if (lines.length === 0) {
+        return { status: 'no_lines' as const };
+      }
+
+      // 2. SIM競合チェック（同じICCIDがACTIVE/SHIPPED回線に紐付いていないか）
+      const existingAssignment = await tx.applicationLine.findFirst({
+        where: {
+          simId: input.iccid,
+          status: { in: ['ACTIVATED', 'SHIPPED'] },
+        },
+        include: {
+          application: {
+            select: {
+              id: true,
+              applicationNumber: true,
+              customer: {
+                select: { lastName: true, firstName: true, companyName: true },
+              },
+            },
+          },
+        },
+      });
+
+      if (existingAssignment) {
+        const customer = existingAssignment.application.customer;
+        const customerName = customer.companyName
+          || `${customer.lastName} ${customer.firstName}`;
+        return {
+          status: 'conflict' as const,
+          conflict: {
+            iccid: input.iccid,
+            currentApplicationId: existingAssignment.application.id,
+            currentApplicationNumber: existingAssignment.application.applicationNumber,
+            currentCustomerName: customerName,
+            currentLineId: existingAssignment.id,
+          },
+        };
+      }
+
+      // 3. SIM情報取得（msisdn）
+      const sim = await tx.sim.findUnique({
+        where: { iccid: input.iccid },
+        select: { iccid: true, msisdn: true },
+      });
+
+      // 4. 回線更新（1件 Raw SQL）
+      const lineId = lines[0].id;
+      await tx.$executeRaw(
+        Prisma.sql`
+          UPDATE "ApplicationLine" SET
+            "simId" = ${input.iccid},
+            msisdn = ${sim?.msisdn || null},
+            status = 'ACTIVATED'::"ApplicationLineStatus",
+            "contractMonth" = ${input.contractMonth}::timestamp,
+            "lineTagId" = ${input.lineTagId || null}::int,
+            "lineReserveTagId" = ${input.lineReserveTagId || null}::int,
+            "updatedAt" = now()
+          WHERE id = ${lineId}
+        `
+      );
+
+      logger.info('ICCID 1件登録完了', {
+        applicationId,
+        iccid: input.iccid,
+        lineId,
+        lineNumber: lines[0].lineNumber,
+      });
+
+      return {
+        status: 'ok' as const,
+        line: {
+          id: lineId,
+          lineNumber: lines[0].lineNumber,
+          simId: input.iccid,
+          msisdn: sim?.msisdn || null,
+          status: 'ACTIVATED',
+        },
+      };
+    }, { timeout: 10_000 });
+  }
+
+  /**
+   * 競合解決（force-reassign）
+   *
+   * 旧回線をCANCELLED + simId解除し、新回線にICCIDを割当
+   */
+  async forceReassign(
+    applicationId: string,
+    input: ForceReassignInput
+  ): Promise<SingleLineScanResult> {
+    logger.info('競合解決開始', { applicationId, iccid: input.iccid, cancelLineId: input.cancelLineId });
+
+    return await this.prisma.$transaction(async (tx) => {
+      // 1. 旧回線を解除（CANCELLED + simId/msisdnクリア）
+      await tx.applicationLine.update({
+        where: { id: input.cancelLineId },
+        data: {
+          status: 'CANCELLED',
+          simId: null,
+          msisdn: null,
+        },
+      });
+
+      // 2. 新回線に割当（scanSingleIccidと同じロジック）
+      const lines = await tx.$queryRaw<{ id: string; lineNumber: number }[]>(
+        Prisma.sql`
+          SELECT id, "lineNumber" FROM "ApplicationLine"
+          WHERE "applicationId" = ${applicationId} AND status = 'NOT_ACTIVATED'::"ApplicationLineStatus"
+          ORDER BY "lineNumber" ASC LIMIT 1
+          FOR UPDATE SKIP LOCKED
+        `
+      );
+
+      if (lines.length === 0) {
+        return { status: 'no_lines' as const };
+      }
+
+      // 3. SIM情報取得
+      const sim = await tx.sim.findUnique({
+        where: { iccid: input.iccid },
+        select: { iccid: true, msisdn: true },
+      });
+
+      // 4. 回線更新
+      const lineId = lines[0].id;
+      await tx.$executeRaw(
+        Prisma.sql`
+          UPDATE "ApplicationLine" SET
+            "simId" = ${input.iccid},
+            msisdn = ${sim?.msisdn || null},
+            status = 'ACTIVATED'::"ApplicationLineStatus",
+            "contractMonth" = ${input.contractMonth}::timestamp,
+            "lineTagId" = ${input.lineTagId || null}::int,
+            "lineReserveTagId" = ${input.lineReserveTagId || null}::int,
+            "updatedAt" = now()
+          WHERE id = ${lineId}
+        `
+      );
+
+      logger.info('競合解決完了', {
+        applicationId,
+        iccid: input.iccid,
+        cancelledLineId: input.cancelLineId,
+        newLineId: lineId,
+      });
+
+      return {
+        status: 'ok' as const,
+        line: {
+          id: lineId,
+          lineNumber: lines[0].lineNumber,
+          simId: input.iccid,
+          msisdn: sim?.msisdn || null,
+          status: 'ACTIVATED',
+        },
+      };
+    }, { timeout: 10_000 });
   }
 }

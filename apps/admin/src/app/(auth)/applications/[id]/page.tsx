@@ -1701,6 +1701,9 @@ export default function ApplicationDetailPage() {
           onClose={() => setShowScanModal(false)}
           onComplete={() => {
             setShowScanModal(false);
+            toast.success("ICCID登録が完了しました");
+            // simValidationキャッシュを無効化（割当済みSIMを反映）
+            queryClient.invalidateQueries({ queryKey: ['simValidation'] });
             refetchApplication();
           }}
         />
