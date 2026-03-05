@@ -103,6 +103,7 @@ export interface ApplicationUpdateInput {
   unitPrice?: number;
   couponCode?: string | null;
   couponId?: string | null;
+  planId?: string;
 }
 
 /**

@@ -105,32 +105,34 @@ interface UploadedFile {
 function FileUpload({
   label,
   uploadedFile,
-  onFileUploaded,
+  onFileChange,
+  fileType,
   accept = "image/*",
   required = false,
-  fileType,
 }: {
   label: string;
   uploadedFile: UploadedFile | null;
-  onFileUploaded: (uploaded: UploadedFile | null) => void;
+  onFileChange: (uploaded: UploadedFile | null) => void;
+  fileType: string;
   accept?: string;
   required?: boolean;
-  fileType: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
+  const file = uploadedFile?.file || null;
+
   useEffect(() => {
-    if (uploadedFile?.file) {
-      const url = URL.createObjectURL(uploadedFile.file);
+    if (file) {
+      const url = URL.createObjectURL(file);
       setPreview(url);
       return () => URL.revokeObjectURL(url);
     } else {
       setPreview(null);
     }
-  }, [uploadedFile]);
+  }, [file]);
 
   const handleClick = () => {
     inputRef.current?.click();
@@ -142,21 +144,19 @@ function FileUpload({
 
     setUploading(true);
     setUploadError(null);
-
     try {
       const storagePath = await uploadToSupabase(selectedFile, fileType);
-      onFileUploaded({ file: selectedFile, storagePath });
-    } catch (err) {
-      console.error("アップロードエラー:", err);
+      onFileChange({ file: selectedFile, storagePath });
+    } catch {
       setUploadError("アップロードに失敗しました。再度お試しください。");
-      onFileUploaded(null);
+      onFileChange(null);
     } finally {
       setUploading(false);
     }
   };
 
   const handleRemove = () => {
-    onFileUploaded(null);
+    onFileChange(null);
     setUploadError(null);
     if (inputRef.current) {
       inputRef.current.value = "";
@@ -176,14 +176,16 @@ function FileUpload({
         className="hidden"
       />
       {uploading ? (
-        <div className="flex items-center justify-center border-2 border-dashed border-border rounded-lg p-6">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground mr-2" />
-          <span className="text-sm text-muted-foreground">アップロード中...</span>
+        <div className="w-full border-2 border-dashed border-border rounded-lg p-6">
+          <div className="flex flex-col items-center gap-2 text-muted-foreground">
+            <Loader2 className="h-8 w-8 animate-spin" />
+            <span className="text-sm">アップロード中...</span>
+          </div>
         </div>
-      ) : uploadedFile && preview ? (
+      ) : file && preview ? (
         <div className="relative border rounded-lg p-2 bg-muted">
           <div className="flex items-center gap-3">
-            {uploadedFile.file.type.startsWith("image/") ? (
+            {file.type.startsWith("image/") ? (
               <Image
                 src={preview}
                 alt="プレビュー"
@@ -197,9 +199,9 @@ function FileUpload({
               </div>
             )}
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">{uploadedFile.file.name}</p>
+              <p className="text-sm font-medium truncate">{file.name}</p>
               <p className="text-xs text-muted-foreground">
-                {(uploadedFile.file.size / 1024 / 1024).toFixed(2)} MB
+                {(file.size / 1024 / 1024).toFixed(2)} MB
               </p>
             </div>
             <button
@@ -251,22 +253,30 @@ export default function ApplyPage() {
   const [agreeInitialCancellation, setAgreeInitialCancellation] = useState(false);
   const [agreeAntiSocial, setAgreeAntiSocial] = useState(false);
 
+  // 代表者と担当者が同じ
+  const [sameAsRepresentative, setSameAsRepresentative] = useState(false);
+
   // パスワード
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
 
-  // KYC書類（Supabaseに直接アップロード済みのファイル情報）
+  // KYC書類
   const [idFront, setIdFront] = useState<UploadedFile | null>(null);
   const [idBack, setIdBack] = useState<UploadedFile | null>(null);
   const [corporateRegistry, setCorporateRegistry] = useState<UploadedFile | null>(null);
   const [idExpiryDate, setIdExpiryDate] = useState("");
 
+  // メール重複チェック
+  const [emailExists, setEmailExists] = useState(false);
+  const [checkingEmail, setCheckingEmail] = useState(false);
+
   // クーポン
   const [couponCode, setCouponCode] = useState("");
   const [couponApplied, setCouponApplied] = useState(false);
   const [couponUnitPrice, setCouponUnitPrice] = useState<number | null>(null);
+  const [couponPricings, setCouponPricings] = useState<{ minQuantity: number; maxQuantity: number | null; unitPrice: number }[] | null>(null);
   const [couponDescription, setCouponDescription] = useState<string | null>(null);
   const [couponValidating, setCouponValidating] = useState(false);
   const [couponError, setCouponError] = useState<string | null>(null);
@@ -287,6 +297,11 @@ export default function ApplyPage() {
     building: "",
     companyName: "",
     companyNameKana: "",
+    establishedDate: "",
+    representativeLastName: "",
+    representativeFirstName: "",
+    representativeLastNameKana: "",
+    representativeFirstNameKana: "",
     companyPostalCode: "",
     companyPrefecture: "",
     companyCity: "",
@@ -315,6 +330,27 @@ export default function ApplyPage() {
     }
   };
 
+  const checkEmailExists = async (email: string) => {
+    if (!email || !email.includes("@")) {
+      setEmailExists(false);
+      return;
+    }
+    setCheckingEmail(true);
+    try {
+      const res = await fetch("/api/applications/check-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      setEmailExists(data.exists);
+    } catch {
+      setEmailExists(false);
+    } finally {
+      setCheckingEmail(false);
+    }
+  };
+
   const validateCoupon = async () => {
     if (!couponCode.trim()) return;
     setCouponValidating(true);
@@ -330,7 +366,8 @@ export default function ApplyPage() {
 
       if (data.valid) {
         setCouponApplied(true);
-        setCouponUnitPrice(data.unitPrice);
+        setCouponUnitPrice(data.unitPrice ?? null);
+        setCouponPricings(data.pricings ?? null);
         setCouponDescription(data.description);
         setCouponError(null);
       } else {
@@ -350,6 +387,7 @@ export default function ApplyPage() {
     setCouponCode("");
     setCouponApplied(false);
     setCouponUnitPrice(null);
+    setCouponPricings(null);
     setCouponDescription(null);
     setCouponError(null);
   };
@@ -375,7 +413,26 @@ export default function ApplyPage() {
   };
 
   const baseUnitPrice = getUnitPrice();
-  const unitPrice = couponApplied && couponUnitPrice !== null ? couponUnitPrice : baseUnitPrice;
+
+  const getCouponUnitPrice = (): number | null => {
+    if (couponPricings && couponPricings.length > 0) {
+      const sorted = [...couponPricings].sort((a, b) => a.minQuantity - b.minQuantity);
+      let price = sorted[0].unitPrice;
+      for (const p of sorted) {
+        if (lineCount >= p.minQuantity && (!p.maxQuantity || lineCount <= p.maxQuantity)) {
+          price = p.unitPrice;
+        }
+      }
+      return price;
+    }
+    if (couponUnitPrice !== null && couponUnitPrice !== undefined) {
+      return couponUnitPrice;
+    }
+    return null;
+  };
+
+  const couponPrice = couponApplied ? getCouponUnitPrice() : null;
+  const unitPrice = couponPrice !== null ? couponPrice : baseUnitPrice;
   const totalAmount = unitPrice * lineCount;
 
   const formatPrice = (price: number) => {
@@ -399,7 +456,7 @@ export default function ApplyPage() {
       formData.append("agreeInitialCancellation", agreeInitialCancellation.toString());
       formData.append("agreeAntiSocial", agreeAntiSocial.toString());
 
-      // KYC書類（Supabaseにアップロード済みのパスを送信）
+      // KYC書類（Supabase Storageのパスを送信）
       if (idFront) formData.append("idFrontPath", idFront.storagePath);
       if (idBack) formData.append("idBackPath", idBack.storagePath);
       if (corporateRegistry) formData.append("corporateRegistryPath", corporateRegistry.storagePath);
@@ -427,12 +484,19 @@ export default function ApplyPage() {
   };
 
   const canProceedStep2 = (): boolean => {
+    // メール重複チェック
+    if (emailExists) return false;
+
     // パスワードチェック
     if (password.length < 8) return false;
     if (password !== passwordConfirm) return false;
 
     if (customerType === "CORPORATE") {
       if (!customerData.companyName || !customerData.companyNameKana) {
+        return false;
+      }
+      if (!customerData.companyPostalCode || !customerData.companyPrefecture ||
+          !customerData.companyCity || !customerData.companyAddress) {
         return false;
       }
     }
@@ -473,7 +537,7 @@ export default function ApplyPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <header className="bg-white border-b">
+      <header className="bg-card border-b">
         <div className="max-w-3xl mx-auto px-4 py-4">
           <div className="flex items-center gap-4">
             <Link href="/" className="text-muted-foreground hover:text-foreground">
@@ -657,7 +721,188 @@ export default function ApplyPage() {
                         />
                       </div>
                     </div>
+                    <div>
+                      <Label htmlFor="establishedDate">法人設立日 *</Label>
+                      <div className="flex gap-2">
+                        <select
+                          className="px-3 py-2 border rounded-md bg-background text-foreground"
+                          value={customerData.establishedDate ? customerData.establishedDate.split("-")[0] : ""}
+                          onChange={(e) => {
+                            const year = e.target.value;
+                            const month = customerData.establishedDate ? customerData.establishedDate.split("-")[1] : "01";
+                            setCustomerData({ ...customerData, establishedDate: year ? `${year}-${month}-01` : "" });
+                          }}
+                        >
+                          <option value="">年</option>
+                          {Array.from({ length: 100 }, (_, i) => new Date().getFullYear() - i).map((y) => (
+                            <option key={y} value={y}>{y}年</option>
+                          ))}
+                        </select>
+                        <select
+                          className="px-3 py-2 border rounded-md bg-background text-foreground"
+                          value={customerData.establishedDate ? customerData.establishedDate.split("-")[1] : ""}
+                          onChange={(e) => {
+                            const year = customerData.establishedDate ? customerData.establishedDate.split("-")[0] : "";
+                            const month = e.target.value;
+                            setCustomerData({ ...customerData, establishedDate: year ? `${year}-${month}-01` : "" });
+                          }}
+                        >
+                          <option value="">月</option>
+                          {Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0")).map((m) => (
+                            <option key={m} value={m}>{parseInt(m)}月</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
                   </div>
+
+                  <h4 className="font-medium mt-4">法人住所</h4>
+                  <div className="grid gap-4">
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <Label htmlFor="companyPostalCode">郵便番号 *</Label>
+                        <Input
+                          id="companyPostalCode"
+                          placeholder="123-4567"
+                          value={customerData.companyPostalCode}
+                          onChange={(e) => setCustomerData({ ...customerData, companyPostalCode: e.target.value })}
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <Label htmlFor="companyPrefecture">都道府県 *</Label>
+                        <select
+                          id="companyPrefecture"
+                          className="w-full h-10 px-3 border rounded-md bg-background text-foreground border-border"
+                          value={customerData.companyPrefecture}
+                          onChange={(e) => setCustomerData({ ...customerData, companyPrefecture: e.target.value })}
+                        >
+                          <option value="">選択してください</option>
+                          {prefectures.map((pref) => (
+                            <option key={pref} value={pref}>{pref}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div>
+                      <Label htmlFor="companyCity">市区町村 *</Label>
+                      <Input
+                        id="companyCity"
+                        placeholder="渋谷区"
+                        value={customerData.companyCity}
+                        onChange={(e) => setCustomerData({ ...customerData, companyCity: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="companyAddress">番地 *</Label>
+                      <Input
+                        id="companyAddress"
+                        placeholder="1-2-3"
+                        value={customerData.companyAddress}
+                        onChange={(e) => setCustomerData({ ...customerData, companyAddress: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="companyBuilding">建物名・部屋番号（任意）</Label>
+                      <Input
+                        id="companyBuilding"
+                        placeholder="〇〇ビル 5F"
+                        value={customerData.companyBuilding}
+                        onChange={(e) => setCustomerData({ ...customerData, companyBuilding: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <h4 className="font-medium mt-4">代表者情報</h4>
+                  <div className="grid gap-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="representativeLastName">姓 *</Label>
+                        <Input
+                          id="representativeLastName"
+                          placeholder="山田"
+                          value={customerData.representativeLastName}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setCustomerData((prev) => ({
+                              ...prev,
+                              representativeLastName: val,
+                              ...(sameAsRepresentative ? { lastName: val } : {}),
+                            }));
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="representativeFirstName">名 *</Label>
+                        <Input
+                          id="representativeFirstName"
+                          placeholder="太郎"
+                          value={customerData.representativeFirstName}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setCustomerData((prev) => ({
+                              ...prev,
+                              representativeFirstName: val,
+                              ...(sameAsRepresentative ? { firstName: val } : {}),
+                            }));
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="representativeLastNameKana">セイ *</Label>
+                        <Input
+                          id="representativeLastNameKana"
+                          placeholder="ヤマダ"
+                          value={customerData.representativeLastNameKana}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setCustomerData((prev) => ({
+                              ...prev,
+                              representativeLastNameKana: val,
+                              ...(sameAsRepresentative ? { lastNameKana: val } : {}),
+                            }));
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="representativeFirstNameKana">メイ *</Label>
+                        <Input
+                          id="representativeFirstNameKana"
+                          placeholder="タロウ"
+                          value={customerData.representativeFirstNameKana}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setCustomerData((prev) => ({
+                              ...prev,
+                              representativeFirstNameKana: val,
+                              ...(sameAsRepresentative ? { firstNameKana: val } : {}),
+                            }));
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <label className="flex items-center gap-2 mt-2">
+                    <Checkbox
+                      checked={sameAsRepresentative}
+                      onCheckedChange={(checked) => {
+                        const isChecked = checked === true;
+                        setSameAsRepresentative(isChecked);
+                        if (isChecked) {
+                          setCustomerData((prev) => ({
+                            ...prev,
+                            lastName: prev.representativeLastName,
+                            firstName: prev.representativeFirstName,
+                            lastNameKana: prev.representativeLastNameKana,
+                            firstNameKana: prev.representativeFirstNameKana,
+                          }));
+                        }
+                      }}
+                    />
+                    <span className="text-sm">担当者も代表者と同じ</span>
+                  </label>
                 </div>
               )}
 
@@ -673,6 +918,7 @@ export default function ApplyPage() {
                       placeholder="山田"
                       value={customerData.lastName}
                       onChange={(e) => setCustomerData({ ...customerData, lastName: e.target.value })}
+                      disabled={sameAsRepresentative}
                     />
                   </div>
                   <div>
@@ -682,6 +928,7 @@ export default function ApplyPage() {
                       placeholder="太郎"
                       value={customerData.firstName}
                       onChange={(e) => setCustomerData({ ...customerData, firstName: e.target.value })}
+                      disabled={sameAsRepresentative}
                     />
                   </div>
                 </div>
@@ -693,6 +940,7 @@ export default function ApplyPage() {
                       placeholder="ヤマダ"
                       value={customerData.lastNameKana}
                       onChange={(e) => setCustomerData({ ...customerData, lastNameKana: e.target.value })}
+                      disabled={sameAsRepresentative}
                     />
                   </div>
                   <div>
@@ -702,6 +950,7 @@ export default function ApplyPage() {
                       placeholder="タロウ"
                       value={customerData.firstNameKana}
                       onChange={(e) => setCustomerData({ ...customerData, firstNameKana: e.target.value })}
+                      disabled={sameAsRepresentative}
                     />
                   </div>
                 </div>
@@ -759,8 +1008,17 @@ export default function ApplyPage() {
                     type="email"
                     placeholder="example@email.com"
                     value={customerData.email}
-                    onChange={(e) => setCustomerData({ ...customerData, email: e.target.value })}
+                    onChange={(e) => {
+                      setCustomerData({ ...customerData, email: e.target.value });
+                      if (emailExists) setEmailExists(false);
+                    }}
+                    onBlur={(e) => checkEmailExists(e.target.value)}
                   />
+                  {emailExists && (
+                    <p className="text-sm text-red-500 mt-1">
+                      このメールアドレスは既に登録されています。マイページから追加申込をしてください。
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -780,7 +1038,7 @@ export default function ApplyPage() {
                     <Label htmlFor="prefecture">都道府県 *</Label>
                     <select
                       id="prefecture"
-                      className="w-full h-10 px-3 border rounded-md bg-background text-foreground"
+                      className="w-full h-10 px-3 border rounded-md bg-background text-foreground border-border"
                       value={customerData.prefecture}
                       onChange={(e) => setCustomerData({ ...customerData, prefecture: e.target.value })}
                     >
@@ -902,14 +1160,14 @@ export default function ApplyPage() {
                     <FileUpload
                       label="免許証（表面）"
                       uploadedFile={idFront}
-                      onFileUploaded={setIdFront}
+                      onFileChange={setIdFront}
                       fileType="id_front"
                       required
                     />
                     <FileUpload
                       label="免許証（裏面）"
                       uploadedFile={idBack}
-                      onFileUploaded={setIdBack}
+                      onFileChange={setIdBack}
                       fileType="id_back"
                       required
                     />
@@ -922,9 +1180,9 @@ export default function ApplyPage() {
                     <FileUpload
                       label="登記簿謄本（履歴事項全部証明書）"
                       uploadedFile={corporateRegistry}
-                      onFileUploaded={setCorporateRegistry}
-                      accept="image/*,.pdf"
+                      onFileChange={setCorporateRegistry}
                       fileType="corporate_registry"
+                      accept="image/*,.pdf"
                       required
                     />
                     <p className="text-sm text-muted-foreground">
@@ -937,14 +1195,14 @@ export default function ApplyPage() {
                       <FileUpload
                         label="身分証明書（表面）"
                         uploadedFile={idFront}
-                        onFileUploaded={setIdFront}
+                        onFileChange={setIdFront}
                         fileType="id_front"
                         required
                       />
                       <FileUpload
                         label="身分証明書（裏面）"
                         uploadedFile={idBack}
-                        onFileUploaded={setIdBack}
+                        onFileChange={setIdBack}
                         fileType="id_back"
                         required
                       />
@@ -1137,11 +1395,62 @@ export default function ApplyPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* 法人情報（法人の場合） */}
+              {customerType === "CORPORATE" && (
+                <div className="border border-border rounded-lg overflow-hidden">
+                  <div className="px-4 py-3 border-b border-border">
+                    <div className="flex justify-between items-center">
+                      <h4 className="font-semibold text-gold">法人情報</h4>
+                      <button
+                        type="button"
+                        onClick={() => setCurrentStep(2)}
+                        className="text-sm text-gold hover:underline"
+                      >
+                        修正する
+                      </button>
+                    </div>
+                  </div>
+                  <div className="divide-y divide-border">
+                    <div className="flex px-4 py-3">
+                      <span className="w-36 text-sm text-muted-foreground shrink-0">法人名</span>
+                      <span className="text-sm">
+                        {customerData.companyName}（{customerData.companyNameKana}）
+                      </span>
+                    </div>
+                    <div className="flex px-4 py-3">
+                      <span className="w-36 text-sm text-muted-foreground shrink-0">法人設立日</span>
+                      <span className="text-sm">
+                        {customerData.establishedDate
+                          ? `${customerData.establishedDate.split("-")[0]}年${parseInt(customerData.establishedDate.split("-")[1])}月`
+                          : ""}
+                      </span>
+                    </div>
+                    <div className="flex px-4 py-3">
+                      <span className="w-36 text-sm text-muted-foreground shrink-0">法人住所</span>
+                      <span className="text-sm">
+                        〒{customerData.companyPostalCode} {customerData.companyPrefecture}
+                        {customerData.companyCity}{customerData.companyAddress}
+                        {customerData.companyBuilding && ` ${customerData.companyBuilding}`}
+                      </span>
+                    </div>
+                    <div className="flex px-4 py-3">
+                      <span className="w-36 text-sm text-muted-foreground shrink-0">代表者名</span>
+                      <span className="text-sm">
+                        {customerData.representativeLastName} {customerData.representativeFirstName}
+                        {" "}({customerData.representativeLastNameKana} {customerData.representativeFirstNameKana})
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* 個人情報 */}
               <div className="border border-border rounded-lg overflow-hidden">
                 <div className="px-4 py-3 border-b border-border">
                   <div className="flex justify-between items-center">
-                    <h4 className="font-semibold text-gold">個人情報</h4>
+                    <h4 className="font-semibold text-gold">
+                      {customerType === "CORPORATE" ? "担当者情報" : "個人情報"}
+                    </h4>
                     <button
                       type="button"
                       onClick={() => setCurrentStep(2)}

@@ -30,7 +30,8 @@ type AssertServiceAccess = (
 export async function getAllApplications(
   request: NextRequest,
   prisma: any,
-  getAdminSession: GetAdminSession
+  getAdminSession: GetAdminSession,
+  getSignedUrl?: (bucket: string, path: string) => Promise<string>
 ): Promise<NextResponse> {
   // 1. 認証チェック
   const sessionResult = await getAdminSession();
@@ -45,7 +46,7 @@ export async function getAllApplications(
     serviceId: searchParams.get('serviceId') || undefined,
     customerType: searchParams.get('customerType') || undefined,
     includeArchived: parseBooleanParam(searchParams.get('includeArchived')),
-    archivedOnly: parseBooleanParam(searchParams.get('archivedOnly')),
+    archivedOnly: parseBooleanParam(searchParams.get('archivedOnly') ?? searchParams.get('archived')),
   };
 
   const pagination = parsePaginationParams(searchParams);
@@ -61,9 +62,45 @@ export async function getAllApplications(
     session
   );
 
-  // 4. レスポンス
+  // 4. KYC画像の署名付きURL生成 & 有効期限マッピング
+  const applications = await Promise.all(
+    result.applications.map(async (app) => {
+      // 有効期限
+      const expirationDate = app.latestExpiryDate
+        ? new Date(app.latestExpiryDate).toISOString()
+        : null;
+
+      // KYC画像URL
+      let idCardFrontUrl: string | null = null;
+      let idCardBackUrl: string | null = null;
+      let registrationUrl: string | null = null;
+
+      if (getSignedUrl && app.kycImages) {
+        for (const img of app.kycImages) {
+          try {
+            const url = await getSignedUrl('kyc', img.storagePath);
+            if (img.type === 'ID_FRONT') idCardFrontUrl = url;
+            else if (img.type === 'ID_BACK') idCardBackUrl = url;
+            else if (img.type === 'CORPORATE_REGISTRY') registrationUrl = url;
+          } catch {
+            // 署名URL生成失敗は無視
+          }
+        }
+      }
+
+      return {
+        ...app,
+        expirationDate,
+        idCardFrontUrl,
+        idCardBackUrl,
+        registrationUrl,
+      };
+    })
+  );
+
+  // 5. レスポンス
   return NextResponse.json({
-    data: result.applications,
+    applications,
     pagination: result.pagination,
   });
 }
@@ -195,6 +232,11 @@ const customerInfoSchema = z.object({
   building: z.string().optional(),
   companyName: z.string().optional(),
   companyNameKana: z.string().optional(),
+  establishedDate: z.string().optional(),
+  representativeLastName: z.string().optional(),
+  representativeFirstName: z.string().optional(),
+  representativeLastNameKana: z.string().optional(),
+  representativeFirstNameKana: z.string().optional(),
   companyPostalCode: z.string().optional(),
   companyPrefecture: z.string().optional(),
   companyCity: z.string().optional(),
@@ -289,6 +331,15 @@ export async function createCustomerApplication(
     if (customerType === 'CORPORATE') {
       if (!customerData.companyName || !customerData.companyNameKana) {
         throw new ValidationError('法人名を入力してください');
+      }
+      if (!customerData.representativeLastName || !customerData.representativeFirstName) {
+        throw new ValidationError('代表者名を入力してください');
+      }
+      if (!customerData.representativeLastNameKana || !customerData.representativeFirstNameKana) {
+        throw new ValidationError('代表者名（カナ）を入力してください');
+      }
+      if (!customerData.establishedDate) {
+        throw new ValidationError('法人設立日を入力してください');
       }
     }
 

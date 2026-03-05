@@ -7,9 +7,16 @@ export interface CouponValidationRequest {
   planId: string;
 }
 
+export interface CouponPricingTier {
+  minQuantity: number;
+  maxQuantity: number | null;
+  unitPrice: number;
+}
+
 export interface CouponValidationResult {
   valid: boolean;
-  unitPrice?: number;
+  unitPrice?: number | null;
+  pricings?: CouponPricingTier[];
   description?: string;
   error?: string;
 }

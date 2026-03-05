@@ -1,20 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
-import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Users,
   FileText,
   CheckSquare,
-  Package,
-  LogOut,
   Check,
   X,
   ZoomIn,
@@ -166,7 +160,7 @@ export default function KycManagementPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="flex items-center justify-center py-12">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-muted-foreground">読み込み中...</p>
@@ -176,318 +170,264 @@ export default function KycManagementPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold text-primary">物販管理画面</h1>
-            <Badge variant="secondary">ADMIN</Badge>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground">管理者</span>
-            <Button variant="ghost" size="sm">
-              <LogOut className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </header>
+    <>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold">KYC確認</h2>
+        <Badge variant="outline">{applications.length}件 確認待ち</Badge>
+      </div>
 
-      <nav className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex gap-6">
-            <Link
-              href="/admin"
-              className="py-3 border-b-2 border-transparent text-sm text-muted-foreground hover:text-foreground"
-            >
-              ダッシュボード
-            </Link>
-            <Link
-              href="/admin/applications"
-              className="py-3 border-b-2 border-transparent text-sm text-muted-foreground hover:text-foreground"
-            >
-              申込管理
-            </Link>
-            <Link
-              href="/admin/customers"
-              className="py-3 border-b-2 border-transparent text-sm text-muted-foreground hover:text-foreground"
-            >
-              顧客管理
-            </Link>
-            <Link
-              href="/admin/kyc"
-              className="py-3 border-b-2 border-primary text-sm font-medium"
-            >
-              KYC確認
-            </Link>
-            <Link
-              href="/admin/shipping"
-              className="py-3 border-b-2 border-transparent text-sm text-muted-foreground hover:text-foreground"
-            >
-              発送管理
-            </Link>
-          </div>
-        </div>
-      </nav>
-
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold">KYC確認</h2>
-          <Badge variant="outline">{applications.length}件 確認待ち</Badge>
-        </div>
-
-        {applications.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <CheckSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">
-                確認待ちの申込はありません
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid lg:grid-cols-2 gap-6">
-            {/* 申込一覧 */}
-            <div className="space-y-4">
-              <h3 className="font-medium text-sm text-muted-foreground">
-                申込一覧
-              </h3>
-              {applications.map((app) => (
-                <Card
-                  key={app.id}
-                  className={`cursor-pointer transition-shadow hover:shadow-md ${
-                    selectedApplication?.id === app.id
-                      ? "ring-2 ring-primary"
-                      : ""
-                  }`}
-                  onClick={() => {
-                    setSelectedApplication(app);
-                    setSelectedImageIndex(0);
-                  }}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <p className="font-medium">{app.applicationNumber}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {app.customer.name}
-                        </p>
+      {applications.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <CheckSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <p className="text-muted-foreground">
+              確認待ちの申込はありません
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid lg:grid-cols-2 gap-6">
+          {/* 申込一覧 */}
+          <div className="space-y-4">
+            <h3 className="font-medium text-sm text-muted-foreground">
+              申込一覧
+            </h3>
+            {applications.map((app) => (
+              <Card
+                key={app.id}
+                className={`cursor-pointer transition-shadow hover:shadow-md ${
+                  selectedApplication?.id === app.id
+                    ? "ring-2 ring-primary"
+                    : ""
+                }`}
+                onClick={() => {
+                  setSelectedApplication(app);
+                  setSelectedImageIndex(0);
+                }}
+              >
+                <CardContent className="p-4">
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <p className="font-medium">{app.applicationNumber}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {app.customer.name}
+                      </p>
+                    </div>
+                    <Badge variant="warning">
+                      {app.kycImages.filter((i) => i.status === "PENDING")
+                        .length}
+                      件 未確認
+                    </Badge>
+                  </div>
+                  <div className="flex gap-2 text-xs text-muted-foreground">
+                    <span>{app.plan.name}</span>
+                    <span>×{app.lineCount}回線</span>
+                    <span>{formatDate(app.createdAt)}</span>
+                  </div>
+                  <div className="flex gap-1 mt-2">
+                    {app.kycImages.map((img) => (
+                      <div
+                        key={img.id}
+                        className={`w-8 h-8 rounded border ${
+                          img.status === "PENDING"
+                            ? "border-yellow-400 bg-yellow-50"
+                            : img.status === "APPROVED"
+                              ? "border-green-400 bg-green-50"
+                              : "border-red-400 bg-red-50"
+                        }`}
+                      >
+                        {img.signedUrl && (
+                          <img
+                            src={img.signedUrl}
+                            alt={img.type}
+                            className="w-full h-full object-cover rounded"
+                          />
+                        )}
                       </div>
-                      <Badge variant="warning">
-                        {app.kycImages.filter((i) => i.status === "PENDING")
-                          .length}
-                        件 未確認
-                      </Badge>
-                    </div>
-                    <div className="flex gap-2 text-xs text-muted-foreground">
-                      <span>{app.plan.name}</span>
-                      <span>×{app.lineCount}回線</span>
-                      <span>{formatDate(app.createdAt)}</span>
-                    </div>
-                    <div className="flex gap-1 mt-2">
-                      {app.kycImages.map((img) => (
-                        <div
-                          key={img.id}
-                          className={`w-8 h-8 rounded border ${
-                            img.status === "PENDING"
-                              ? "border-yellow-400 bg-yellow-50"
-                              : img.status === "APPROVED"
-                                ? "border-green-400 bg-green-50"
-                                : "border-red-400 bg-red-50"
-                          }`}
-                        >
-                          {img.signedUrl && (
-                            <img
-                              src={img.signedUrl}
-                              alt={img.type}
-                              className="w-full h-full object-cover rounded"
-                            />
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
 
-            {/* 詳細パネル */}
-            <div className="lg:sticky lg:top-4">
-              {selectedApplication ? (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">
-                      {selectedApplication.applicationNumber}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    {/* 画像プレビュー */}
-                    {selectedApplication.kycImages.length > 0 && (
-                      <div>
-                        <div className="flex justify-between items-center mb-2">
-                          <p className="text-sm font-medium">
-                            {
-                              kycTypeLabels[
-                                selectedApplication.kycImages[selectedImageIndex]
-                                  ?.type
-                              ]
+          {/* 詳細パネル */}
+          <div className="lg:sticky lg:top-4">
+            {selectedApplication ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">
+                    {selectedApplication.applicationNumber}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* 画像プレビュー */}
+                  {selectedApplication.kycImages.length > 0 && (
+                    <div>
+                      <div className="flex justify-between items-center mb-2">
+                        <p className="text-sm font-medium">
+                          {
+                            kycTypeLabels[
+                              selectedApplication.kycImages[selectedImageIndex]
+                                ?.type
+                            ]
+                          }
+                        </p>
+                        {getStatusBadge(
+                          selectedApplication.kycImages[selectedImageIndex]
+                            ?.status
+                        )}
+                      </div>
+                      <div
+                        className="relative aspect-[4/3] bg-gray-100 rounded-lg overflow-hidden cursor-pointer"
+                        onClick={() => setIsImageModalOpen(true)}
+                      >
+                        {selectedApplication.kycImages[selectedImageIndex]
+                          ?.signedUrl ? (
+                          <img
+                            src={
+                              selectedApplication.kycImages[selectedImageIndex]
+                                .signedUrl
                             }
-                          </p>
-                          {getStatusBadge(
-                            selectedApplication.kycImages[selectedImageIndex]
-                              ?.status
-                          )}
-                        </div>
-                        <div
-                          className="relative aspect-[4/3] bg-gray-100 rounded-lg overflow-hidden cursor-pointer"
-                          onClick={() => setIsImageModalOpen(true)}
-                        >
-                          {selectedApplication.kycImages[selectedImageIndex]
-                            ?.signedUrl ? (
-                            <img
-                              src={
-                                selectedApplication.kycImages[selectedImageIndex]
-                                  .signedUrl
-                              }
-                              alt="KYC画像"
-                              className="w-full h-full object-contain"
-                            />
-                          ) : (
-                            <div className="flex items-center justify-center h-full text-muted-foreground">
-                              画像を読み込めません
-                            </div>
-                          )}
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            className="absolute bottom-2 right-2"
-                          >
-                            <ZoomIn className="h-4 w-4 mr-1" />
-                            拡大
-                          </Button>
-                        </div>
-                        {selectedApplication.kycImages.length > 1 && (
-                          <div className="flex justify-center gap-2 mt-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              disabled={selectedImageIndex === 0}
-                              onClick={() =>
-                                setSelectedImageIndex((i) => i - 1)
-                              }
-                            >
-                              <ChevronLeft className="h-4 w-4" />
-                            </Button>
-                            <span className="text-sm py-2">
-                              {selectedImageIndex + 1} /{" "}
-                              {selectedApplication.kycImages.length}
-                            </span>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              disabled={
-                                selectedImageIndex ===
-                                selectedApplication.kycImages.length - 1
-                              }
-                              onClick={() =>
-                                setSelectedImageIndex((i) => i + 1)
-                              }
-                            >
-                              <ChevronRight className="h-4 w-4" />
-                            </Button>
+                            alt="KYC画像"
+                            className="w-full h-full object-contain"
+                          />
+                        ) : (
+                          <div className="flex items-center justify-center h-full text-muted-foreground">
+                            画像を読み込めません
                           </div>
                         )}
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="absolute bottom-2 right-2"
+                        >
+                          <ZoomIn className="h-4 w-4 mr-1" />
+                          拡大
+                        </Button>
                       </div>
-                    )}
+                      {selectedApplication.kycImages.length > 1 && (
+                        <div className="flex justify-center gap-2 mt-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={selectedImageIndex === 0}
+                            onClick={() =>
+                              setSelectedImageIndex((i) => i - 1)
+                            }
+                          >
+                            <ChevronLeft className="h-4 w-4" />
+                          </Button>
+                          <span className="text-sm py-2">
+                            {selectedImageIndex + 1} /{" "}
+                            {selectedApplication.kycImages.length}
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={
+                              selectedImageIndex ===
+                              selectedApplication.kycImages.length - 1
+                            }
+                            onClick={() =>
+                              setSelectedImageIndex((i) => i + 1)
+                            }
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
-                    {/* 顧客情報 */}
-                    <div>
-                      <h4 className="font-medium text-sm mb-2">顧客情報</h4>
-                      <dl className="grid grid-cols-2 gap-2 text-sm">
-                        <dt className="text-muted-foreground">氏名</dt>
-                        <dd>{selectedApplication.customer.name}</dd>
-                        <dt className="text-muted-foreground">種別</dt>
-                        <dd>
-                          {selectedApplication.customer.type === "INDIVIDUAL"
-                            ? "個人"
-                            : "法人"}
-                        </dd>
-                        <dt className="text-muted-foreground">メール</dt>
-                        <dd className="truncate">
-                          {selectedApplication.customer.email}
-                        </dd>
-                        <dt className="text-muted-foreground">電話番号</dt>
-                        <dd>{selectedApplication.customer.phone}</dd>
-                        {selectedApplication.customer.birthDate && (
+                  {/* 顧客情報 */}
+                  <div>
+                    <h4 className="font-medium text-sm mb-2">顧客情報</h4>
+                    <dl className="grid grid-cols-2 gap-2 text-sm">
+                      <dt className="text-muted-foreground">氏名</dt>
+                      <dd>{selectedApplication.customer.name}</dd>
+                      <dt className="text-muted-foreground">種別</dt>
+                      <dd>
+                        {selectedApplication.customer.type === "INDIVIDUAL"
+                          ? "個人"
+                          : "法人"}
+                      </dd>
+                      <dt className="text-muted-foreground">メール</dt>
+                      <dd className="truncate">
+                        {selectedApplication.customer.email}
+                      </dd>
+                      <dt className="text-muted-foreground">電話番号</dt>
+                      <dd>{selectedApplication.customer.phone}</dd>
+                      {selectedApplication.customer.birthDate && (
+                        <>
+                          <dt className="text-muted-foreground">生年月日</dt>
+                          <dd>
+                            {new Date(
+                              selectedApplication.customer.birthDate
+                            ).toLocaleDateString("ja-JP")}
+                          </dd>
+                        </>
+                      )}
+                      <dt className="text-muted-foreground">住所</dt>
+                      <dd className="col-span-1">
+                        〒{selectedApplication.customer.postalCode}
+                        <br />
+                        {selectedApplication.customer.prefecture}
+                        {selectedApplication.customer.city}
+                        {selectedApplication.customer.address}
+                        {selectedApplication.customer.building && (
                           <>
-                            <dt className="text-muted-foreground">生年月日</dt>
-                            <dd>
-                              {new Date(
-                                selectedApplication.customer.birthDate
-                              ).toLocaleDateString("ja-JP")}
-                            </dd>
+                            <br />
+                            {selectedApplication.customer.building}
                           </>
                         )}
-                        <dt className="text-muted-foreground">住所</dt>
-                        <dd className="col-span-1">
-                          〒{selectedApplication.customer.postalCode}
-                          <br />
-                          {selectedApplication.customer.prefecture}
-                          {selectedApplication.customer.city}
-                          {selectedApplication.customer.address}
-                          {selectedApplication.customer.building && (
-                            <>
-                              <br />
-                              {selectedApplication.customer.building}
-                            </>
-                          )}
-                        </dd>
-                      </dl>
-                    </div>
+                      </dd>
+                    </dl>
+                  </div>
 
-                    {/* 承認/不備ボタン */}
-                    {selectedApplication.kycImages[selectedImageIndex]
-                      ?.status === "PENDING" && (
-                      <div className="flex gap-2">
-                        <Button
-                          className="flex-1"
-                          onClick={() =>
-                            handleApprove(
-                              selectedApplication.kycImages[selectedImageIndex]
-                                .id
-                            )
-                          }
-                          disabled={processing}
-                        >
-                          <Check className="h-4 w-4 mr-1" />
-                          承認
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          className="flex-1"
-                          onClick={() => setIsRejectModalOpen(true)}
-                          disabled={processing}
-                        >
-                          <X className="h-4 w-4 mr-1" />
-                          不備
-                        </Button>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ) : (
-                <Card>
-                  <CardContent className="py-12 text-center">
-                    <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground">
-                      左の一覧から申込を選択してください
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
+                  {/* 承認/不備ボタン */}
+                  {selectedApplication.kycImages[selectedImageIndex]
+                    ?.status === "PENDING" && (
+                    <div className="flex gap-2">
+                      <Button
+                        className="flex-1"
+                        onClick={() =>
+                          handleApprove(
+                            selectedApplication.kycImages[selectedImageIndex]
+                              .id
+                          )
+                        }
+                        disabled={processing}
+                      >
+                        <Check className="h-4 w-4 mr-1" />
+                        承認
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        className="flex-1"
+                        onClick={() => setIsRejectModalOpen(true)}
+                        disabled={processing}
+                      >
+                        <X className="h-4 w-4 mr-1" />
+                        不備
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">
+                    左の一覧から申込を選択してください
+                  </p>
+                </CardContent>
+              </Card>
+            )}
           </div>
-        )}
-      </main>
+        </div>
+      )}
 
       {/* 画像拡大モーダル */}
       <Dialog open={isImageModalOpen} onOpenChange={setIsImageModalOpen}>
@@ -550,6 +490,6 @@ export default function KycManagementPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }

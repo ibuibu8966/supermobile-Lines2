@@ -140,7 +140,7 @@ export default function LinesPage() {
             契約回線
           </CardTitle>
           <CardDescription>
-            全 {lines.length} 件の回線
+            全 {filteredLines.length} 件の回線
           </CardDescription>
         </CardHeader>
         <CardContent>

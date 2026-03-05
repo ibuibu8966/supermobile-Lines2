@@ -398,7 +398,7 @@ export function CsvImportDialog({
                         <TableHead className="min-w-[100px]">SIMタイプ</TableHead>
                         <TableHead className="min-w-[120px]">キャリア</TableHead>
                         <TableHead className="min-w-[150px]">プラン</TableHead>
-                        <TableHead className="min-w-[120px]">解約日</TableHead>
+                        <TableHead className="min-w-[120px]">解約予定日</TableHead>
                         <TableHead className="min-w-[100px]">自動解約</TableHead>
                         <TableHead className="min-w-[200px]">用途タグ</TableHead>
                         <TableHead className="sticky right-[100px] bg-white z-10 w-[100px]">
@@ -458,8 +458,8 @@ export function CsvImportDialog({
                               {data.plan || "-"}
                             </TableCell>
                             <TableCell className="text-sm">
-                              {data.supplierContractEnd
-                                ? new Date(data.supplierContractEnd).toLocaleDateString("ja-JP")
+                              {data.autoCancelDate
+                                ? new Date(data.autoCancelDate).toLocaleDateString("ja-JP")
                                 : "-"}
                             </TableCell>
                             <TableCell className="text-sm">

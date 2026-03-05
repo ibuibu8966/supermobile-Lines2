@@ -26,7 +26,7 @@ const avarisAuthConfig: NextAuthConfig = {
       const pathname = nextUrl.pathname;
 
       // 公開ページ（認証不要）
-      const publicPaths = ["/", "/apply", "/login", "/register", "/legal", "/privacy", "/terms"];
+      const publicPaths = ["/", "/apply", "/login", "/register", "/forgot-password", "/legal", "/privacy", "/terms"];
       const isPublicPage = publicPaths.some(
         (path) => pathname === path || pathname.startsWith("/apply/") || pathname.startsWith("/documents/")
       );

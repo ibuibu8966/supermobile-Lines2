@@ -42,6 +42,10 @@ interface Customer {
   companyCity: string | null;
   companyAddress: string | null;
   companyBuilding: string | null;
+  representativeLastName: string | null;
+  representativeFirstName: string | null;
+  representativeLastNameKana: string | null;
+  representativeFirstNameKana: string | null;
   kycImages: KycImage[];
 }
 

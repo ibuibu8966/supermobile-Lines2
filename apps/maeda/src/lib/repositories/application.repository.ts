@@ -117,6 +117,16 @@ export class ApplicationRepository {
               companyNameKana: true,
               email: true,
               phone: true,
+              postalCode: true,
+              prefecture: true,
+              city: true,
+              address: true,
+              building: true,
+              companyPostalCode: true,
+              companyPrefecture: true,
+              companyCity: true,
+              companyAddress: true,
+              companyBuilding: true,
             },
           },
           service: {
@@ -135,7 +145,11 @@ export class ApplicationRepository {
           },
           lines: {
             select: {
+              id: true,
+              lineNumber: true,
               status: true,
+              shippedAt: true,
+              returnedAt: true,
             },
           },
           kycImages: {

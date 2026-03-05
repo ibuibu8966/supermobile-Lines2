@@ -86,4 +86,5 @@ export class DashboardStatsRepository {
       ORDER BY "activeCount" DESC
     `;
   }
+
 }

@@ -7,8 +7,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ==================== ENUMS ====================
@@ -104,6 +105,18 @@ enum PurchaseOrderStatus {
   BEFORE_PAYMENT // 振込前
   AWAITING_DELIVERY // 納品待ち
   DELIVERED // 納品済
+}
+
+enum PurchaseOrderType {
+  PURCHASE_ORDER // 発注
+  SUPPLIER_INVOICE // 請求
+  EXPENSE // 経費
+  CUSTOMER_INVOICE // 追加請求
+}
+
+enum SimplePaymentStatus {
+  UNPAID // 未払い
+  PAID // 支払済
 }
 
 // ==================== SIM管理 ====================
@@ -351,6 +364,10 @@ model Customer {
   companyName       String?   @db.VarChar(100)
   companyNameKana   String?   @db.VarChar(100)
   establishedDate   DateTime?
+  representativeLastName      String?   @db.VarChar(50)
+  representativeFirstName     String?   @db.VarChar(50)
+  representativeLastNameKana  String?   @db.VarChar(50)
+  representativeFirstNameKana String?   @db.VarChar(50)
   companyPostalCode String?   @db.VarChar(10)
   companyPrefecture String?   @db.VarChar(20)
   companyCity       String?   @db.VarChar(100)
@@ -525,7 +542,7 @@ model Coupon {
   id          String   @id @default(cuid())
   code        String   @unique @db.VarChar(50)
   planId      String
-  unitPrice   Int
+  unitPrice   Int?
   description String?  @db.VarChar(200)
   maxUsages   Int?
   usageCount  Int      @default(0)
@@ -535,12 +552,27 @@ model Coupon {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  plan         Plan          @relation(fields: [planId], references: [id])
+  plan         Plan            @relation(fields: [planId], references: [id])
   applications Application[]
+  pricings     CouponPricing[]
 
   @@index([code])
   @@index([planId])
   @@index([isActive])
+}
+
+model CouponPricing {
+  id          String   @id @default(cuid())
+  couponId    String
+  minQuantity Int      @default(1)
+  maxQuantity Int?
+  unitPrice   Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  coupon Coupon @relation(fields: [couponId], references: [id], onDelete: Cascade)
+
+  @@index([couponId])
 }
 
 model ApplicationLine {
@@ -604,14 +636,23 @@ model KycImage {
 
 model PurchaseOrder {
   id          String              @id @default(cuid())
-  supplierId  Int
+  type        PurchaseOrderType   @default(PURCHASE_ORDER)
+  supplierId  Int?
   totalAmount Int
   status      PurchaseOrderStatus @default(ORDERED)
 
+  // 支払ステータス（請求/経費/追加請求用）
+  paymentStatus SimplePaymentStatus?
+  paidAt        DateTime?
+
+  // 追加請求の顧客名（自由入力）
+  customerName String? @db.VarChar(200)
+
   // 日付
-  orderedAt    DateTime  @default(now())
-  invoiceDate  DateTime?
-  deliveryDate DateTime?
+  orderedAt      DateTime  @default(now())
+  invoiceDate    DateTime?
+  deliveryDate   DateTime?
+  paymentDueDate DateTime?
 
   // 書類（画像パス）
   purchaseOrderImagePath String? @db.VarChar(500)
@@ -625,23 +666,29 @@ model PurchaseOrder {
   updatedAt DateTime @updatedAt
 
   // リレーション
-  supplier Supplier            @relation(fields: [supplierId], references: [id])
+  supplier Supplier?           @relation(fields: [supplierId], references: [id])
   lines    PurchaseOrderLine[]
   sims     Sim[]
 
   @@index([supplierId])
+  @@index([type])
   @@index([status])
   @@index([orderedAt])
   @@index([deliveryDate])
+  @@index([paymentDueDate])
+  @@index([updatedAt])
+  @@index([type, paymentStatus])
 }
 
 model PurchaseOrderLine {
-  id              String      @id @default(cuid())
+  id              String       @id @default(cuid())
   purchaseOrderId String
-  carrierType     CarrierType
+  name            String?      @db.VarChar(200)
+  carrierType     CarrierType?
   quantity        Int
   unitPrice       Int
   subtotal        Int
+  isIncludedInUnitCost Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

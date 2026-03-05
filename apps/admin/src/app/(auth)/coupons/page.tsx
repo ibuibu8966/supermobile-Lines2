@@ -578,18 +578,18 @@ function CouponsContent() {
                       料金条件
                     </label>
                     {/* ヘッダー */}
-                    <div className="grid grid-cols-[1fr_1fr_auto_auto_1fr_auto_24px] gap-2 text-xs text-gray-500 mb-1 px-1">
+                    <div className="grid grid-cols-[1fr_1fr_80px_64px_1fr_80px_24px] gap-2 text-xs text-gray-500 mb-1 px-1">
                       <span>最低</span>
                       <span>最大</span>
                       <span>元価格</span>
                       <span></span>
                       <span>金額</span>
-                      <span>適用後</span>
+                      <span className="text-right">適用後</span>
                       <span></span>
                     </div>
                     <div className="space-y-1">
                       {pricingTiers.map((tier, index) => (
-                        <div key={index} className="grid grid-cols-[1fr_1fr_auto_auto_1fr_auto_24px] gap-2 items-center">
+                        <div key={index} className="grid grid-cols-[1fr_1fr_80px_64px_1fr_80px_24px] gap-2 items-center">
                           <input
                             type="number"
                             value={tier.minQuantity}

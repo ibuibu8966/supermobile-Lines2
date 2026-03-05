@@ -79,7 +79,7 @@ export function SimHistoryTable({ purchaseOrderId }: { purchaseOrderId: string }
               <TableHead className="min-w-[100px]">SIMタイプ</TableHead>
               <TableHead className="min-w-[120px]">キャリア</TableHead>
               <TableHead className="min-w-[150px]">プラン</TableHead>
-              <TableHead className="min-w-[120px]">解約日</TableHead>
+              <TableHead className="min-w-[120px]">解約予定日</TableHead>
               <TableHead className="min-w-[100px]">自動解約</TableHead>
               <TableHead className="min-w-[120px]">保管場所</TableHead>
               <TableHead className="sticky right-[120px] bg-white z-10 min-w-[100px]">ステータス</TableHead>
@@ -95,7 +95,7 @@ export function SimHistoryTable({ purchaseOrderId }: { purchaseOrderId: string }
                 <TableCell className="text-sm">{sim.carrierType ? CARRIER_LABELS[sim.carrierType] : "-"}</TableCell>
                 <TableCell className="text-sm">{sim.plan || "-"}</TableCell>
                 <TableCell className="text-sm">
-                  {sim.supplierContractEnd ? new Date(sim.supplierContractEnd).toLocaleDateString("ja-JP") : "-"}
+                  {sim.autoCancelDate ? new Date(sim.autoCancelDate).toLocaleDateString("ja-JP") : "-"}
                 </TableCell>
                 <TableCell className="text-sm">
                   {sim.isAutoCancel ? <Badge variant="secondary">有効</Badge> : "-"}
@@ -173,7 +173,7 @@ export function SimHistoryDialog({
                     <TableHead className="min-w-[100px]">SIMタイプ</TableHead>
                     <TableHead className="min-w-[120px]">キャリア</TableHead>
                     <TableHead className="min-w-[150px]">プラン</TableHead>
-                    <TableHead className="min-w-[120px]">解約日</TableHead>
+                    <TableHead className="min-w-[120px]">解約予定日</TableHead>
                     <TableHead className="min-w-[100px]">自動解約</TableHead>
                     <TableHead className="min-w-[120px]">保管場所</TableHead>
                     <TableHead className="sticky right-[120px] bg-white z-10 min-w-[100px]">
@@ -205,9 +205,9 @@ export function SimHistoryDialog({
                         {sim.plan || "-"}
                       </TableCell>
                       <TableCell className="text-sm">
-                        {sim.supplierContractEnd
+                        {sim.autoCancelDate
                           ? new Date(
-                              sim.supplierContractEnd
+                              sim.autoCancelDate
                             ).toLocaleDateString("ja-JP")
                           : "-"}
                       </TableCell>

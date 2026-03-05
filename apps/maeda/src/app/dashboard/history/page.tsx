@@ -46,16 +46,11 @@ export default async function HistoryPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">申し込み履歴</h1>
-        <p className="text-gray-600">過去の申し込み状況を確認できます</p>
-      </div>
-
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            申込一覧
+            申し込み履歴
           </CardTitle>
           <CardDescription>
             全 {applications.length} 件の申込
@@ -63,7 +58,7 @@ export default async function HistoryPage() {
         </CardHeader>
         <CardContent>
           {applications.length === 0 ? (
-            <p className="text-gray-500 text-center py-8">
+            <p className="text-muted-foreground text-center py-8">
               申し込み履歴がありません
             </p>
           ) : (
@@ -84,7 +79,7 @@ export default async function HistoryPage() {
                       <TableCell className="font-medium">
                         {app.applicationNumber}
                       </TableCell>
-                      <TableCell className="text-gray-500">
+                      <TableCell className="text-muted-foreground">
                         {new Date(app.createdAt).toLocaleDateString("ja-JP")}
                       </TableCell>
                       <TableCell>{app.plan.name}</TableCell>

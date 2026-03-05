@@ -16,7 +16,7 @@ export class CouponValidationService {
     // Fetch coupon
     const coupon = await this.prisma.coupon.findUnique({
       where: { code: request.code.toUpperCase() },
-      include: { plan: true },
+      include: { plan: true, pricings: true },
     });
 
     if (!coupon) {
@@ -45,6 +45,11 @@ export class CouponValidationService {
     return {
       valid: true,
       unitPrice: coupon.unitPrice,
+      pricings: coupon.pricings.map(p => ({
+        minQuantity: p.minQuantity,
+        maxQuantity: p.maxQuantity,
+        unitPrice: p.unitPrice,
+      })),
       description: coupon.description || undefined,
     };
   }

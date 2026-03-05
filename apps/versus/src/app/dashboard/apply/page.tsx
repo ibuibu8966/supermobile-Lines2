@@ -98,6 +98,7 @@ export default function AdditionalApplyPage() {
   const [couponCode, setCouponCode] = useState("");
   const [couponApplied, setCouponApplied] = useState(false);
   const [couponUnitPrice, setCouponUnitPrice] = useState<number | null>(null);
+  const [couponPricings, setCouponPricings] = useState<{ minQuantity: number; maxQuantity: number | null; unitPrice: number }[] | null>(null);
   const [couponDescription, setCouponDescription] = useState<string | null>(null);
   const [couponValidating, setCouponValidating] = useState(false);
   const [couponError, setCouponError] = useState<string | null>(null);
@@ -234,7 +235,8 @@ export default function AdditionalApplyPage() {
 
       if (data.valid) {
         setCouponApplied(true);
-        setCouponUnitPrice(data.unitPrice);
+        setCouponUnitPrice(data.unitPrice ?? null);
+        setCouponPricings(data.pricings ?? null);
         setCouponDescription(data.description);
         setCouponError(null);
       } else {
@@ -254,6 +256,7 @@ export default function AdditionalApplyPage() {
     setCouponCode("");
     setCouponApplied(false);
     setCouponUnitPrice(null);
+    setCouponPricings(null);
     setCouponDescription(null);
     setCouponError(null);
   };
@@ -335,7 +338,26 @@ export default function AdditionalApplyPage() {
   }
 
   const baseUnitPrice = selectedPlan ? getUnitPrice(selectedPlan, lineCount) : 0;
-  const selectedPlanPrice = couponApplied && couponUnitPrice !== null ? couponUnitPrice : baseUnitPrice;
+
+  const getCouponUnitPrice = (): number | null => {
+    if (couponPricings && couponPricings.length > 0) {
+      const sorted = [...couponPricings].sort((a, b) => a.minQuantity - b.minQuantity);
+      let price = sorted[0].unitPrice;
+      for (const p of sorted) {
+        if (lineCount >= p.minQuantity && (!p.maxQuantity || lineCount <= p.maxQuantity)) {
+          price = p.unitPrice;
+        }
+      }
+      return price;
+    }
+    if (couponUnitPrice !== null && couponUnitPrice !== undefined) {
+      return couponUnitPrice;
+    }
+    return null;
+  };
+
+  const couponPrice = couponApplied ? getCouponUnitPrice() : null;
+  const selectedPlanPrice = couponPrice !== null ? couponPrice : baseUnitPrice;
 
   return (
     <div className="max-w-2xl mx-auto">

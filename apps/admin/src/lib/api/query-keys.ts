@@ -27,6 +27,7 @@ export const queryKeys = {
   applications: (filters?: Record<string, string>) => ["applications", filters] as const,
   lines: (filters?: Record<string, string>) => ["lines", filters] as const,
   linesWithTags: (filters?: Record<string, string>) => ["linesWithTags", filters] as const,
+  profitLoss: (year: number, month: number) => ["profit-loss", year, month] as const,
   procurement: ["procurement"] as const,
   procurementSims: (purchaseOrderId: string) => ["procurement-sims", purchaseOrderId] as const,
   applicationKyc: (applicationId: string) => ["application-kyc", applicationId] as const,

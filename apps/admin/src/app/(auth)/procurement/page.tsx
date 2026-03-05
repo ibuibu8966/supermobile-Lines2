@@ -6,7 +6,7 @@ import { TagCrudService } from "@/services/tag-crud.service";
 import { ProcurementClient } from "./procurement-client";
 
 export const metadata = {
-  title: "仕入れ管理 | SIM統合管理システム",
+  title: "仕入れ(支出)管理 | SIM統合管理システム",
 };
 
 export default async function ProcurementPage() {

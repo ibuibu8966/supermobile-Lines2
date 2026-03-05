@@ -51,6 +51,7 @@ interface Sim {
   simType: string;
   carrierType: string | null;
   status: string;
+  isAutoCancel: boolean;
   autoCancelDate: string | null;
   supplier: {
     id: string;
@@ -289,7 +290,28 @@ export function SimsClient() {
     setEditModalOpen(true);
   };
 
-  // 自動解約予定日を自動保存
+  // 自動解約フラグを切り替え
+  const handleAutoCancelToggle = async (iccid: string, checked: boolean) => {
+    try {
+      const res = await fetch(`/api/sims/${iccid}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isAutoCancel: checked }),
+      });
+
+      if (res.ok) {
+        toast.success(checked ? '自動解約をONにしました' : '自動解約をOFFにしました');
+        queryClient.invalidateQueries({ queryKey: queryKeys.sims(queryParams) });
+      } else {
+        const data = await res.json();
+        toast.error(data.error || '更新に失敗しました');
+      }
+    } catch {
+      toast.error('更新に失敗しました');
+    }
+  };
+
+  // 解約予定日を自動保存
   const handleAutoCancelDateChange = async (iccid: string, date: Date | undefined) => {
     try {
       // ローカルタイムゾーンでYYYY-MM-DD形式に変換
@@ -310,7 +332,7 @@ export function SimsClient() {
       });
 
       if (res.ok) {
-        toast.success('自動解約予定日を更新しました');
+        toast.success('解約予定日を更新しました');
         queryClient.invalidateQueries({ queryKey: queryKeys.sims(queryParams) });
         // ポップオーバーを閉じる
         setAutoCancelPopoverOpen(prev => ({ ...prev, [iccid]: false }));
@@ -602,7 +624,7 @@ export function SimsClient() {
                         <th className="text-left py-3 px-4 whitespace-nowrap min-w-[140px]">利用可能な用途タグ</th>
                         <th className="text-left py-3 px-4 whitespace-nowrap min-w-[110px]">SIMの場所</th>
                         <th className="text-left py-3 px-4 whitespace-nowrap min-w-[90px]">ステータス</th>
-                        <th className="text-left py-3 px-4 whitespace-nowrap min-w-[110px]">自動解約予定日</th>
+                        <th className="text-left py-3 px-4 whitespace-nowrap min-w-[110px]">解約予定日</th>
                         <th className="text-left py-3 px-4 whitespace-nowrap min-w-[100px]">仕入れ先</th>
                       </tr>
                     </thead>
@@ -735,17 +757,22 @@ export function SimsClient() {
                               </Badge>
                             </td>
                             <td className="py-3 px-4">
-                              <Popover
-                                open={autoCancelPopoverOpen[sim.iccid] || false}
-                                onOpenChange={(open) => setAutoCancelPopoverOpen(prev => ({ ...prev, [sim.iccid]: open }))}
-                              >
-                                <PopoverTrigger asChild>
-                                  <button className="hover:underline text-left text-sm">
-                                    {sim.autoCancelDate
-                                      ? new Date(sim.autoCancelDate).toLocaleDateString("ja-JP")
-                                      : "—"}
-                                  </button>
-                                </PopoverTrigger>
+                              <div className="flex items-center gap-2">
+                                <Checkbox
+                                  checked={sim.isAutoCancel}
+                                  onCheckedChange={(checked) => handleAutoCancelToggle(sim.iccid, !!checked)}
+                                />
+                                <Popover
+                                  open={autoCancelPopoverOpen[sim.iccid] || false}
+                                  onOpenChange={(open) => setAutoCancelPopoverOpen(prev => ({ ...prev, [sim.iccid]: open }))}
+                                >
+                                  <PopoverTrigger asChild>
+                                    <button className="hover:underline text-left text-sm">
+                                      {sim.autoCancelDate
+                                        ? new Date(sim.autoCancelDate).toLocaleDateString("ja-JP")
+                                        : "—"}
+                                    </button>
+                                  </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0" align="start">
                                   <Calendar
                                     mode="single"
@@ -767,6 +794,7 @@ export function SimsClient() {
                                   )}
                                 </PopoverContent>
                               </Popover>
+                              </div>
                             </td>
                             <td className="py-3 px-4">{sim.supplier.name}</td>
                           </tr>

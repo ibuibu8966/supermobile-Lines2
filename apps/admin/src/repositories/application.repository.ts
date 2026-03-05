@@ -278,6 +278,31 @@ export class ApplicationRepository {
       updateData.archivedAt = null;
     }
 
+    // planId が変更された場合、PlanPricingから単価を自動取得して再計算
+    if (data.planId) {
+      const current = await this.prisma.application.findUnique({
+        where: { id },
+        select: { lineCount: true },
+      });
+      if (current) {
+        const pricing = await this.prisma.planPricing.findFirst({
+          where: {
+            planId: data.planId,
+            minQuantity: { lte: current.lineCount },
+            OR: [
+              { maxQuantity: { gte: current.lineCount } },
+              { maxQuantity: null },
+            ],
+          },
+          orderBy: { minQuantity: 'desc' },
+        });
+        if (pricing) {
+          updateData.unitPrice = pricing.unitPrice;
+          updateData.totalAmount = current.lineCount * pricing.unitPrice;
+        }
+      }
+    }
+
     // lineCount または unitPrice が変更された場合、totalAmount を再計算
     if (data.lineCount !== undefined || data.unitPrice !== undefined) {
       const current = await this.prisma.application.findUnique({

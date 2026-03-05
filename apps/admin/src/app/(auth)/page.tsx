@@ -4,10 +4,20 @@ import { queryKeys, STALE_TIMES } from "@/lib/api/query-keys";
 import { prisma } from "@/lib/database";
 
 async function fetchDashboardStats() {
-  const [overviewResult, simByUsageTag, activeLinesByPlan] = await Promise.all([
-    prisma.$queryRaw<Array<{ in_stock: bigint; active: bigint; returned: bigint }>>`
+  const [overviewResult, simByUsageTag, activeLinesByPlan, unitCostBySupplier] = await Promise.all([
+    prisma.$queryRaw<Array<{ in_stock: bigint; active: bigint }>>`
       SELECT
-        (SELECT COUNT(*) FROM "Sim" WHERE status = 'IN_STOCK') as in_stock,
+        (
+          SELECT COUNT(*) FROM "Sim" s
+          WHERE NOT EXISTS (
+            SELECT 1 FROM "ApplicationLine" al
+            WHERE al."simId" = s.iccid
+              AND al.status IN ('ACTIVATED', 'SHIPPED')
+              AND al."updatedAt" = (
+                SELECT MAX(al2."updatedAt") FROM "ApplicationLine" al2 WHERE al2."simId" = s.iccid
+              )
+          )
+        ) as in_stock,
         (SELECT COUNT(*) FROM "ApplicationLine" WHERE status = 'ACTIVATED') as active
     `,
     // 用途タグ別: そのタグを消費していない在庫SIMをカウント
@@ -22,7 +32,14 @@ async function fetchDashboardStats() {
         COUNT(s.iccid) as "availableCount"
       FROM "UsageTag" ut
       CROSS JOIN "Sim" s
-      WHERE s.status = 'IN_STOCK'
+      WHERE NOT EXISTS (
+        SELECT 1 FROM "ApplicationLine" al
+        WHERE al."simId" = s.iccid
+          AND al.status IN ('ACTIVATED', 'SHIPPED')
+          AND al."updatedAt" = (
+            SELECT MAX(al2."updatedAt") FROM "ApplicationLine" al2 WHERE al2."simId" = s.iccid
+          )
+      )
         AND NOT (s."consumedTagIds" @> ARRAY[ut.id])
         AND ut."isActive" = true
       GROUP BY ut.id, ut.name
@@ -47,6 +64,22 @@ async function fetchDashboardStats() {
       GROUP BY p.id, p.name, s.name
       ORDER BY "activeCount" DESC
     `,
+    prisma.$queryRaw<Array<{
+      supplier_name: string;
+      included_total: bigint;
+      sim_qty: bigint;
+    }>>`
+      SELECT
+        COALESCE(s.name, '不明') as supplier_name,
+        SUM(CASE WHEN pol."isIncludedInUnitCost" THEN pol.subtotal ELSE 0 END) as included_total,
+        SUM(CASE WHEN pol."carrierType" IS NOT NULL THEN pol.quantity ELSE 0 END) as sim_qty
+      FROM "PurchaseOrder" po
+      JOIN "PurchaseOrderLine" pol ON po.id = pol."purchaseOrderId"
+      LEFT JOIN "Supplier" s ON po."supplierId" = s.id
+      WHERE po.type = 'PURCHASE_ORDER'
+      GROUP BY s.name
+      HAVING SUM(CASE WHEN pol."carrierType" IS NOT NULL THEN pol.quantity ELSE 0 END) > 0
+    `,
   ]);
 
   const totalInStockSims = Number(overviewResult[0]?.in_stock ?? 0);
@@ -62,6 +95,12 @@ async function fetchDashboardStats() {
     activeLinesByPlan: activeLinesByPlan.map((item) => ({
       ...item,
       activeCount: Number(item.activeCount),
+    })),
+    unitCostBySupplier: unitCostBySupplier.map((row) => ({
+      supplierName: row.supplier_name,
+      includedTotal: Number(row.included_total),
+      simQuantity: Number(row.sim_qty),
+      unitCost: Number(row.sim_qty) > 0 ? Math.round(Number(row.included_total) / Number(row.sim_qty)) : null,
     })),
   };
 }

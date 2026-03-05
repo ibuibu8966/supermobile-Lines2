@@ -21,6 +21,75 @@ interface Line {
   };
 }
 
+const getProgressBadge = (status: string) => {
+  switch (status) {
+    case "ACTIVATED":
+    case "SHIPPING_INSTRUCTED":
+      return (
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+          開通済み
+        </span>
+      );
+    case "SHIPPED":
+      return (
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+          発送済み
+        </span>
+      );
+    case "NOT_ACTIVATED":
+      return (
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">
+          未開通
+        </span>
+      );
+    case "RETURNED":
+    case "CANCELLED":
+      return (
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">
+          解約済み
+        </span>
+      );
+    default:
+      return (
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">
+          {status}
+        </span>
+      );
+  }
+};
+
+const getStatusLabel = (status: string) => {
+  switch (status) {
+    case "NOT_ACTIVATED":
+      return (
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">
+          申込中
+        </span>
+      );
+    case "ACTIVATED":
+    case "SHIPPING_INSTRUCTED":
+    case "SHIPPED":
+      return (
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+          契約中
+        </span>
+      );
+    case "RETURNED":
+    case "CANCELLED":
+      return (
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">
+          解約
+        </span>
+      );
+    default:
+      return (
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">
+          {status}
+        </span>
+      );
+  }
+};
+
 export default function LinesPage() {
   const [lines, setLines] = useState<Line[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,55 +113,9 @@ export default function LinesPage() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "ACTIVATED":
-        return (
-          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
-            開通済み
-          </span>
-        );
-      case "SHIPPED":
-        return (
-          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
-            発送済み
-          </span>
-        );
-      case "SHIPPING_INSTRUCTED":
-        return (
-          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border border-muted text-muted-foreground">
-            発送指示済み
-          </span>
-        );
-      case "NOT_ACTIVATED":
-        return (
-          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">
-            未開通
-          </span>
-        );
-      case "RETURNED":
-        return (
-          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">
-            返却済み
-          </span>
-        );
-      case "CANCELLED":
-        return (
-          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">
-            解約
-          </span>
-        );
-      default:
-        return (
-          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">
-            {status}
-          </span>
-        );
-    }
-  };
-
   const filteredLines = lines.filter((line) => {
     if (activeTab === "all") return true;
+    if (activeTab === "pending") return line.status === "NOT_ACTIVATED";
     if (activeTab === "active")
       return line.status === "ACTIVATED" || line.status === "SHIPPED" || line.status === "SHIPPING_INSTRUCTED";
     if (activeTab === "cancelled")
@@ -110,25 +133,21 @@ export default function LinesPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">契約回線一覧</h1>
-        <p className="text-muted-foreground">ご契約中の回線を確認できます</p>
-      </div>
-
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Phone className="h-5 w-5" />
-            回線一覧
+            契約回線
           </CardTitle>
           <CardDescription>
-            全 {lines.length} 件の回線
+            全 {filteredLines.length} 件の回線
           </CardDescription>
         </CardHeader>
         <CardContent>
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="mb-4">
               <TabsTrigger value="all">すべて</TabsTrigger>
+              <TabsTrigger value="pending">申込中</TabsTrigger>
               <TabsTrigger value="active">契約中</TabsTrigger>
               <TabsTrigger value="cancelled">解約済み</TabsTrigger>
             </TabsList>
@@ -147,7 +166,8 @@ export default function LinesPage() {
                         <TableHead className="min-w-[100px]">プラン</TableHead>
                         <TableHead className="min-w-[100px]">申込番号</TableHead>
                         <TableHead className="min-w-[90px]">申込日</TableHead>
-                        <TableHead className="min-w-[100px]">ステータス</TableHead>
+                        <TableHead className="min-w-[100px]">進捗</TableHead>
+                        <TableHead className="min-w-[80px]">ステータス</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -163,7 +183,8 @@ export default function LinesPage() {
                           <TableCell className="text-muted-foreground">
                             {new Date(line.application.createdAt).toLocaleDateString("ja-JP")}
                           </TableCell>
-                          <TableCell>{getStatusBadge(line.status)}</TableCell>
+                          <TableCell>{getProgressBadge(line.status)}</TableCell>
+                          <TableCell>{getStatusLabel(line.status)}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

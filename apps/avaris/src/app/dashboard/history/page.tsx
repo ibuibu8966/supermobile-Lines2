@@ -46,16 +46,11 @@ export default async function HistoryPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">申し込み履歴</h1>
-        <p className="text-muted-foreground">過去の申し込み状況を確認できます</p>
-      </div>
-
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            申込一覧
+            申し込み履歴
           </CardTitle>
           <CardDescription>
             全 {applications.length} 件の申込

@@ -107,6 +107,18 @@ enum PurchaseOrderStatus {
   DELIVERED // 納品済
 }
 
+enum PurchaseOrderType {
+  PURCHASE_ORDER // 発注
+  SUPPLIER_INVOICE // 請求
+  EXPENSE // 経費
+  CUSTOMER_INVOICE // 追加請求
+}
+
+enum SimplePaymentStatus {
+  UNPAID // 未払い
+  PAID // 支払済
+}
+
 // ==================== SIM管理 ====================
 
 model Supplier {
@@ -352,6 +364,10 @@ model Customer {
   companyName       String?   @db.VarChar(100)
   companyNameKana   String?   @db.VarChar(100)
   establishedDate   DateTime?
+  representativeLastName      String?   @db.VarChar(50)
+  representativeFirstName     String?   @db.VarChar(50)
+  representativeLastNameKana  String?   @db.VarChar(50)
+  representativeFirstNameKana String?   @db.VarChar(50)
   companyPostalCode String?   @db.VarChar(10)
   companyPrefecture String?   @db.VarChar(20)
   companyCity       String?   @db.VarChar(100)
@@ -496,6 +512,7 @@ model Application {
   @@index([status])
   @@index([createdAt])
   @@index([isArchived])
+  @@index([paymentStatus, updatedAt])
 }
 
 model ApplicationReferral {
@@ -620,14 +637,23 @@ model KycImage {
 
 model PurchaseOrder {
   id          String              @id @default(cuid())
-  supplierId  Int
+  type        PurchaseOrderType   @default(PURCHASE_ORDER)
+  supplierId  Int?
   totalAmount Int
   status      PurchaseOrderStatus @default(ORDERED)
 
+  // 支払ステータス（請求/経費/追加請求用）
+  paymentStatus SimplePaymentStatus?
+  paidAt        DateTime?
+
+  // 追加請求の顧客名（自由入力）
+  customerName String? @db.VarChar(200)
+
   // 日付
-  orderedAt    DateTime  @default(now())
-  invoiceDate  DateTime?
-  deliveryDate DateTime?
+  orderedAt      DateTime  @default(now())
+  invoiceDate    DateTime?
+  deliveryDate   DateTime?
+  paymentDueDate DateTime?
 
   // 書類（画像パス）
   purchaseOrderImagePath String? @db.VarChar(500)
@@ -641,23 +667,29 @@ model PurchaseOrder {
   updatedAt DateTime @updatedAt
 
   // リレーション
-  supplier Supplier            @relation(fields: [supplierId], references: [id])
+  supplier Supplier?           @relation(fields: [supplierId], references: [id])
   lines    PurchaseOrderLine[]
   sims     Sim[]
 
   @@index([supplierId])
+  @@index([type])
   @@index([status])
   @@index([orderedAt])
   @@index([deliveryDate])
+  @@index([paymentDueDate])
+  @@index([updatedAt])
+  @@index([type, paymentStatus])
 }
 
 model PurchaseOrderLine {
-  id              String      @id @default(cuid())
+  id              String       @id @default(cuid())
   purchaseOrderId String
-  carrierType     CarrierType
+  name            String?      @db.VarChar(200)
+  carrierType     CarrierType?
   quantity        Int
   unitPrice       Int
   subtotal        Int
+  isIncludedInUnitCost Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

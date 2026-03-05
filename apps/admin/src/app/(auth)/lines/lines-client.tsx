@@ -107,14 +107,6 @@ const STATUS_LABELS: Record<string, string> = {
   CANCELLED: "解約",
 };
 
-const STATUS_VARIANTS: Record<string, "default" | "success" | "destructive" | "secondary" | "outline"> = {
-  NOT_ACTIVATED: "secondary",
-  ACTIVATED: "success",
-  SHIPPING_INSTRUCTED: "outline",
-  SHIPPED: "default",
-  RETURNED: "destructive",
-  CANCELLED: "destructive",
-};
 
 export function LinesClient() {
   const queryClient = useQueryClient();
@@ -374,241 +366,11 @@ export function LinesClient() {
 
   return (
     <div className="p-6 h-full flex flex-col">
-      <div className="mb-6 flex items-center justify-end">
-        <div className="flex items-center gap-2">
-          {pagination?.total && (
-            <span className="text-sm text-gray-500">
-              表示: {pagination.total.toLocaleString()}件
-            </span>
-          )}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowFilters(!showFilters)}
-          >
-            <Filter className="h-4 w-4 mr-2" />
-            フィルター
-            {showFilters ? (
-              <ChevronUp className="h-4 w-4 ml-2" />
-            ) : (
-              <ChevronDown className="h-4 w-4 ml-2" />
-            )}
-          </Button>
-        </div>
-      </div>
-
       {error && (
         <div className="bg-red-50 text-red-600 px-4 py-3 rounded-md text-sm flex items-center gap-2 mb-4">
           <AlertCircle className="h-4 w-4" />
           データの取得に失敗しました。
         </div>
-      )}
-
-      {/* Filters */}
-      {showFilters && (
-        <Card className="mb-6">
-          <CardContent className="pt-6">
-            <div className="grid grid-cols-4 gap-4 mb-4">
-              <input
-                type="text"
-                placeholder="申込者名"
-                className="px-3 py-2 border rounded-md"
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-              />
-              <input
-                type="text"
-                placeholder="会社名"
-                className="px-3 py-2 border rounded-md"
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-              />
-              <input
-                type="text"
-                placeholder="電話番号"
-                className="px-3 py-2 border rounded-md"
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-              />
-              <input
-                type="text"
-                placeholder="ICCID"
-                className="px-3 py-2 border rounded-md"
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-              />
-            </div>
-
-            <div className="grid grid-cols-3 gap-4 mb-4">
-              {/* SIM Location Tags */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  SIMの場所
-                </label>
-                <div className="space-y-1 max-h-32 overflow-y-auto border rounded-md p-2">
-                  {simLocationTags.map((tag) => (
-                    <label key={tag.id} className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        className="rounded"
-                        checked={simLocationTagIds.split(",").includes(tag.id.toString())}
-                        onChange={(e) => {
-                          const ids = simLocationTagIds.split(",").filter(Boolean);
-                          if (e.target.checked) {
-                            ids.push(tag.id.toString());
-                          } else {
-                            const index = ids.indexOf(tag.id.toString());
-                            if (index > -1) ids.splice(index, 1);
-                          }
-                          setSimLocationTagIds(ids.join(","));
-                          setPage("1");
-                        }}
-                      />
-                      <span className="text-sm">{tag.name}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* Line Reserve Tags */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  予備タグ
-                </label>
-                <div className="space-y-1 max-h-32 overflow-y-auto border rounded-md p-2">
-                  {lineReserveTags.map((tag) => (
-                    <label key={tag.id} className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        className="rounded"
-                        checked={lineReserveTagIds.split(",").includes(tag.id.toString())}
-                        onChange={(e) => {
-                          const ids = lineReserveTagIds.split(",").filter(Boolean);
-                          if (e.target.checked) {
-                            ids.push(tag.id.toString());
-                          } else {
-                            const index = ids.indexOf(tag.id.toString());
-                            if (index > -1) ids.splice(index, 1);
-                          }
-                          setLineReserveTagIds(ids.join(","));
-                          setPage("1");
-                        }}
-                      />
-                      <span className="text-sm">{tag.name}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* Statuses */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  ステータス
-                </label>
-                <div className="space-y-1 max-h-32 overflow-y-auto border rounded-md p-2">
-                  {Object.entries(STATUS_LABELS).map(([value, label]) => (
-                    <label key={value} className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        className="rounded"
-                        checked={statuses.split(",").includes(value)}
-                        onChange={(e) => {
-                          const vals = statuses.split(",").filter(Boolean);
-                          if (e.target.checked) {
-                            vals.push(value);
-                          } else {
-                            const index = vals.indexOf(value);
-                            if (index > -1) vals.splice(index, 1);
-                          }
-                          setStatuses(vals.join(","));
-                          setPage("1");
-                        }}
-                      />
-                      <span className="text-sm">{label}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Date Filters */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  発送日
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="date"
-                    className="px-3 py-2 border rounded-md flex-1"
-                    value={shippedFrom}
-                    onChange={(e) => {
-                      setShippedFrom(e.target.value);
-                      setPage("1");
-                    }}
-                  />
-                  <span className="text-gray-500">～</span>
-                  <input
-                    type="date"
-                    className="px-3 py-2 border rounded-md flex-1"
-                    value={shippedTo}
-                    onChange={(e) => {
-                      setShippedTo(e.target.value);
-                      setPage("1");
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  返却日
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="date"
-                    className="px-3 py-2 border rounded-md flex-1"
-                    value={returnedFrom}
-                    onChange={(e) => {
-                      setReturnedFrom(e.target.value);
-                      setPage("1");
-                    }}
-                  />
-                  <span className="text-gray-500">～</span>
-                  <input
-                    type="date"
-                    className="px-3 py-2 border rounded-md flex-1"
-                    value={returnedTo}
-                    onChange={(e) => {
-                      setReturnedTo(e.target.value);
-                      setPage("1");
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Archive Filter */}
-            <div className="mt-4 pt-4 border-t">
-              <label className="flex items-center gap-2 text-sm text-gray-600">
-                <input
-                  type="checkbox"
-                  checked={showArchived === "true"}
-                  onChange={(e) => {
-                    setShowArchived(e.target.checked ? "true" : "false");
-                    setPage("1");
-                  }}
-                  className="rounded"
-                />
-                アーカイブ済み申し込みの回線を表示
-              </label>
-            </div>
-          </CardContent>
-        </Card>
       )}
 
       {/* Bulk Edit Bar */}
@@ -728,17 +490,237 @@ export function LinesClient() {
       {/* Table */}
       <Card className="flex-1 min-h-0 flex flex-col">
         <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            回線一覧
-            {pagination?.total && (
-              <span className="text-sm font-normal text-gray-500">
-                {pagination.total.toLocaleString()}件
-              </span>
-            )}
-            {isLoadingLines && (
-              <Loader2 className="h-4 w-4 animate-spin text-blue-400" />
-            )}
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              回線一覧
+              {pagination?.total && (
+                <span className="text-sm font-normal text-gray-500">
+                  {pagination.total.toLocaleString()}件
+                </span>
+              )}
+              {isLoadingLines && (
+                <Loader2 className="h-4 w-4 animate-spin text-blue-400" />
+              )}
+            </CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowFilters(!showFilters)}
+            >
+              <Filter className="h-4 w-4 mr-2" />
+              フィルター
+              {showFilters ? (
+                <ChevronUp className="h-4 w-4 ml-2" />
+              ) : (
+                <ChevronDown className="h-4 w-4 ml-2" />
+              )}
+            </Button>
+          </div>
+
+          {/* Filters */}
+          {showFilters && (
+            <div className="pt-4 border-t mt-4">
+              <div className="grid grid-cols-4 gap-4 mb-4">
+                <input
+                  type="text"
+                  placeholder="申込者名"
+                  className="px-3 py-2 border rounded-md"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                />
+                <input
+                  type="text"
+                  placeholder="会社名"
+                  className="px-3 py-2 border rounded-md"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                />
+                <input
+                  type="text"
+                  placeholder="電話番号"
+                  className="px-3 py-2 border rounded-md"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                />
+                <input
+                  type="text"
+                  placeholder="ICCID"
+                  className="px-3 py-2 border rounded-md"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-4 mb-4">
+                {/* SIM Location Tags */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    SIMの場所
+                  </label>
+                  <div className="space-y-1 max-h-32 overflow-y-auto border rounded-md p-2">
+                    {simLocationTags.map((tag) => (
+                      <label key={tag.id} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="rounded"
+                          checked={simLocationTagIds.split(",").includes(tag.id.toString())}
+                          onChange={(e) => {
+                            const ids = simLocationTagIds.split(",").filter(Boolean);
+                            if (e.target.checked) {
+                              ids.push(tag.id.toString());
+                            } else {
+                              const index = ids.indexOf(tag.id.toString());
+                              if (index > -1) ids.splice(index, 1);
+                            }
+                            setSimLocationTagIds(ids.join(","));
+                            setPage("1");
+                          }}
+                        />
+                        <span className="text-sm">{tag.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Line Reserve Tags */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    予備タグ
+                  </label>
+                  <div className="space-y-1 max-h-32 overflow-y-auto border rounded-md p-2">
+                    {lineReserveTags.map((tag) => (
+                      <label key={tag.id} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="rounded"
+                          checked={lineReserveTagIds.split(",").includes(tag.id.toString())}
+                          onChange={(e) => {
+                            const ids = lineReserveTagIds.split(",").filter(Boolean);
+                            if (e.target.checked) {
+                              ids.push(tag.id.toString());
+                            } else {
+                              const index = ids.indexOf(tag.id.toString());
+                              if (index > -1) ids.splice(index, 1);
+                            }
+                            setLineReserveTagIds(ids.join(","));
+                            setPage("1");
+                          }}
+                        />
+                        <span className="text-sm">{tag.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Statuses */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    ステータス
+                  </label>
+                  <div className="space-y-1 max-h-32 overflow-y-auto border rounded-md p-2">
+                    {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                      <label key={value} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="rounded"
+                          checked={statuses.split(",").includes(value)}
+                          onChange={(e) => {
+                            const vals = statuses.split(",").filter(Boolean);
+                            if (e.target.checked) {
+                              vals.push(value);
+                            } else {
+                              const index = vals.indexOf(value);
+                              if (index > -1) vals.splice(index, 1);
+                            }
+                            setStatuses(vals.join(","));
+                            setPage("1");
+                          }}
+                        />
+                        <span className="text-sm">{label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Date Filters */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    発送日
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="date"
+                      className="px-3 py-2 border rounded-md flex-1"
+                      value={shippedFrom}
+                      onChange={(e) => {
+                        setShippedFrom(e.target.value);
+                        setPage("1");
+                      }}
+                    />
+                    <span className="text-gray-500">～</span>
+                    <input
+                      type="date"
+                      className="px-3 py-2 border rounded-md flex-1"
+                      value={shippedTo}
+                      onChange={(e) => {
+                        setShippedTo(e.target.value);
+                        setPage("1");
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    返却日
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="date"
+                      className="px-3 py-2 border rounded-md flex-1"
+                      value={returnedFrom}
+                      onChange={(e) => {
+                        setReturnedFrom(e.target.value);
+                        setPage("1");
+                      }}
+                    />
+                    <span className="text-gray-500">～</span>
+                    <input
+                      type="date"
+                      className="px-3 py-2 border rounded-md flex-1"
+                      value={returnedTo}
+                      onChange={(e) => {
+                        setReturnedTo(e.target.value);
+                        setPage("1");
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Archive Filter */}
+              <div className="mt-4 pt-4 border-t">
+                <label className="flex items-center gap-2 text-sm text-gray-600">
+                  <input
+                    type="checkbox"
+                    checked={showArchived === "true"}
+                    onChange={(e) => {
+                      setShowArchived(e.target.checked ? "true" : "false");
+                      setPage("1");
+                    }}
+                    className="rounded"
+                  />
+                  アーカイブ済み申し込みの回線を表示
+                </label>
+              </div>
+            </div>
+          )}
         </CardHeader>
         <CardContent className="flex-1 min-h-0 p-0 overflow-auto">
           {lines.length === 0 && !isLoadingLines ? (

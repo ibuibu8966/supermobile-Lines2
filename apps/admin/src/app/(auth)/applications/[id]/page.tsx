@@ -52,6 +52,11 @@ interface Customer {
   companyCity: string | null;
   companyAddress: string | null;
   companyBuilding: string | null;
+  establishedDate: string | null;
+  representativeLastName: string | null;
+  representativeFirstName: string | null;
+  representativeLastNameKana: string | null;
+  representativeFirstNameKana: string | null;
 }
 
 interface Service {
@@ -270,6 +275,13 @@ export default function ApplicationDetailPage() {
   const [couponConfirmOpen, setCouponConfirmOpen] = useState(false);
   const [couponSaving, setCouponSaving] = useState(false);
 
+  // プラン変更の状態
+  const [isEditingPlan, setIsEditingPlan] = useState(false);
+  const [selectedPlanId, setSelectedPlanId] = useState("");
+  const [availablePlans, setAvailablePlans] = useState<Array<{id: string; name: string; pricings: Array<{minQuantity: number; maxQuantity: number | null; unitPrice: number}>}>>([]);
+  const [planConfirmOpen, setPlanConfirmOpen] = useState(false);
+  const [planSaving, setPlanSaving] = useState(false);
+
   // アーカイブ関連の状態
   const [isArchiveConfirmOpen, setIsArchiveConfirmOpen] = useState(false);
   const [archiveProcessing, setArchiveProcessing] = useState(false);
@@ -405,6 +417,55 @@ export default function ApplicationDetailPage() {
       toast.error("回線数の更新に失敗しました");
     } finally {
       setLineCountSaving(false);
+    }
+  };
+
+  // プラン一覧取得
+  const fetchPlansForService = async (serviceId: string) => {
+    try {
+      const res = await fetch(`/api/plans?serviceId=${serviceId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setAvailablePlans(data);
+      }
+    } catch {
+      toast.error("プラン一覧の取得に失敗しました");
+    }
+  };
+
+  // プラン変更時の新単価を計算
+  const getNewPlanPricing = () => {
+    if (!application) return null;
+    const plan = availablePlans.find((p) => p.id === selectedPlanId);
+    if (!plan) return null;
+    const pricing = plan.pricings.find(
+      (p) => p.minQuantity <= application.lineCount && (p.maxQuantity === null || p.maxQuantity >= application.lineCount)
+    );
+    return pricing || null;
+  };
+
+  // プラン変更確定
+  const handleSavePlan = async () => {
+    if (!application) return;
+    setPlanSaving(true);
+    try {
+      const res = await fetch(`/api/applications/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ planId: selectedPlanId }),
+      });
+      if (res.ok) {
+        toast.success("プランを変更しました");
+        setPlanConfirmOpen(false);
+        setIsEditingPlan(false);
+        refetchApplication();
+      } else {
+        throw new Error("更新に失敗しました");
+      }
+    } catch {
+      toast.error("プランの変更に失敗しました");
+    } finally {
+      setPlanSaving(false);
     }
   };
 
@@ -825,7 +886,46 @@ export default function ApplicationDetailPage() {
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-0.5">プラン</p>
-                  <p>{application.plan.name}</p>
+                  {isEditingPlan ? (
+                    <div className="flex items-center gap-1">
+                      <select
+                        className="px-2 py-1 border rounded text-sm"
+                        value={selectedPlanId}
+                        onChange={(e) => setSelectedPlanId(e.target.value)}
+                      >
+                        {availablePlans.map((p) => (
+                          <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                      </select>
+                      <Button
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                        disabled={selectedPlanId === application.plan.id}
+                        onClick={() => setPlanConfirmOpen(true)}
+                      >確認</Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 px-2 text-xs"
+                        onClick={() => setIsEditingPlan(false)}
+                      >✕</Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <p>{application.plan.name}</p>
+                      <button
+                        onClick={() => {
+                          setSelectedPlanId(application.plan.id);
+                          fetchPlansForService(application.service.id);
+                          setIsEditingPlan(true);
+                        }}
+                        className="text-gray-400 hover:text-gray-600"
+                        title="プランを変更"
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-0.5">回線数</p>
@@ -1058,6 +1158,21 @@ export default function ApplicationDetailPage() {
                           〒{application.customer.companyPostalCode} {application.customer.companyPrefecture}
                           {application.customer.companyCity}{application.customer.companyAddress}
                           {application.customer.companyBuilding}
+                        </p>
+                      </div>
+                    )}
+                    {application.customer.establishedDate && (
+                      <div>
+                        <p className="text-xs text-gray-500 mb-0.5">設立日</p>
+                        <p>{formatDate(application.customer.establishedDate)}</p>
+                      </div>
+                    )}
+                    {application.customer.representativeLastName && (
+                      <div>
+                        <p className="text-xs text-gray-500 mb-0.5">代表者名</p>
+                        <p>
+                          {application.customer.representativeLastName} {application.customer.representativeFirstName}
+                          （{application.customer.representativeLastNameKana} {application.customer.representativeFirstNameKana}）
                         </p>
                       </div>
                     )}
@@ -1601,6 +1716,70 @@ export default function ApplicationDetailPage() {
         }}
         initialImageType={kycModalInitialType}
       />
+
+      {/* プラン変更確認ダイアログ */}
+      <Dialog open={planConfirmOpen} onOpenChange={setPlanConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-yellow-500" />
+              プラン変更の確認
+            </DialogTitle>
+            <DialogDescription>
+              この操作は申し込みの単価と合計金額に影響します。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
+              <p className="font-medium mb-1">注意事項</p>
+              <ul className="list-disc list-inside space-y-1 text-xs">
+                <li>プランを変更すると、単価と合計金額が自動的に再計算されます。</li>
+                <li>請求書が発行済みの場合は、別途対応が必要です。</li>
+              </ul>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500">変更前:</span>
+              <span className="font-medium">{application?.plan.name}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500">変更後:</span>
+              <span className="font-bold text-blue-600">{availablePlans.find((p) => p.id === selectedPlanId)?.name}</span>
+            </div>
+            {(() => {
+              const pricing = getNewPlanPricing();
+              if (!pricing || !application) return null;
+              return (
+                <>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">単価変更:</span>
+                    <span>
+                      {application.unitPrice.toLocaleString()}円 → {pricing.unitPrice.toLocaleString()}円
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">新しい合計金額:</span>
+                    <span className="font-bold">{(application.lineCount * pricing.unitPrice).toLocaleString()}円</span>
+                  </div>
+                </>
+              );
+            })()}
+            {!getNewPlanPricing() && application && (
+              <div className="p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+                選択したプランにこの回線数（{application.lineCount}回線）に対応する料金設定がありません。料金は変更されません。
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPlanConfirmOpen(false)}>
+              キャンセル
+            </Button>
+            <Button onClick={handleSavePlan} disabled={planSaving}>
+              {planSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              変更する
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* 回線数変更確認ダイアログ */}
       <Dialog open={lineCountConfirmOpen} onOpenChange={setLineCountConfirmOpen}>

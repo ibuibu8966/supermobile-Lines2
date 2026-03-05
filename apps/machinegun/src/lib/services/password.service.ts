@@ -52,4 +52,51 @@ export class PasswordService {
 
     return { success: true };
   }
+
+  /**
+   * Reset password by identity verification (email + birthDate)
+   */
+  async resetPasswordByIdentity(
+    email: string,
+    birthDate: string,
+    newPassword: string,
+    hashPasswordFn: (password: string) => Promise<string>
+  ): Promise<PasswordChangeResult> {
+    if (newPassword.length < 8) {
+      throw new ValidationError("新しいパスワードは8文字以上で入力してください");
+    }
+
+    // Find customer by email
+    const customer = await this.prisma.customer.findUnique({
+      where: { email },
+      select: { userId: true, birthDate: true },
+    });
+
+    if (!customer || !customer.userId || !customer.birthDate) {
+      throw new ValidationError("メールアドレスまたは生年月日が正しくありません");
+    }
+
+    // Verify birthDate
+    const inputDate = new Date(birthDate);
+    const storedDate = new Date(customer.birthDate);
+    if (
+      inputDate.getFullYear() !== storedDate.getFullYear() ||
+      inputDate.getMonth() !== storedDate.getMonth() ||
+      inputDate.getDate() !== storedDate.getDate()
+    ) {
+      throw new ValidationError("メールアドレスまたは生年月日が正しくありません");
+    }
+
+    // Hash and update password
+    const hashedPassword = await hashPasswordFn(newPassword);
+
+    await this.prisma.user.update({
+      where: { id: customer.userId },
+      data: { password: hashedPassword },
+    });
+
+    logger.info("Password reset by identity", { email });
+
+    return { success: true };
+  }
 }

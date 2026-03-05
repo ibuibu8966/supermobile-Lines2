@@ -1,7 +1,7 @@
 /**
  * Procurement Controller
  *
- * 発注管理のコントローラー層
+ * 仕入れ・経費管理のコントローラー層
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -11,38 +11,66 @@ import { ProcurementService } from '../services/procurement.service';
 import { ProcurementSimImportService } from '../services/procurement-sim-import.service';
 import { ImageUploadService, StorageClient } from '../services/image-upload.service';
 import { logger } from '../shared/utils/logger';
+import type { PurchaseOrderType } from '../types/procurement';
 
 // ==================== Validation Schemas ====================
 
+const PURCHASE_ORDER_TYPES = ['PURCHASE_ORDER', 'SUPPLIER_INVOICE', 'EXPENSE', 'CUSTOMER_INVOICE'] as const;
+const CARRIER_TYPES = ['DOCOMO', 'AU', 'SOFTBANK', 'RAKUTEN'] as const;
+const PURCHASE_ORDER_STATUSES = ['ORDERED', 'CONFIRMED', 'AWAITING_SEAL', 'BEFORE_PAYMENT', 'AWAITING_DELIVERY', 'DELIVERED'] as const;
+const PAYMENT_STATUSES = ['UNPAID', 'PAID'] as const;
+
 const createPurchaseOrderSchema = z.object({
-  supplierId: z.number().int().positive('仕入先IDは正の整数である必要があります'),
+  type: z.enum(PURCHASE_ORDER_TYPES),
+  supplierId: z.number().int().positive('仕入先IDは正の整数である必要があります').nullable().optional(),
   totalAmount: z.number().positive('金額は正の数である必要があります').optional(),
+  customerName: z.string().max(200).nullable().optional(),
   lines: z
     .array(
       z.object({
-        carrierType: z.enum(['DOCOMO', 'AU', 'SOFTBANK', 'RAKUTEN']),
+        name: z.string().max(200).nullable().optional(),
+        carrierType: z.enum(CARRIER_TYPES).nullable().optional(),
         quantity: z.number().int().positive('数量は正の整数である必要があります'),
         unitPrice: z.number().positive('単価は正の数である必要があります'),
+        isIncludedInUnitCost: z.boolean().optional(),
       })
     )
     .min(1, '明細は1件以上必要です'),
-  note: z.string().optional(),
+  note: z.string().nullable().optional(),
+  deliveryDate: z.string().nullable().optional(),
+  paymentDueDate: z.string().nullable().optional(),
 });
 
 const updatePurchaseOrderSchema = z.object({
-  status: z
-    .enum(['ORDERED', 'CONFIRMED', 'AWAITING_SEAL', 'BEFORE_PAYMENT', 'AWAITING_DELIVERY', 'DELIVERED'])
-    .optional(),
+  status: z.enum(PURCHASE_ORDER_STATUSES).optional(),
+  paymentStatus: z.enum(PAYMENT_STATUSES).nullable().optional(),
+  paidAt: z.string().nullable().optional(),
   invoiceDate: z.string().nullable().optional(),
   deliveryDate: z.string().nullable().optional(),
+  paymentDueDate: z.string().nullable().optional(),
   totalAmount: z.number().positive('金額は正の数である必要があります').optional(),
+  supplierId: z.number().int().positive().nullable().optional(),
+  customerName: z.string().max(200).nullable().optional(),
+  note: z.string().nullable().optional(),
+  lines: z
+    .array(
+      z.object({
+        name: z.string().max(200).nullable().optional(),
+        carrierType: z.enum(CARRIER_TYPES).nullable().optional(),
+        quantity: z.number().int().positive('数量は正の整数である必要があります'),
+        unitPrice: z.number().positive('単価は正の数である必要があります'),
+        isIncludedInUnitCost: z.boolean().optional(),
+      })
+    )
+    .min(1, '明細は1件以上必要です')
+    .optional(),
 });
 
 const importSimDataSchema = z.object({
   iccid: z.string().min(1, 'ICCIDは必須です'),
   msisdn: z.string().optional(),
   simType: z.enum(['INDIVIDUAL', 'CORPORATE', 'BOTH']).optional(),
-  carrierType: z.enum(['DOCOMO', 'AU', 'SOFTBANK', 'RAKUTEN']).optional(),
+  carrierType: z.enum(CARRIER_TYPES).optional(),
   plan: z.string().optional(),
   supplierContractEnd: z.string().optional(),
   isAutoCancel: z.boolean().optional(),
@@ -56,11 +84,18 @@ const importSimsSchema = z.object({
 });
 
 /**
- * 発注一覧を取得
+ * 一覧を取得（typeフィルター対応）
  */
-export async function getAllPurchaseOrders(prisma: PrismaClient): Promise<NextResponse> {
+export async function getAllPurchaseOrders(
+  prisma: PrismaClient,
+  request?: NextRequest
+): Promise<NextResponse> {
+  const typeFilter = request
+    ? (new URL(request.url).searchParams.get('type') as PurchaseOrderType | null) ?? undefined
+    : undefined;
+
   const service = new ProcurementService(prisma);
-  const orders = await service.getAllPurchaseOrders();
+  const orders = await service.getAllPurchaseOrders(typeFilter);
   return NextResponse.json(orders);
 }
 
@@ -79,9 +114,18 @@ export async function createPurchaseOrder(
       { status: 400 }
     );
   }
-  const service = new ProcurementService(prisma);
-  const order = await service.createPurchaseOrder(result.data);
-  return NextResponse.json(order, { status: 201 });
+  try {
+    const service = new ProcurementService(prisma);
+    const order = await service.createPurchaseOrder(result.data);
+    return NextResponse.json(order, { status: 201 });
+  } catch (error) {
+    logger.error('発注作成エラー', { error: error instanceof Error ? error.message : error });
+    const statusCode = (error as { statusCode?: number }).statusCode || 500;
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : '作成に失敗しました' },
+      { status: statusCode }
+    );
+  }
 }
 
 /**
@@ -113,6 +157,19 @@ export async function updatePurchaseOrder(
     );
   }
   const service = new ProcurementService(prisma);
+
+  if (result.data.lines) {
+    const order = await service.updatePurchaseOrderFull(id, {
+      supplierId: result.data.supplierId,
+      customerName: result.data.customerName,
+      lines: result.data.lines,
+      note: result.data.note,
+      deliveryDate: result.data.deliveryDate,
+      paymentDueDate: result.data.paymentDueDate,
+    });
+    return NextResponse.json(order);
+  }
+
   const order = await service.updatePurchaseOrder(id, result.data);
   return NextResponse.json(order);
 }
@@ -132,7 +189,6 @@ export async function uploadPurchaseOrderImage(
   const file = formData.get('file') as File;
   const imageType = formData.get('imageType') as string;
 
-  // 必須パラメータチェック
   if (!file || !imageType) {
     return NextResponse.json(
       { error: 'ファイルと画像タイプが必要です' },
@@ -140,10 +196,8 @@ export async function uploadPurchaseOrderImage(
     );
   }
 
-  // 画像アップロードサービス
   const imageService = new ImageUploadService(storageClient);
 
-  // 画像タイプのバリデーション
   if (!imageService.isValidImageType(imageType, validImageTypes)) {
     return NextResponse.json(
       { error: '無効な画像タイプです' },
@@ -151,15 +205,12 @@ export async function uploadPurchaseOrderImage(
     );
   }
 
-  // 発注を取得
   const procurementService = new ProcurementService(prisma);
   const order = await procurementService.getPurchaseOrderById(id);
 
-  // フィールド名を取得
   const fieldName = imageTypeFieldMap[imageType];
   const existingUrl = (order as unknown as Record<string, unknown>)[fieldName] as string | null;
 
-  // 画像をアップロード
   const uploadResult = await imageService.uploadImage(
     id,
     imageType,
@@ -167,7 +218,6 @@ export async function uploadPurchaseOrderImage(
     existingUrl
   );
 
-  // データベースを更新
   const updatedOrder = await procurementService.updateImagePath(
     id,
     fieldName,
@@ -212,7 +262,6 @@ export async function deletePurchaseOrderImage(
   const { searchParams } = new URL(request.url);
   const imageType = searchParams.get('imageType');
 
-  // 必須パラメータチェック
   if (!imageType) {
     return NextResponse.json(
       { error: '画像タイプが必要です' },
@@ -220,10 +269,8 @@ export async function deletePurchaseOrderImage(
     );
   }
 
-  // 画像アップロードサービス
   const imageService = new ImageUploadService(storageClient);
 
-  // 画像タイプのバリデーション
   if (!imageService.isValidImageType(imageType, validImageTypes)) {
     return NextResponse.json(
       { error: '無効な画像タイプです' },
@@ -231,11 +278,9 @@ export async function deletePurchaseOrderImage(
     );
   }
 
-  // 発注を取得
   const procurementService = new ProcurementService(prisma);
   const order = await procurementService.getPurchaseOrderById(id);
 
-  // フィールド名を取得
   const fieldName = imageTypeFieldMap[imageType];
   const imageUrl = (order as unknown as Record<string, unknown>)[fieldName] as string | null;
 
@@ -246,10 +291,8 @@ export async function deletePurchaseOrderImage(
     );
   }
 
-  // 画像を削除
   await imageService.deleteImage(imageUrl, id);
 
-  // データベースを更新（画像パスをnullにクリア）
   const updatedOrder = await prisma.purchaseOrder.update({
     where: { id },
     data: {

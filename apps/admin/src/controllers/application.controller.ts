@@ -114,13 +114,17 @@ export async function getApplicationById(
     );
   }
 
-  // 5. 申込自身のkycImagesから有効期限を取得
-  const expiryDates = (application.kycImages ?? [])
-    .map((k) => k.expiryDate)
-    .filter((d): d is Date => d != null);
-  const latestExpiryDate = expiryDates.length > 0
-    ? expiryDates.reduce((a, b) => (a > b ? a : b))
-    : null;
+  // 5. 同一顧客の全申込のkycImagesから最新の有効期限を取得
+  const allCustomerKycImages = await prisma.kycImage.findMany({
+    where: {
+      application: { customerId: application.customerId },
+      expiryDate: { not: null },
+    },
+    select: { expiryDate: true },
+    orderBy: { expiryDate: 'desc' },
+    take: 1,
+  });
+  const latestExpiryDate = allCustomerKycImages[0]?.expiryDate ?? null;
 
   // 6. レスポンス
   return NextResponse.json({
@@ -159,6 +163,7 @@ const updateApplicationSchema = z.object({
   unitPrice: z.number().int().min(0).optional(),
   couponCode: z.string().optional().nullable(),
   couponId: z.string().optional().nullable(),
+  planId: z.string().cuid().optional(),
 });
 
 export async function updateApplication(

@@ -55,6 +55,7 @@ export class ApplicationService {
 
     const ordinalMap: Record<string, number> = {};
     const appExpiryMap: Record<string, Date | null> = {};
+    const customerLatestExpiryMap: Record<string, Date | null> = {};
     const needsKycCheckMap: Record<string, boolean> = {};
     const customerSeq: Record<string, number> = {};
     const prevExpiryMap: Record<string, Date | null> = {};
@@ -70,6 +71,14 @@ export class ApplicationService {
         .filter((d): d is Date => d != null)
         .sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
       appExpiryMap[app.id] = appExpiry;
+
+      // 顧客ごとの最新有効期限を追跡（全申込を通じて最も新しい有効期限）
+      if (appExpiry) {
+        const current = customerLatestExpiryMap[cid];
+        if (!current || appExpiry.getTime() > current.getTime()) {
+          customerLatestExpiryMap[cid] = appExpiry;
+        }
+      }
 
       // 要確認判定: 初回 or 前回とexpiryDateが変わった
       const isFirst = customerSeq[cid] === 1;
@@ -97,7 +106,7 @@ export class ApplicationService {
           lineStatus,
         },
         applicationOrdinal: ordinalMap[app.id] ?? 1,
-        latestExpiryDate: appExpiryMap[app.id] ?? null,
+        latestExpiryDate: customerLatestExpiryMap[app.customerId] ?? null,
         needsKycCheck: needsKycCheckMap[app.id] ?? true,
       };
     });

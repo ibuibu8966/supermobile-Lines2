@@ -41,7 +41,7 @@ export interface ApplicationDetailResult extends ApplicationWithRelations {
   latestExpiryDate: Date | null;
 }
 
-interface ApplicationWithStats extends Omit<ApplicationWithRelations, 'lines'> {
+interface ApplicationWithStats extends ApplicationWithRelations {
   applicationOrdinal: number;
   stats: {
     lineCount: number;
@@ -261,11 +261,8 @@ export class ApplicationService {
         ? expiryDates.reduce((a, b) => (a > b ? a : b))
         : null;
 
-      // linesを除外してレスポンスを構築（APIレスポンスサイズ削減）
-      const { lines: _, ...appWithoutLines } = app;
-
       return {
-        ...appWithoutLines,
+        ...app,
         applicationOrdinal: (app as any).applicationOrdinal || 1,
         stats: {
           lineCount: app.lineCount,
@@ -341,6 +338,7 @@ export class ApplicationService {
     if (input.couponCode) {
       const coupon = await this.prisma.coupon.findFirst({
         where: { code: input.couponCode, isActive: true },
+        include: { pricings: true },
       });
       if (coupon) {
         const now = new Date();
@@ -350,7 +348,18 @@ export class ApplicationService {
           now <= coupon.validUntil &&
           (coupon.maxUsages === null || coupon.usageCount < coupon.maxUsages)
         ) {
-          unitPrice = coupon.unitPrice;
+          // CouponPricingティア価格 → フラット価格 → プラン価格（フォールバック）
+          if (coupon.pricings && coupon.pricings.length > 0) {
+            const sorted = [...coupon.pricings].sort((a: any, b: any) => a.minQuantity - b.minQuantity);
+            unitPrice = sorted[0].unitPrice;
+            for (const p of sorted) {
+              if (input.lineCount >= p.minQuantity && (!p.maxQuantity || input.lineCount <= p.maxQuantity)) {
+                unitPrice = p.unitPrice;
+              }
+            }
+          } else if (coupon.unitPrice !== null) {
+            unitPrice = coupon.unitPrice;
+          }
           couponId = coupon.id;
           appliedCouponCode = coupon.code;
         }
@@ -387,7 +396,7 @@ export class ApplicationService {
       // 顧客を作成
       const customer = await tx.customer.create({
         data: {
-          userId: user.id,
+          user: { connect: { id: user.id } },
           type: input.customerType,
           email: input.customer.email,
           phone: input.customer.phone,
@@ -403,6 +412,11 @@ export class ApplicationService {
           building: input.customer.building || null,
           companyName: input.customerType === 'CORPORATE' ? input.customer.companyName : null,
           companyNameKana: input.customerType === 'CORPORATE' ? input.customer.companyNameKana : null,
+          establishedDate: input.customerType === 'CORPORATE' && input.customer.establishedDate ? new Date(input.customer.establishedDate) : null,
+          representativeLastName: input.customerType === 'CORPORATE' ? input.customer.representativeLastName : null,
+          representativeFirstName: input.customerType === 'CORPORATE' ? input.customer.representativeFirstName : null,
+          representativeLastNameKana: input.customerType === 'CORPORATE' ? input.customer.representativeLastNameKana : null,
+          representativeFirstNameKana: input.customerType === 'CORPORATE' ? input.customer.representativeFirstNameKana : null,
           companyPostalCode: input.customerType === 'CORPORATE' ? input.customer.companyPostalCode?.replace('-', '') : null,
           companyPrefecture: input.customerType === 'CORPORATE' ? input.customer.companyPrefecture : null,
           companyCity: input.customerType === 'CORPORATE' ? input.customer.companyCity : null,
@@ -674,6 +688,7 @@ export class ApplicationService {
     if (input.couponCode) {
       const coupon = await this.prisma.coupon.findFirst({
         where: { code: input.couponCode, isActive: true },
+        include: { pricings: true },
       });
       if (coupon) {
         const now = new Date();
@@ -683,7 +698,18 @@ export class ApplicationService {
           now <= coupon.validUntil &&
           (coupon.maxUsages === null || coupon.usageCount < coupon.maxUsages)
         ) {
-          unitPrice = coupon.unitPrice;
+          // CouponPricingティア価格 → フラット価格 → プラン価格（フォールバック）
+          if (coupon.pricings && coupon.pricings.length > 0) {
+            const sorted = [...coupon.pricings].sort((a: any, b: any) => a.minQuantity - b.minQuantity);
+            unitPrice = sorted[0].unitPrice;
+            for (const p of sorted) {
+              if (input.lineCount >= p.minQuantity && (!p.maxQuantity || input.lineCount <= p.maxQuantity)) {
+                unitPrice = p.unitPrice;
+              }
+            }
+          } else if (coupon.unitPrice !== null) {
+            unitPrice = coupon.unitPrice;
+          }
           couponId = coupon.id;
           appliedCouponCode = coupon.code;
         }

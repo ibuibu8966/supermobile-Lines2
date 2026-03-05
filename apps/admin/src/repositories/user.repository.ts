@@ -30,7 +30,18 @@ export class UserRepository {
     const users = await this.prisma.user.findMany({
       where,
       include: {
-        service: true,
+        service: {
+          select: { id: true, code: true, name: true },
+        },
+        customers: {
+          select: {
+            type: true,
+            lastName: true,
+            firstName: true,
+            companyName: true,
+          },
+          take: 1,
+        },
         _count: {
           select: {
             customers: true,

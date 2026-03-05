@@ -45,7 +45,7 @@ export function ManualSettingsForm({
   const hasSimType = mappedFields.includes("simType");
   const hasCarrierType = mappedFields.includes("carrierType");
   const hasPlan = mappedFields.includes("plan");
-  const hasContractEnd = mappedFields.includes("supplierContractEnd");
+  const hasAutoCancelDate = mappedFields.includes("autoCancelDate");
   const hasUsageTag = mappedFields.includes("usageTag");
 
   const updateSetting = <K extends keyof ManualSettings>(
@@ -66,7 +66,7 @@ export function ManualSettingsForm({
   };
 
   return (
-    <Card>
+    <Card className="max-w-[1024px]">
       <CardHeader>
         <CardTitle className="text-base">
           一括設定（全行に適用）
@@ -144,42 +144,43 @@ export function ManualSettingsForm({
             />
           </div>
 
-          {/* 解約日 - 常に表示 */}
+          {/* 解約予定日 - 常に表示 */}
           <div className="space-y-2">
             <Label>
-              解約日（任意）
-              {hasContractEnd && <span className="text-xs text-gray-500 ml-2">※CSVの値が優先</span>}
+              解約予定日（任意）
+              {hasAutoCancelDate && <span className="text-xs text-gray-500 ml-2">※CSVの値が優先</span>}
             </Label>
             <Input
               type="date"
               value={
-                settings.supplierContractEnd
-                  ? settings.supplierContractEnd.split("T")[0]
+                settings.autoCancelDate
+                  ? settings.autoCancelDate.split("T")[0]
                   : ""
               }
               onChange={(e) => {
                 const value = e.target.value;
                 if (value) {
                   const isoDate = new Date(value).toISOString();
-                  updateSetting("supplierContractEnd", isoDate);
-                  updateSetting("isAutoCancel", true);
+                  updateSetting("autoCancelDate", isoDate);
                 } else {
-                  updateSetting("supplierContractEnd", undefined);
-                  updateSetting("isAutoCancel", undefined);
+                  updateSetting("autoCancelDate", undefined);
                 }
               }}
             />
-            {settings.supplierContractEnd && (
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <Checkbox
-                  checked={settings.isAutoCancel ?? true}
-                  onCheckedChange={(checked) =>
-                    updateSetting("isAutoCancel", checked as boolean)
-                  }
-                />
-                <span>自動解約を有効にする</span>
-              </div>
-            )}
+          </div>
+
+          {/* 自動解約 - 常に表示 */}
+          <div className="space-y-2">
+            <Label>自動解約</Label>
+            <div className="flex items-center gap-2 h-10">
+              <Checkbox
+                checked={settings.isAutoCancel ?? false}
+                onCheckedChange={(checked) =>
+                  updateSetting("isAutoCancel", checked ? true : undefined)
+                }
+              />
+              <span className="text-sm">自動解約を有効にする</span>
+            </div>
           </div>
         </div>
 

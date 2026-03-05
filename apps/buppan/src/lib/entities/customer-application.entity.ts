@@ -54,6 +54,11 @@ export interface CustomerInfo {
   // 法人情報（法人の場合）
   companyName?: string;
   companyNameKana?: string;
+  establishedDate?: string;
+  representativeLastName?: string;
+  representativeFirstName?: string;
+  representativeLastNameKana?: string;
+  representativeFirstNameKana?: string;
   companyPostalCode?: string;
   companyPrefecture?: string;
   companyCity?: string;
