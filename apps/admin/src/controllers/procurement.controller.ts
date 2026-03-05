@@ -81,6 +81,7 @@ const importSimDataSchema = z.object({
 const importSimsSchema = z.object({
   sims: z.array(importSimDataSchema).min(1, 'SIMデータは1件以上必要です'),
   supplierId: z.number().int().positive('仕入先IDは正の整数である必要があります'),
+  updateExisting: z.boolean().optional(),
 });
 
 /**
@@ -311,6 +312,80 @@ export async function deletePurchaseOrderImage(
   });
 
   return NextResponse.json(updatedOrder);
+}
+
+// ==================== Bulk Update Schema ====================
+
+const bulkUpdateSimsSchema = z.object({
+  iccids: z.array(z.string()).min(1, '1件以上のICCIDが必要です'),
+  simType: z.enum(['INDIVIDUAL', 'CORPORATE', 'BOTH']).optional(),
+  carrierType: z.enum(CARRIER_TYPES).nullable().optional(),
+  plan: z.string().nullable().optional(),
+  eligibleTagIds: z.array(z.number().int()).optional(),
+  status: z.enum(['IN_STOCK', 'ACTIVE', 'RETURNING', 'RETIRED', 'CANCELLED']).optional(),
+});
+
+/**
+ * 発注に紐づくSIMを一括更新
+ */
+export async function bulkUpdatePurchaseOrderSims(
+  id: string,
+  request: NextRequest,
+  prisma: PrismaClient
+): Promise<NextResponse> {
+  const body = await request.json();
+  const validation = bulkUpdateSimsSchema.safeParse(body);
+  if (!validation.success) {
+    return NextResponse.json(
+      { error: 'バリデーションエラー', details: validation.error.flatten() },
+      { status: 400 }
+    );
+  }
+
+  const { iccids, ...updateFields } = validation.data;
+
+  // purchaseOrderの存在確認
+  const purchaseOrder = await prisma.purchaseOrder.findUnique({
+    where: { id },
+  });
+  if (!purchaseOrder) {
+    return NextResponse.json({ error: '発注が見つかりません' }, { status: 404 });
+  }
+
+  // 更新データを構築（undefinedのフィールドは除外）
+  const data: Record<string, unknown> = {};
+  if (updateFields.simType !== undefined) data.simType = updateFields.simType;
+  if (updateFields.carrierType !== undefined) data.carrierType = updateFields.carrierType;
+  if (updateFields.plan !== undefined) data.plan = updateFields.plan;
+  if (updateFields.eligibleTagIds !== undefined) data.eligibleTagIds = updateFields.eligibleTagIds;
+  if (updateFields.status !== undefined) data.status = updateFields.status;
+
+  if (Object.keys(data).length === 0) {
+    return NextResponse.json({ error: '更新するフィールドがありません' }, { status: 400 });
+  }
+
+  try {
+    const result = await prisma.sim.updateMany({
+      where: {
+        iccid: { in: iccids },
+        purchaseOrderId: id,
+      },
+      data,
+    });
+
+    logger.info('SIM一括更新完了', {
+      purchaseOrderId: id,
+      updated: result.count,
+    });
+
+    return NextResponse.json({ updated: result.count });
+  } catch (error) {
+    logger.error('SIM一括更新エラー', { error: error instanceof Error ? error.message : error });
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : '更新に失敗しました' },
+      { status: 500 }
+    );
+  }
 }
 
 /**
