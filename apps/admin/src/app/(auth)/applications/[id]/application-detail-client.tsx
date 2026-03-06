@@ -1699,7 +1699,6 @@ export function ApplicationDetailClient() {
           lineTags={lineTags}
           lineReserveTags={lineReserveTags}
           simValidationMap={simValidationMap}
-          onClose={() => setShowScanModal(false)}
           onComplete={() => {
             setShowScanModal(false);
             toast.success("ICCID登録が完了しました");

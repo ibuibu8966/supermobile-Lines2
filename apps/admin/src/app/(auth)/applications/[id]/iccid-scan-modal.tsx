@@ -37,7 +37,6 @@ interface IccidScanModalProps {
   lineTags: LineTag[];
   lineReserveTags: LineReserveTag[];
   simValidationMap: Record<string, SimIccidValidation>;
-  onClose: () => void;
   onComplete: () => void;
 }
 
@@ -73,7 +72,6 @@ export function IccidScanModal({
   lineTags,
   lineReserveTags,
   simValidationMap,
-  onClose,
   onComplete,
 }: IccidScanModalProps) {
   const [iccids, setIccids] = useState<IccidItem[]>([]);
@@ -87,7 +85,8 @@ export function IccidScanModal({
   const [autoEnter, setAutoEnter] = useState(true);
   const [autoEnterLength, setAutoEnterLength] = useState(19);
   const [error, setError] = useState<string | null>(null);
-  const [isClosing, setIsClosing] = useState(false); // 「完了して保存」待機中
+  const [isClosing, setIsClosing] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // スキャン開始後は設定変更をロック
@@ -343,7 +342,33 @@ export function IccidScanModal({
     setIccids((prev) => prev.filter((item) => item.iccid !== iccid));
   }, []);
 
-  // 「閉じる」
+  // 「キャンセル」: このセッションでsavedした全件の割当を解除して閉じる
+  const handleCancel = async () => {
+    const savedItems = iccids.filter(i => i.saveStatus === "saved" && i.lineId);
+    if (savedItems.length === 0) {
+      onComplete();
+      return;
+    }
+
+    setIsCancelling(true);
+    try {
+      await Promise.all(
+        savedItems.map(item =>
+          fetch(`/api/applications/${applicationId}/lines/${item.lineId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ simId: null, msisdn: null, status: "NOT_ACTIVATED" }),
+          })
+        )
+      );
+    } catch {
+      // エラーでもモーダルは閉じる
+    }
+    setIsCancelling(false);
+    onComplete();
+  };
+
+  // 「入力を確定」: pending完了待ち + エラーチェック後に閉じる
   const handleSubmit = async () => {
     if (iccids.length === 0) {
       onComplete();
@@ -361,7 +386,7 @@ export function IccidScanModal({
     const failedCount = iccids.filter((i) => i.saveStatus === "failed").length;
     const conflictCount = iccids.filter((i) => i.saveStatus === "conflict").length;
     if (failedCount > 0 || conflictCount > 0) {
-      setError(`${failedCount + conflictCount}件の問題があります。解決してから閉じてください。`);
+      setError(`${failedCount + conflictCount}件の問題があります。解決してから確定してください。`);
       return;
     }
 
@@ -412,9 +437,7 @@ export function IccidScanModal({
               </span>
             </div>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <X className="h-5 w-5" />
-          </button>
+          {/* モーダルを閉じるにはフッターのボタンを使用 */}
         </div>
 
         {/* 設定 */}
@@ -655,15 +678,25 @@ export function IccidScanModal({
         </div>
 
         {/* フッター */}
-        <div className="flex justify-end px-6 py-4 border-t bg-gray-50">
-          <Button variant="outline" onClick={handleSubmit} disabled={isClosing}>
+        <div className="flex justify-end gap-2 px-6 py-4 border-t bg-gray-50">
+          <Button variant="outline" onClick={handleCancel} disabled={isClosing || isCancelling}>
+            {isCancelling ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                キャンセル中...
+              </>
+            ) : (
+              "キャンセル"
+            )}
+          </Button>
+          <Button onClick={handleSubmit} disabled={isClosing || isCancelling}>
             {isClosing ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 処理完了待ち...
               </>
             ) : (
-              "閉じる"
+              "入力を確定"
             )}
           </Button>
         </div>
