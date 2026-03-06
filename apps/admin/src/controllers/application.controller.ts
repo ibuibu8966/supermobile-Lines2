@@ -203,10 +203,15 @@ export async function updateApplication(
   if (accessDenied) return accessDenied;
 
   // 4. Service呼び出し
-  const updated = await applicationService.updateApplication(id, validated as ApplicationUpdateInput);
-
-  // 5. レスポンス
-  return NextResponse.json(updated);
+  try {
+    const updated = await applicationService.updateApplication(id, validated as ApplicationUpdateInput);
+    return NextResponse.json(updated);
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('SIM割当済み')) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+    throw error;
+  }
 }
 
 // 顧客情報スキーマ

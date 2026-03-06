@@ -316,6 +316,40 @@ export class ApplicationRepository {
       }
     }
 
+    // lineCount が変更された場合、ApplicationLineも調整
+    if (data.lineCount !== undefined) {
+      const currentLines = await this.prisma.applicationLine.findMany({
+        where: { applicationId: id },
+        orderBy: { lineNumber: 'asc' },
+      });
+      const currentCount = currentLines.length;
+      const newCount = data.lineCount;
+      const assignedCount = currentLines.filter(l => l.simId !== null).length;
+
+      if (newCount < assignedCount) {
+        throw new Error(`SIM割当済みの回線が${assignedCount}件あるため、${assignedCount}回線未満には変更できません`);
+      }
+
+      if (newCount > currentCount) {
+        // 増加: 新しい行を追加
+        const newLines = Array.from({ length: newCount - currentCount }, (_, i) => ({
+          applicationId: id,
+          lineNumber: currentCount + i + 1,
+          status: 'NOT_ACTIVATED' as const,
+        }));
+        await this.prisma.applicationLine.createMany({ data: newLines });
+      } else if (newCount < currentCount) {
+        // 減少: 未割当の行を末尾から削除
+        const unassignedLines = currentLines
+          .filter(l => l.simId === null)
+          .sort((a, b) => b.lineNumber - a.lineNumber)
+          .slice(0, currentCount - newCount);
+        await this.prisma.applicationLine.deleteMany({
+          where: { id: { in: unassignedLines.map(l => l.id) } },
+        });
+      }
+    }
+
     const application = await this.prisma.application.update({
       where: { id },
       data: updateData,

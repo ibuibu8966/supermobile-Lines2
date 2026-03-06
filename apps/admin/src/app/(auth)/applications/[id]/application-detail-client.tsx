@@ -411,10 +411,11 @@ export function ApplicationDetailClient() {
         setIsEditingLineCount(false);
         refetchApplication();
       } else {
-        throw new Error("更新に失敗しました");
+        const errorData = await res.json().catch(() => null);
+        throw new Error(errorData?.error || "更新に失敗しました");
       }
-    } catch {
-      toast.error("回線数の更新に失敗しました");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "回線数の更新に失敗しました");
     } finally {
       setLineCountSaving(false);
     }
@@ -1801,7 +1802,8 @@ export function ApplicationDetailClient() {
               <p className="font-medium mb-1">⚠️ 注意事項</p>
               <ul className="list-disc list-inside space-y-1 text-xs">
                 <li>回線数を変更すると、合計金額が自動的に再計算されます。</li>
-                <li>実際の回線（SIM）枚数は変更されません。</li>
+                <li>回線管理の行数も自動で増減します。</li>
+                <li>SIM割当済みの回線数より少ない数には変更できません。</li>
                 <li>請求書が発行済みの場合は、別途対応が必要です。</li>
               </ul>
             </div>
