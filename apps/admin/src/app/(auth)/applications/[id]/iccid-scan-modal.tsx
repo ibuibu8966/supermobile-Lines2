@@ -292,7 +292,33 @@ export function IccidScanModal({
     cancelSaveRef.current = true;
   };
 
-  // 「入力を確定」: 一括でDB登録
+  // 1件処理してステータス更新
+  const processOneItem = useCallback(async (item: IccidItem, progressRef: { current: number }, total: number) => {
+    setIccids(prev => prev.map(x => x.iccid === item.iccid ? { ...x, saveStatus: "saving" } : x));
+
+    const result = await saveSingleIccid(item.iccid);
+
+    setIccids(prev => prev.map(x => {
+      if (x.iccid !== item.iccid) return x;
+      switch (result.status) {
+        case "ok":
+          return { ...x, saveStatus: "saved", lineId: result.line?.id };
+        case "conflict":
+          return { ...x, saveStatus: "conflict", conflict: result.conflict };
+        case "no_lines":
+          return { ...x, saveStatus: "failed", error: "未割当の回線がありません" };
+        default:
+          return { ...x, saveStatus: "failed", error: result.error || "登録に失敗しました" };
+      }
+    }));
+
+    progressRef.current += 1;
+    setSaveProgress({ current: progressRef.current, total });
+  }, [saveSingleIccid]);
+
+  // 「入力を確定」: 20件並列でDB登録
+  const CONCURRENCY = 20;
+
   const handleSubmit = async () => {
     const queuedItems = iccids.filter(i => i.saveStatus === "queued");
 
@@ -302,7 +328,6 @@ export function IccidScanModal({
     }
 
     if (queuedItems.length === 0) {
-      // 全件処理済み（再試行後など）
       const hasProblems = iccids.some(i => i.saveStatus === "failed" || i.saveStatus === "conflict");
       if (hasProblems) {
         setError("問題のある項目を解決してから確定してください");
@@ -315,44 +340,22 @@ export function IccidScanModal({
     setIsSaving(true);
     setError(null);
     cancelSaveRef.current = false;
+    const progressRef = { current: 0 };
     setSaveProgress({ current: 0, total: queuedItems.length });
 
-    for (let i = 0; i < queuedItems.length; i++) {
+    for (let i = 0; i < queuedItems.length; i += CONCURRENCY) {
       if (cancelSaveRef.current) break;
-
-      const item = queuedItems[i];
-      setSaveProgress({ current: i + 1, total: queuedItems.length });
-
-      // saving に更新
-      setIccids(prev => prev.map(x => x.iccid === item.iccid ? { ...x, saveStatus: "saving" } : x));
-
-      const result = await saveSingleIccid(item.iccid);
-
-      setIccids(prev => prev.map(x => {
-        if (x.iccid !== item.iccid) return x;
-        switch (result.status) {
-          case "ok":
-            return { ...x, saveStatus: "saved", lineId: result.line?.id };
-          case "conflict":
-            return { ...x, saveStatus: "conflict", conflict: result.conflict };
-          case "no_lines":
-            return { ...x, saveStatus: "failed", error: "未割当の回線がありません" };
-          default:
-            return { ...x, saveStatus: "failed", error: result.error || "登録に失敗しました" };
-        }
-      }));
+      const batch = queuedItems.slice(i, i + CONCURRENCY);
+      await Promise.all(batch.map(item => processOneItem(item, progressRef, queuedItems.length)));
     }
 
     setIsSaving(false);
 
-    // キャンセルされなかった場合、全件成功なら自動で閉じる
     if (!cancelSaveRef.current) {
-      // setIccids の更新が反映されるのを待つ
       setTimeout(() => {
         setIccids(prev => {
           const hasProblems = prev.some(i => i.saveStatus === "failed" || i.saveStatus === "conflict");
           if (!hasProblems) {
-            // 全件成功 → onComplete を非同期で呼ぶ
             setTimeout(() => onComplete(), 0);
           }
           return prev;
