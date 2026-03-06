@@ -32,6 +32,7 @@ interface IccidItem {
 interface IccidScanModalProps {
   applicationId: string;
   notActivatedCount: number;
+  existingIccids: Set<string>;
   lineTags: LineTag[];
   lineReserveTags: LineReserveTag[];
   simValidationMap: Record<string, SimIccidValidation>;
@@ -67,6 +68,7 @@ async function fetchWithRetry(
 export function IccidScanModal({
   applicationId,
   notActivatedCount,
+  existingIccids,
   lineTags,
   lineReserveTags,
   simValidationMap,
@@ -202,6 +204,11 @@ export function IccidScanModal({
 
     if (iccids.some((item) => item.iccid === iccid)) {
       setError("このICCIDは既に入力されています");
+      return;
+    }
+
+    if (existingIccids.has(iccid)) {
+      setError("このICCIDは既にこの申し込みの回線に割り当て済みです");
       return;
     }
 

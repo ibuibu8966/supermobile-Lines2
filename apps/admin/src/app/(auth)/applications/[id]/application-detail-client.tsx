@@ -1695,6 +1695,7 @@ export function ApplicationDetailClient() {
         <IccidScanModal
           applicationId={id}
           notActivatedCount={notActivatedCount}
+          existingIccids={new Set(application.lines.filter(l => l.simId).map(l => l.simId!))}
           lineTags={lineTags}
           lineReserveTags={lineReserveTags}
           simValidationMap={simValidationMap}
