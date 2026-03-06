@@ -668,7 +668,7 @@ export function SimsClient() {
                             </td>
                             <td className="py-3 px-4 font-mono text-xs">
                               <div className="flex items-center gap-2">
-                                <Link href={`/sims/${sim.iccid}`} className="hover:underline text-blue-600">
+                                <Link href={`/sims/${sim.iccid}`} prefetch={false} className="hover:underline text-blue-600">
                                   {sim.iccid}
                                 </Link>
                                 {hasArchivedApplication(sim) && (

@@ -825,7 +825,7 @@ export default function ApplicationDetailPage() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <p className="text-gray-500 mb-4">申し込みが見つかりません</p>
-          <Link href="/applications">
+          <Link href="/applications" prefetch={false}>
             <Button variant="outline">一覧に戻る</Button>
           </Link>
         </div>

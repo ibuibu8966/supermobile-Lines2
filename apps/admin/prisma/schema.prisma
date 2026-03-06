@@ -646,6 +646,8 @@ model ApplicationLine {
   @@index([status])
   @@index([lineTagId])
   @@index([lineReserveTagId])
+  @@index([shippedAt])    // 発送日フィルタ最適化
+  @@index([returnedAt])   // 返却日フィルタ最適化
 }
 
 model KycImage {

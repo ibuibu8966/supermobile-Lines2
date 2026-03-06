@@ -573,6 +573,7 @@ export function ApplicationsClient() {
                         <div className="flex items-center gap-1">
                           <Link
                             href={`/applications/${app.id}`}
+                            prefetch={false}
                             className="text-blue-600 hover:underline flex items-center gap-1"
                           >
                             <ExternalLink className="h-3 w-3" />

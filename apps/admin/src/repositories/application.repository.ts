@@ -365,6 +365,73 @@ export class ApplicationRepository {
     });
   }
 
+  /**
+   * 申込の統計情報をDB側のWINDOW関数で一括計算（N+1クエリ回避）
+   * - applicationOrdinal: 顧客内の申込順番
+   * - needsKycCheck: KYC要確認フラグ
+   * - latestExpiryDate: 顧客の全申込を通じた最新KYC有効期限
+   */
+  async findApplicationStats(
+    applicationIds: string[],
+    customerIds: string[]
+  ): Promise<Map<string, { ordinal: number; needsKycCheck: boolean; latestExpiryDate: Date | null }>> {
+    if (applicationIds.length === 0) {
+      return new Map();
+    }
+
+    const rows = await this.prisma.$queryRaw<Array<{
+      id: string;
+      ordinal: bigint;
+      needs_kyc_check: boolean;
+      latest_expiry_date: Date | null;
+    }>>(
+      Prisma.sql`
+        WITH app_kyc AS (
+          SELECT
+            a.id,
+            a."customerId",
+            a."createdAt",
+            MAX(ki."expiryDate") as app_expiry
+          FROM "Application" a
+          LEFT JOIN "KycImage" ki ON ki."applicationId" = a.id
+          WHERE a."customerId" = ANY(${customerIds})
+          GROUP BY a.id, a."customerId", a."createdAt"
+        ),
+        app_stats AS (
+          SELECT
+            id,
+            ROW_NUMBER() OVER (PARTITION BY "customerId" ORDER BY "createdAt", id) as ordinal,
+            app_expiry,
+            LAG(app_expiry) OVER (PARTITION BY "customerId" ORDER BY "createdAt", id) as prev_expiry,
+            MAX(app_expiry) OVER (PARTITION BY "customerId") as latest_expiry
+          FROM app_kyc
+        )
+        SELECT
+          id,
+          ordinal,
+          latest_expiry as latest_expiry_date,
+          CASE
+            WHEN ordinal = 1 THEN true
+            WHEN app_expiry IS NOT NULL AND prev_expiry IS NOT NULL AND app_expiry != prev_expiry THEN true
+            WHEN app_expiry IS NOT NULL AND prev_expiry IS NULL THEN true
+            ELSE false
+          END as needs_kyc_check
+        FROM app_stats
+        WHERE id = ANY(${applicationIds})
+      `
+    );
+
+    const result = new Map<string, { ordinal: number; needsKycCheck: boolean; latestExpiryDate: Date | null }>();
+    for (const row of rows) {
+      result.set(row.id, {
+        ordinal: Number(row.ordinal),
+        needsKycCheck: row.needs_kyc_check,
+        latestExpiryDate: row.latest_expiry_date,
+      });
+    }
+    return result;
+  }
+
   // ─── 紹介者 ───────────────────────────────────────────
 
   async addReferral(applicationId: string, referrerName: string, fee: number) {

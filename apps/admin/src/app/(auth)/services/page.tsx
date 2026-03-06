@@ -242,7 +242,7 @@ export default function ServicesPage() {
                           {service.isActive ? "有効" : "無効"}
                         </Badge>
                       </button>
-                      <Link href={"/plans?serviceId=" + service.id}>
+                      <Link href={"/plans?serviceId=" + service.id} prefetch={false}>
                         <Button variant="outline" size="sm">
                           <Plus className="h-4 w-4 mr-2" />
                           プラン追加
@@ -300,7 +300,7 @@ export default function ServicesPage() {
                               </Badge>
                             </td>
                             <td className="py-2 px-4 text-right">
-                              <Link href={"/plans/" + plan.id}>
+                              <Link href={"/plans/" + plan.id} prefetch={false}>
                                 <Button variant="ghost" size="sm">
                                   <Settings className="h-4 w-4" />
                                 </Button>

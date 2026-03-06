@@ -49,46 +49,10 @@ export class ApplicationService {
 
     logger.debug('Repository取得完了', { count: applications.length, total });
 
-    // 顧客ごとの申込順番・KYC要確認判定を計算（全申込をcreatedAt昇順で取得）
+    // 顧客ごとの申込順番・KYC情報をDB側のWINDOW関数で一括計算（N+1クエリ回避）
+    const applicationIds = applications.map((a) => a.id);
     const customerIds = [...new Set(applications.map((a) => a.customerId))];
-    const allCustomerApps = await this.applicationRepo.findByCustomerIds(customerIds);
-
-    const ordinalMap: Record<string, number> = {};
-    const appExpiryMap: Record<string, Date | null> = {};
-    const customerLatestExpiryMap: Record<string, Date | null> = {};
-    const needsKycCheckMap: Record<string, boolean> = {};
-    const customerSeq: Record<string, number> = {};
-    const prevExpiryMap: Record<string, Date | null> = {};
-
-    for (const app of allCustomerApps) {
-      const cid = app.customerId;
-      customerSeq[cid] = (customerSeq[cid] || 0) + 1;
-      ordinalMap[app.id] = customerSeq[cid];
-
-      // この申込自身のkycImagesから最新の有効期限を取得
-      const appExpiry = app.kycImages
-        .map((k) => k.expiryDate)
-        .filter((d): d is Date => d != null)
-        .sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
-      appExpiryMap[app.id] = appExpiry;
-
-      // 顧客ごとの最新有効期限を追跡（全申込を通じて最も新しい有効期限）
-      if (appExpiry) {
-        const current = customerLatestExpiryMap[cid];
-        if (!current || appExpiry.getTime() > current.getTime()) {
-          customerLatestExpiryMap[cid] = appExpiry;
-        }
-      }
-
-      // 要確認判定: 初回 or 前回とexpiryDateが変わった
-      const isFirst = customerSeq[cid] === 1;
-      const prevExpiry = prevExpiryMap[cid] ?? null;
-      needsKycCheckMap[app.id] = isFirst
-        || (appExpiry !== null && prevExpiry !== null && appExpiry.getTime() !== prevExpiry.getTime())
-        || (appExpiry !== null && prevExpiry === null);
-
-      if (appExpiry) prevExpiryMap[cid] = appExpiry;
-    }
+    const statsMap = await this.applicationRepo.findApplicationStats(applicationIds, customerIds);
 
     // 統計情報を計算
     const applicationsWithStats = applications.map((app: ApplicationWithRelations) => {
@@ -96,6 +60,7 @@ export class ApplicationService {
       const statuses = lines.map((l) => l.status);
       const uniqueStatuses = [...new Set(statuses)];
       const lineStatus = lines.length > 0 && uniqueStatuses.length === 1 ? uniqueStatuses[0] : null;
+      const appStats = statsMap.get(app.id);
       return {
         ...app,
         stats: {
@@ -105,9 +70,9 @@ export class ApplicationService {
           returnedCount: lines.filter((l) => l.status === 'RETURNED').length,
           lineStatus,
         },
-        applicationOrdinal: ordinalMap[app.id] ?? 1,
-        latestExpiryDate: customerLatestExpiryMap[app.customerId] ?? null,
-        needsKycCheck: needsKycCheckMap[app.id] ?? true,
+        applicationOrdinal: appStats?.ordinal ?? 1,
+        latestExpiryDate: appStats?.latestExpiryDate ?? null,
+        needsKycCheck: appStats?.needsKycCheck ?? true,
       };
     });
 

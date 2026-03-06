@@ -261,7 +261,7 @@ export default function PlanDetailPage({
       <div className="p-6">
         <div className="text-center py-12">
           <p className="text-gray-500 mb-4">プランが見つかりません</p>
-          <Link href="/plans">
+          <Link href="/plans" prefetch={false}>
             <Button variant="outline">一覧に戻る</Button>
           </Link>
         </div>

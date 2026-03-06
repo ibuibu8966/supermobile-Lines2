@@ -52,13 +52,102 @@ export interface SimFilters {
 export class SimRepository {
   constructor(private prisma: PrismaClient) {}
 
+  /** Prisma select定義（findMany / findManyWithStatusFilter で共通利用） */
+  private readonly simListSelect = {
+    iccid: true,
+    msisdn: true,
+    simType: true,
+    carrierType: true,
+    autoCancelDate: true,
+    updatedAt: true,
+    supplierId: true,
+    simLocationTagId: true,
+    eligibleTagIds: true,
+    supplier: {
+      select: { id: true, code: true, name: true },
+    },
+    simLocationTag: {
+      select: { id: true, code: true, name: true },
+    },
+    contracts: {
+      select: {
+        id: true,
+        serviceName: true,
+        contractStart: true,
+        contractEnd: true,
+        status: true,
+        usageTags: {
+          select: {
+            usageTag: {
+              select: { id: true, code: true, name: true },
+            },
+          },
+        },
+        customer: {
+          select: {
+            id: true,
+            lastName: true,
+            firstName: true,
+            companyName: true,
+            type: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' as const },
+      take: 10,
+    },
+    applicationLines: {
+      select: {
+        id: true,
+        status: true,
+        updatedAt: true,
+        application: {
+          select: {
+            id: true,
+            applicationNumber: true,
+            isArchived: true,
+            archivedAt: true,
+          },
+        },
+      },
+    },
+  } as const;
+
+  /** Prisma結果から consumedTagIds / status を計算 */
+  private enrichSimResults(sims: Array<Record<string, unknown>>): SimWithRelations[] {
+    return sims.map((sim) => {
+      const consumedTagIds = new Set<number>();
+      for (const contract of (sim.contracts as Array<Record<string, unknown>>) || []) {
+        for (const ut of (contract.usageTags as Array<Record<string, unknown>>) || []) {
+          const usageTag = ut.usageTag as { id?: number } | undefined;
+          if (usageTag?.id) {
+            consumedTagIds.add(usageTag.id);
+          }
+        }
+      }
+      return {
+        ...sim,
+        consumedTagIds: Array.from(consumedTagIds),
+        status: computeSimStatus(
+          (sim.applicationLines as Array<{ status: string; updatedAt?: Date | null }>) || []
+        ),
+      };
+    }) as unknown as SimWithRelations[];
+  }
+
   /**
    * SIM一覧を取得（フィルタリング・ページネーション対応）
+   * ステータスフィルタがある場合はDB側でフィルタリング（10万件メモリ読み込みを回避）
    */
   async findMany(
     filters: SimFilters,
     pagination: { skip: number; take: number }
   ): Promise<{ sims: SimWithRelations[]; total: number }> {
+    // ステータスフィルタがある場合はDB側でフィルタリング
+    if (filters.status) {
+      return this.findManyWithStatusFilter(filters, pagination);
+    }
+
     const where = this.buildWhereClause(filters);
 
     logger.debug('SimRepository.findMany', { where, pagination });
@@ -66,65 +155,7 @@ export class SimRepository {
     const [sims, total] = await Promise.all([
       this.prisma.sim.findMany({
         where,
-        select: {
-          iccid: true,
-          msisdn: true,
-          simType: true,
-          carrierType: true,
-          autoCancelDate: true,
-          updatedAt: true,
-          supplierId: true,
-          simLocationTagId: true,
-          eligibleTagIds: true,
-          supplier: {
-            select: { id: true, code: true, name: true },
-          },
-          simLocationTag: {
-            select: { id: true, code: true, name: true },
-          },
-          contracts: {
-            select: {
-              id: true,
-              serviceName: true,
-              contractStart: true,
-              contractEnd: true,
-              status: true,
-              usageTags: {
-                select: {
-                  usageTag: {
-                    select: { id: true, code: true, name: true },
-                  },
-                },
-              },
-              customer: {
-                select: {
-                  id: true,
-                  lastName: true,
-                  firstName: true,
-                  companyName: true,
-                  type: true,
-                },
-              },
-            },
-            orderBy: { createdAt: 'desc' },
-            take: 10,
-          },
-          applicationLines: {
-            select: {
-              id: true,
-              status: true,
-              updatedAt: true,
-              application: {
-                select: {
-                  id: true,
-                  applicationNumber: true,
-                  isArchived: true,
-                  archivedAt: true,
-                },
-              },
-            },
-          },
-        },
+        select: this.simListSelect,
         orderBy: { updatedAt: 'desc' },
         skip: pagination.skip,
         take: pagination.take,
@@ -132,24 +163,105 @@ export class SimRepository {
       this.prisma.sim.count({ where }),
     ]);
 
-    // 契約から消費済みタグIDを動的に計算、回線ステータスからSIMステータスを導出
-    const simsWithComputedTags = sims.map((sim) => {
-      const consumedTagIds = new Set<number>();
-      for (const contract of sim.contracts || []) {
-        for (const ut of contract.usageTags || []) {
-          if (ut.usageTag?.id) {
-            consumedTagIds.add(ut.usageTag.id);
-          }
-        }
+    return {
+      sims: this.enrichSimResults(sims as unknown as Array<Record<string, unknown>>),
+      total,
+    };
+  }
+
+  /**
+   * ステータスフィルタ付きSIM一覧取得
+   * SIMステータスはApplicationLineの最新ステータスから導出されるため、
+   * LATERAL JOINでDB側で計算・フィルタ・ページネーションする
+   */
+  private async findManyWithStatusFilter(
+    filters: SimFilters,
+    pagination: { skip: number; take: number }
+  ): Promise<{ sims: SimWithRelations[]; total: number }> {
+    logger.debug('SimRepository.findManyWithStatusFilter', { filters, pagination });
+
+    // WHERE条件をSQL fragmentsで構築
+    let query = Prisma.sql`
+      SELECT s.iccid, COUNT(*) OVER() as total_count
+      FROM "Sim" s
+      LEFT JOIN LATERAL (
+        SELECT al.status
+        FROM "ApplicationLine" al
+        WHERE al."simId" = s.iccid
+        ORDER BY al."updatedAt" DESC LIMIT 1
+      ) latest ON true
+      WHERE 1=1
+    `;
+
+    // 検索フィルタ
+    if (filters.search) {
+      const term = `%${filters.search}%`;
+      query = Prisma.sql`${query} AND (s.iccid ILIKE ${term} OR s.msisdn ILIKE ${term})`;
+    }
+
+    // キャリアフィルタ
+    if (filters.carrier) {
+      if (filters.carrier === 'NULL') {
+        query = Prisma.sql`${query} AND s."carrierType" IS NULL`;
+      } else {
+        query = Prisma.sql`${query} AND s."carrierType"::text = ${filters.carrier}`;
       }
-      return {
-        ...sim,
-        consumedTagIds: Array.from(consumedTagIds),
-        status: computeSimStatus(sim.applicationLines || []),
-      };
+    }
+
+    // SIMタイプフィルタ
+    if (filters.simType) {
+      query = Prisma.sql`${query} AND s."simType"::text = ${filters.simType}`;
+    }
+
+    // 自動解約日フィルタ
+    if (filters.autoCancelDateFrom) {
+      query = Prisma.sql`${query} AND s."autoCancelDate" >= ${new Date(filters.autoCancelDateFrom)}`;
+    }
+    if (filters.autoCancelDateTo) {
+      query = Prisma.sql`${query} AND s."autoCancelDate" <= ${new Date(filters.autoCancelDateTo)}`;
+    }
+
+    // 仕入れ先フィルタ
+    if (filters.supplierId !== undefined) {
+      query = Prisma.sql`${query} AND s."supplierId" = ${filters.supplierId}`;
+    }
+
+    // SIM場所タグフィルタ
+    if (filters.simLocationTagId !== undefined) {
+      query = Prisma.sql`${query} AND s."simLocationTagId" = ${filters.simLocationTagId}`;
+    }
+
+    // ステータスフィルタ（LATERAL JOINの結果で判定）
+    if (filters.status === 'ACTIVE') {
+      query = Prisma.sql`${query} AND latest.status IN ('ACTIVATED', 'SHIPPED')`;
+    } else {
+      // IN_STOCK: 回線なし or 最新がACTIVATED/SHIPPED以外
+      query = Prisma.sql`${query} AND (latest.status IS NULL OR latest.status NOT IN ('ACTIVATED', 'SHIPPED'))`;
+    }
+
+    // ORDER BY + LIMIT + OFFSET
+    query = Prisma.sql`${query} ORDER BY s."updatedAt" DESC LIMIT ${pagination.take} OFFSET ${pagination.skip}`;
+
+    const rows = await this.prisma.$queryRaw<{ iccid: string; total_count: bigint }[]>(query);
+
+    if (rows.length === 0) {
+      return { sims: [], total: 0 };
+    }
+
+    const matchedIccids = rows.map((r) => r.iccid);
+    const total = Number(rows[0].total_count);
+
+    // マッチしたICCIDのフルデータをPrismaで取得
+    const sims = await this.prisma.sim.findMany({
+      where: { iccid: { in: matchedIccids } },
+      select: this.simListSelect,
+      orderBy: { updatedAt: 'desc' },
     });
 
-    return { sims: simsWithComputedTags as unknown as SimWithRelations[], total };
+    return {
+      sims: this.enrichSimResults(sims as unknown as Array<Record<string, unknown>>),
+      total,
+    };
   }
 
   /**
