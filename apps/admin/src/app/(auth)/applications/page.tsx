@@ -57,6 +57,27 @@ export default async function ApplicationsPage() {
           queryFn: () => simRepo.findInStockIccids().then((iccids) => ({ iccids })),
           staleTime: 60_000,
         }),
+        // スタッフ一覧（担当者フィルター用）
+        queryClient.prefetchQuery({
+          queryKey: ["users", "staff"],
+          queryFn: () =>
+            prisma.user.findMany({
+              where: { role: { in: ["SUPER_ADMIN", "EMPLOYEE"] } },
+              select: { id: true, name: true, email: true, role: true },
+              orderBy: { name: "asc" },
+            }),
+          staleTime: STALE_TIMES.MASTER,
+        }),
+        // 紹介者タグ（ワークフロー用）
+        queryClient.prefetchQuery({
+          queryKey: queryKeys.referrerTags,
+          queryFn: () =>
+            prisma.referrerTag.findMany({
+              where: { isActive: true },
+              orderBy: { displayOrder: "asc" },
+            }),
+          staleTime: STALE_TIMES.MASTER,
+        }),
       ]);
     }
   } catch {

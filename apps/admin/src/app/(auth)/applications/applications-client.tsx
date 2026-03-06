@@ -160,22 +160,19 @@ export function ApplicationsClient() {
   const [isKycModalOpen, setIsKycModalOpen] = useState(false);
   const [selectedApplicationId, setSelectedApplicationId] = useState<string | null>(null);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
-  const [referrerTags, setReferrerTags] = useState<{ id: number; name: string }[]>([]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   // コメントモーダル
   const [commentModalAppId, setCommentModalAppId] = useState<string | null>(null);
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
 
-  // referrer-tagsを1回だけ取得（全WorkflowRows共有）
-  useEffect(() => {
-    fetch("/api/referrer-tags")
-      .then((res) => res.ok ? res.json() : null)
-      .then((data) => {
-        if (data) setReferrerTags(data.filter((t: { isActive: boolean }) => t.isActive));
-      })
-      .catch(() => {});
-  }, []);
+  // referrer-tags（SSRプリフェッチ済み）
+  const { data: referrerTags = [] } = useQuery<{ id: number; name: string; isActive: boolean }[]>({
+    queryKey: queryKeys.referrerTags,
+    queryFn: () => fetch("/api/referrer-tags").then((r) => r.json()),
+    staleTime: STALE_TIMES.MASTER,
+    select: (data) => data.filter((t) => t.isActive),
+  });
 
   const toggleRow = (id: string) => {
     setExpandedRows((prev) => {
