@@ -22,6 +22,7 @@ type IccidItemStatus = "pending" | "saving" | "saved" | "failed" | "conflict";
 
 interface IccidItem {
   iccid: string;
+  lineId?: string;
   stockStatus: "ok" | "warning";
   saveStatus: IccidItemStatus;
   error?: string;
@@ -103,6 +104,7 @@ export function IccidScanModal({
   // 1件登録API呼び出し
   const saveSingleIccid = useCallback(async (iccid: string): Promise<{
     status: "ok" | "conflict" | "no_lines" | "error";
+    line?: { id: string };
     conflict?: LineScanConflict;
     error?: string;
   }> => {
@@ -153,7 +155,7 @@ export function IccidScanModal({
         if (item.iccid !== next) return item;
         switch (result.status) {
           case "ok":
-            return { ...item, saveStatus: "saved" };
+            return { ...item, saveStatus: "saved", lineId: result.line?.id };
           case "conflict":
             return { ...item, saveStatus: "conflict", conflict: result.conflict };
           case "no_lines":
@@ -252,13 +254,31 @@ export function IccidScanModal({
     inputRef.current?.focus();
   };
 
-  const removeIccid = (index: number) => {
+  const removeIccid = async (index: number) => {
     const item = iccids[index];
-    // 保存済みの場合は削除不可（DBに既に保存されている）
-    if (item.saveStatus === "saved") return;
-    // キューからも削除
-    const queueIdx = queueRef.current.indexOf(item.iccid);
-    if (queueIdx !== -1) queueRef.current.splice(queueIdx, 1);
+    if (item.saveStatus === "saving") return;
+
+    if (item.saveStatus === "saved" && item.lineId) {
+      // saved: APIで割当解除
+      try {
+        const res = await fetch(
+          `/api/applications/${applicationId}/lines/${item.lineId}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ simId: null, msisdn: null, status: "NOT_ACTIVATED" }),
+          }
+        );
+        if (!res.ok) return;
+      } catch {
+        return;
+      }
+    } else if (item.saveStatus === "pending") {
+      // pending: キューから削除
+      const queueIdx = queueRef.current.indexOf(item.iccid);
+      if (queueIdx !== -1) queueRef.current.splice(queueIdx, 1);
+    }
+
     setIccids((prev) => prev.filter((_, i) => i !== index));
   };
 
@@ -593,7 +613,7 @@ export function IccidScanModal({
                           <RotateCw className="h-4 w-4" />
                         </button>
                       )}
-                      {item.saveStatus !== "saved" && (
+                      {item.saveStatus !== "saving" && (
                         <button
                           onClick={() => removeIccid(index)}
                           className="text-gray-400 hover:text-red-500"
