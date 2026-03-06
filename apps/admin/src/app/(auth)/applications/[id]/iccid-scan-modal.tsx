@@ -326,7 +326,7 @@ export function IccidScanModal({
   // 「閉じる」
   const handleSubmit = async () => {
     if (iccids.length === 0) {
-      setError("ICCIDを入力してください");
+      onComplete();
       return;
     }
 
