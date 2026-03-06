@@ -257,7 +257,7 @@ export function IccidScanModal({
       retryCount: 0,
     };
 
-    setIccids((prev) => [...prev, newItem]);
+    setIccids((prev) => [newItem, ...prev]);
     setCurrentInput("");
     setError(null);
 
