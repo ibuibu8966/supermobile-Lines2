@@ -6,7 +6,6 @@ import { ApplicationService } from "@/services/application.service";
 import { ApplicationRepository } from "@/repositories/application.repository";
 import { ServiceService } from "@/services/service.service";
 import { ServiceRepository } from "@/repositories/service.repository";
-import { SimRepository } from "@/repositories/sim.repository";
 import { ApplicationsClient } from "./applications-client";
 
 export default async function ApplicationsPage() {
@@ -21,7 +20,6 @@ export default async function ApplicationsPage() {
         new ApplicationRepository(prisma)
       );
       const serviceService = new ServiceService(new ServiceRepository(prisma));
-      const simRepo = new SimRepository(prisma);
 
       await Promise.all([
         // デフォルト状態（フィルターなし、1ページ目）をプリフェッチ
@@ -50,12 +48,6 @@ export default async function ApplicationsPage() {
           queryKey: queryKeys.services,
           queryFn: () => serviceService.getServiceList({}),
           staleTime: STALE_TIMES.MASTER,
-        }),
-        // IN_STOCK ICCID一覧（ICCID連続入力モーダル用・ページ読み込み時に1回取得）
-        queryClient.prefetchQuery({
-          queryKey: queryKeys.inStockIccids,
-          queryFn: () => simRepo.findInStockIccids().then((iccids) => ({ iccids })),
-          staleTime: 60_000,
         }),
         // スタッフ一覧（担当者フィルター用）
         queryClient.prefetchQuery({
