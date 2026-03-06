@@ -225,36 +225,14 @@ export function IccidScanModal({
       return;
     }
 
-    // SIM検証マップが取得済みの場合のみ検証
+    // SIM検証（警告のみ、ブロックしない）
     const isMapLoaded = Object.keys(simValidationMap).length > 0;
-    if (isMapLoaded) {
-      const validation = simValidationMap[iccid];
-
-      if (!validation) {
-        setError(`ICCID ${iccid} はシステムに登録されていないか、在庫状態ではありません`);
-        return;
-      }
-      if (!validation.isInStock) {
-        setError(`ICCID ${iccid} は現在在庫状態ではありません（既に使用中の可能性があります）`);
-        return;
-      }
-      if (!validation.hasEligibleTag) {
-        const tagNames = validation.planTagNames.join("、");
-        setError(`ICCID ${iccid} はこのプランで必要な用途タグ（${tagNames}）に対応していません`);
-        return;
-      }
-      if (validation.isConsumed) {
-        const tagNames = validation.planTagNames.join("、");
-        setError(`ICCID ${iccid} は用途タグ（${tagNames}）が既に他の契約で消費されています`);
-        return;
-      }
-    }
-
+    const validation = isMapLoaded ? simValidationMap[iccid] : undefined;
     const isRegisteredAndValid =
       isMapLoaded &&
-      simValidationMap[iccid]?.isInStock &&
-      simValidationMap[iccid]?.hasEligibleTag &&
-      !simValidationMap[iccid]?.isConsumed;
+      validation?.isInStock &&
+      validation?.hasEligibleTag &&
+      !validation?.isConsumed;
     const stockStatus: "ok" | "warning" = isRegisteredAndValid ? "ok" : "warning";
 
     const newItem: IccidItem = {
@@ -599,7 +577,7 @@ export function IccidScanModal({
                       )}
                       <span className="font-mono text-sm">{item.iccid}</span>
                       {item.stockStatus === "warning" && item.saveStatus !== "failed" && item.saveStatus !== "conflict" && (
-                        <span className="text-xs text-yellow-600">（SIMマスタ未登録）</span>
+                        <span className="text-xs text-yellow-600">（SIMマスタ未確認）</span>
                       )}
                       {item.saveStatus === "failed" && (
                         <span className="text-xs text-red-600">{item.error}</span>
