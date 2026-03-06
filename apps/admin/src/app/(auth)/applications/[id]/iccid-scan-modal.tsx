@@ -18,7 +18,7 @@ interface LineReserveTag {
   name: string;
 }
 
-type IccidItemStatus = "pending" | "saving" | "saved" | "failed" | "conflict";
+type IccidItemStatus = "queued" | "saving" | "saved" | "failed" | "conflict";
 
 interface IccidItem {
   iccid: string;
@@ -41,7 +41,7 @@ interface IccidScanModalProps {
 }
 
 const MAX_RETRY = 3;
-const RETRY_DELAYS = [1000, 2000, 4000]; // 指数バックオフ
+const RETRY_DELAYS = [1000, 2000, 4000];
 
 async function fetchWithRetry(
   url: string,
@@ -52,7 +52,6 @@ async function fetchWithRetry(
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       const res = await fetch(url, options);
-      // サーバーエラー(5xx)のみリトライ、4xxはリトライしない
       if (res.ok || res.status < 500) return res;
       lastError = new Error(`HTTP ${res.status}`);
     } catch (err) {
@@ -85,16 +84,16 @@ export function IccidScanModal({
   const [autoEnter, setAutoEnter] = useState(true);
   const [autoEnterLength, setAutoEnterLength] = useState(19);
   const [error, setError] = useState<string | null>(null);
-  const [isClosing, setIsClosing] = useState(false);
-  const [isCancelling, setIsCancelling] = useState(false);
+
+  // 一括保存用の状態
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveProgress, setSaveProgress] = useState({ current: 0, total: 0 });
+  const cancelSaveRef = useRef(false);
+
   const inputRef = useRef<HTMLInputElement>(null);
 
   // スキャン開始後は設定変更をロック
   const hasStartedScanning = iccids.length > 0;
-
-  // バックグラウンドキュー
-  const isProcessingRef = useRef(false);
-  const queueRef = useRef<string[]>([]);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -134,48 +133,6 @@ export function IccidScanModal({
     }
   }, [applicationId, contractMonth, lineTagId, lineReserveTagId]);
 
-  // キュー処理
-  const processQueue = useCallback(async () => {
-    if (isProcessingRef.current) return;
-    const next = queueRef.current.shift();
-    if (!next) return;
-
-    isProcessingRef.current = true;
-
-    // ステータスを saving に更新
-    setIccids((prev) =>
-      prev.map((item) => item.iccid === next ? { ...item, saveStatus: "saving" } : item)
-    );
-
-    const result = await saveSingleIccid(next);
-
-    setIccids((prev) =>
-      prev.map((item) => {
-        if (item.iccid !== next) return item;
-        switch (result.status) {
-          case "ok":
-            return { ...item, saveStatus: "saved", lineId: result.line?.id };
-          case "conflict":
-            return { ...item, saveStatus: "conflict", conflict: result.conflict };
-          case "no_lines":
-            return { ...item, saveStatus: "failed", error: "未割当の回線がありません" };
-          default:
-            return { ...item, saveStatus: "failed", error: result.error || "登録に失敗しました" };
-        }
-      })
-    );
-
-    isProcessingRef.current = false;
-    // 次のキューを処理
-    processQueue();
-  }, [saveSingleIccid]);
-
-  // キューに追加してprocessQueue呼び出し
-  const enqueue = useCallback((iccid: string) => {
-    queueRef.current.push(iccid);
-    processQueue();
-  }, [processQueue]);
-
   const validateIccid = (iccid: string): boolean => {
     return /^[A-Z0-9]{15,20}$/.test(iccid);
   };
@@ -197,6 +154,7 @@ export function IccidScanModal({
     }
   };
 
+  // スキャン時はメモリに追加するだけ（DBに触らない）
   const addIccid = (iccid: string) => {
     if (!validateIccid(iccid)) {
       setError("ICCIDは15〜20桁の英数字です");
@@ -218,9 +176,9 @@ export function IccidScanModal({
       return;
     }
 
+    const queuedCount = iccids.filter((i) => i.saveStatus === "queued").length;
     const savedCount = iccids.filter((i) => i.saveStatus === "saved").length;
-    const pendingCount = iccids.filter((i) => i.saveStatus !== "failed" && i.saveStatus !== "conflict").length;
-    const remaining = notActivatedCount - savedCount - (pendingCount - savedCount);
+    const remaining = notActivatedCount - queuedCount - savedCount;
     if (remaining <= 0) {
       setError("未割当回線数の上限に達しました");
       return;
@@ -239,7 +197,7 @@ export function IccidScanModal({
     const newItem: IccidItem = {
       iccid,
       stockStatus,
-      saveStatus: "pending",
+      saveStatus: "queued",
       retryCount: 0,
     };
 
@@ -247,12 +205,10 @@ export function IccidScanModal({
     setCurrentInput("");
     setError(null);
 
-    // バックグラウンドキューに追加
-    enqueue(iccid);
-
     inputRef.current?.focus();
   };
 
+  // 個別削除
   const removeIccid = async (index: number) => {
     const item = iccids[index];
     if (item.saveStatus === "saving") return;
@@ -272,26 +228,10 @@ export function IccidScanModal({
       } catch {
         return;
       }
-    } else if (item.saveStatus === "pending") {
-      // pending: キューから削除
-      const queueIdx = queueRef.current.indexOf(item.iccid);
-      if (queueIdx !== -1) queueRef.current.splice(queueIdx, 1);
     }
-
+    // queued, failed, conflict: メモリから消すだけ
     setIccids((prev) => prev.filter((_, i) => i !== index));
   };
-
-  // 失敗したICCIDを再試行
-  const retryFailed = useCallback((iccid: string) => {
-    setIccids((prev) =>
-      prev.map((item) =>
-        item.iccid === iccid
-          ? { ...item, saveStatus: "pending", error: undefined, retryCount: item.retryCount + 1 }
-          : item
-      )
-    );
-    enqueue(iccid);
-  }, [enqueue]);
 
   // 競合解決: 解約して登録
   const handleForceReassign = useCallback(async (iccid: string, cancelLineId: string) => {
@@ -337,85 +277,107 @@ export function IccidScanModal({
     }
   }, [applicationId, contractMonth, lineTagId, lineReserveTagId]);
 
-  // 競合をスキップ（リストから削除）
+  // 競合をスキップ
   const skipConflict = useCallback((iccid: string) => {
     setIccids((prev) => prev.filter((item) => item.iccid !== iccid));
   }, []);
 
-  // 「キャンセル」: このセッションでsavedした全件の割当を解除して閉じる
-  const handleCancel = async () => {
-    const savedItems = iccids.filter(i => i.saveStatus === "saved" && i.lineId);
-    if (savedItems.length === 0) {
-      onComplete();
-      return;
-    }
-
-    setIsCancelling(true);
-    try {
-      await Promise.all(
-        savedItems.map(item =>
-          fetch(`/api/applications/${applicationId}/lines/${item.lineId}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ simId: null, msisdn: null, status: "NOT_ACTIVATED" }),
-          })
-        )
-      );
-    } catch {
-      // エラーでもモーダルは閉じる
-    }
-    setIsCancelling(false);
+  // 「キャンセル」: メモリクリアしてモーダルを閉じるだけ
+  const handleCancel = () => {
     onComplete();
   };
 
-  // 「入力を確定」: pending完了待ち + エラーチェック後に閉じる
+  // 保存中キャンセル: 処理を中断
+  const handleCancelSave = () => {
+    cancelSaveRef.current = true;
+  };
+
+  // 「入力を確定」: 一括でDB登録
   const handleSubmit = async () => {
-    if (iccids.length === 0) {
+    const queuedItems = iccids.filter(i => i.saveStatus === "queued");
+
+    if (queuedItems.length === 0 && iccids.length === 0) {
       onComplete();
       return;
     }
 
-    // キューに残っている場合は待機
-    const hasPending = iccids.some((i) => i.saveStatus === "pending" || i.saveStatus === "saving");
-    if (hasPending) {
-      setIsClosing(true);
+    if (queuedItems.length === 0) {
+      // 全件処理済み（再試行後など）
+      const hasProblems = iccids.some(i => i.saveStatus === "failed" || i.saveStatus === "conflict");
+      if (hasProblems) {
+        setError("問題のある項目を解決してから確定してください");
+        return;
+      }
+      onComplete();
       return;
     }
 
-    // 失敗/競合がある場合は表示
-    const failedCount = iccids.filter((i) => i.saveStatus === "failed").length;
-    const conflictCount = iccids.filter((i) => i.saveStatus === "conflict").length;
-    if (failedCount > 0 || conflictCount > 0) {
-      setError(`${failedCount + conflictCount}件の問題があります。解決してから確定してください。`);
-      return;
+    setIsSaving(true);
+    setError(null);
+    cancelSaveRef.current = false;
+    setSaveProgress({ current: 0, total: queuedItems.length });
+
+    for (let i = 0; i < queuedItems.length; i++) {
+      if (cancelSaveRef.current) break;
+
+      const item = queuedItems[i];
+      setSaveProgress({ current: i + 1, total: queuedItems.length });
+
+      // saving に更新
+      setIccids(prev => prev.map(x => x.iccid === item.iccid ? { ...x, saveStatus: "saving" } : x));
+
+      const result = await saveSingleIccid(item.iccid);
+
+      setIccids(prev => prev.map(x => {
+        if (x.iccid !== item.iccid) return x;
+        switch (result.status) {
+          case "ok":
+            return { ...x, saveStatus: "saved", lineId: result.line?.id };
+          case "conflict":
+            return { ...x, saveStatus: "conflict", conflict: result.conflict };
+          case "no_lines":
+            return { ...x, saveStatus: "failed", error: "未割当の回線がありません" };
+          default:
+            return { ...x, saveStatus: "failed", error: result.error || "登録に失敗しました" };
+        }
+      }));
     }
 
-    // 全件saved → 完了
-    onComplete();
+    setIsSaving(false);
+
+    // キャンセルされなかった場合、全件成功なら自動で閉じる
+    if (!cancelSaveRef.current) {
+      // setIccids の更新が反映されるのを待つ
+      setTimeout(() => {
+        setIccids(prev => {
+          const hasProblems = prev.some(i => i.saveStatus === "failed" || i.saveStatus === "conflict");
+          if (!hasProblems) {
+            // 全件成功 → onComplete を非同期で呼ぶ
+            setTimeout(() => onComplete(), 0);
+          }
+          return prev;
+        });
+      }, 100);
+    }
   };
 
-  // isClosing中に全件完了したら自動で閉じる
-  useEffect(() => {
-    if (!isClosing) return;
-    const hasPending = iccids.some((i) => i.saveStatus === "pending" || i.saveStatus === "saving");
-    if (!hasPending) {
-      const failedCount = iccids.filter((i) => i.saveStatus === "failed").length;
-      const conflictCount = iccids.filter((i) => i.saveStatus === "conflict").length;
-      if (failedCount === 0 && conflictCount === 0) {
-        onComplete();
-      } else {
-        setIsClosing(false);
-        setError(`${failedCount + conflictCount}件の問題があります。解決してから完了してください。`);
-      }
-    }
-  }, [isClosing, iccids, onComplete]);
+  // 失敗したICCIDを再試行（queued に戻す）
+  const retryFailed = useCallback((iccid: string) => {
+    setIccids((prev) =>
+      prev.map((item) =>
+        item.iccid === iccid
+          ? { ...item, saveStatus: "queued", error: undefined, retryCount: item.retryCount + 1 }
+          : item
+      )
+    );
+  }, []);
 
   // 統計
   const savedCount = iccids.filter((i) => i.saveStatus === "saved").length;
-  const pendingCount = iccids.filter((i) => i.saveStatus === "pending" || i.saveStatus === "saving").length;
+  const queuedCount = iccids.filter((i) => i.saveStatus === "queued").length;
   const failedCount = iccids.filter((i) => i.saveStatus === "failed").length;
   const conflictCount = iccids.filter((i) => i.saveStatus === "conflict").length;
-  const totalRemaining = notActivatedCount - savedCount;
+  const totalRemaining = notActivatedCount - savedCount - queuedCount;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -437,7 +399,6 @@ export function IccidScanModal({
               </span>
             </div>
           </div>
-          {/* モーダルを閉じるにはフッターのボタンを使用 */}
         </div>
 
         {/* 設定 */}
@@ -527,12 +488,12 @@ export function IccidScanModal({
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
                 maxLength={20}
-                disabled={isClosing}
+                disabled={isSaving}
               />
             </div>
             <Button
               onClick={() => addIccid(currentInput)}
-              disabled={!currentInput || !validateIccid(currentInput) || isClosing}
+              disabled={!currentInput || !validateIccid(currentInput) || isSaving}
             >
               追加
             </Button>
@@ -545,36 +506,55 @@ export function IccidScanModal({
             </div>
           )}
 
-          {/* 進捗 */}
-          <div className="flex items-center justify-between text-sm text-gray-600 mt-4">
-            <span>
-              入力: <span className="font-bold text-blue-600">{iccids.length}</span>件
-              {pendingCount > 0 && (
-                <span className="text-xs text-gray-400 ml-2">（{pendingCount}件処理中）</span>
-              )}
-              {failedCount > 0 && (
-                <span className="text-xs text-red-500 ml-2">（{failedCount}件失敗）</span>
-              )}
-              {conflictCount > 0 && (
-                <span className="text-xs text-amber-500 ml-2">（{conflictCount}件競合）</span>
-              )}
-            </span>
-            <span>
-              残り: <span className="font-bold">{totalRemaining}</span>件
-            </span>
-          </div>
-
-          {/* プログレスバー */}
-          <div className="h-2 bg-gray-200 rounded-full mt-2 overflow-hidden">
-            <div
-              className="h-full bg-green-500 transition-all duration-300"
-              style={{ width: `${(savedCount / notActivatedCount) * 100}%` }}
-            />
-          </div>
-          {savedCount > 0 && (
-            <div className="text-xs text-gray-400 mt-1 text-right">
-              {savedCount} / {notActivatedCount}件登録済み
+          {/* 保存処理中のプログレス */}
+          {isSaving && (
+            <div className="mt-4">
+              <div className="flex items-center gap-2 text-sm text-blue-600">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                処理中... {saveProgress.current}/{saveProgress.total}件
+              </div>
+              <div className="h-2 bg-gray-200 rounded-full mt-2 overflow-hidden">
+                <div
+                  className="h-full bg-blue-500 transition-all duration-300"
+                  style={{ width: `${(saveProgress.current / saveProgress.total) * 100}%` }}
+                />
+              </div>
             </div>
+          )}
+
+          {/* 通常時の進捗 */}
+          {!isSaving && (
+            <>
+              <div className="flex items-center justify-between text-sm text-gray-600 mt-4">
+                <span>
+                  入力: <span className="font-bold text-blue-600">{iccids.length}</span>件
+                  {queuedCount > 0 && (
+                    <span className="text-xs text-gray-400 ml-2">（{queuedCount}件未登録）</span>
+                  )}
+                  {failedCount > 0 && (
+                    <span className="text-xs text-red-500 ml-2">（{failedCount}件失敗）</span>
+                  )}
+                  {conflictCount > 0 && (
+                    <span className="text-xs text-amber-500 ml-2">（{conflictCount}件競合）</span>
+                  )}
+                </span>
+                <span>
+                  残り: <span className="font-bold">{totalRemaining}</span>件
+                </span>
+              </div>
+
+              <div className="h-2 bg-gray-200 rounded-full mt-2 overflow-hidden">
+                <div
+                  className="h-full bg-green-500 transition-all duration-300"
+                  style={{ width: `${((savedCount + queuedCount) / notActivatedCount) * 100}%` }}
+                />
+              </div>
+              {(savedCount > 0 || queuedCount > 0) && (
+                <div className="text-xs text-gray-400 mt-1 text-right">
+                  {savedCount + queuedCount} / {notActivatedCount}件
+                </div>
+              )}
+            </>
           )}
         </div>
 
@@ -597,6 +577,8 @@ export function IccidScanModal({
                         ? "bg-red-50 border border-red-200"
                         : item.saveStatus === "conflict"
                         ? "bg-amber-50 border border-amber-200"
+                        : item.saveStatus === "saved"
+                        ? "bg-green-50 border border-green-200"
                         : item.stockStatus === "warning"
                         ? "bg-yellow-50 border border-yellow-200"
                         : "bg-gray-50"
@@ -615,7 +597,7 @@ export function IccidScanModal({
                       {item.saveStatus === "conflict" && (
                         <AlertTriangle className="h-4 w-4 text-amber-500" />
                       )}
-                      {item.saveStatus === "pending" && (
+                      {item.saveStatus === "queued" && (
                         <Check className={`h-4 w-4 ${item.stockStatus === "warning" ? "text-yellow-500" : "text-green-500"}`} />
                       )}
                       <span className="font-mono text-sm">{item.iccid}</span>
@@ -640,6 +622,7 @@ export function IccidScanModal({
                         <button
                           onClick={() => removeIccid(index)}
                           className="text-gray-400 hover:text-red-500"
+                          disabled={isSaving}
                         >
                           <X className="h-4 w-4" />
                         </button>
@@ -679,26 +662,20 @@ export function IccidScanModal({
 
         {/* フッター */}
         <div className="flex justify-end gap-2 px-6 py-4 border-t bg-gray-50">
-          <Button variant="outline" onClick={handleCancel} disabled={isClosing || isCancelling}>
-            {isCancelling ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                キャンセル中...
-              </>
-            ) : (
-              "キャンセル"
-            )}
-          </Button>
-          <Button onClick={handleSubmit} disabled={isClosing || isCancelling}>
-            {isClosing ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                処理完了待ち...
-              </>
-            ) : (
-              "入力を確定"
-            )}
-          </Button>
+          {isSaving ? (
+            <Button variant="outline" onClick={handleCancelSave}>
+              キャンセル
+            </Button>
+          ) : (
+            <>
+              <Button variant="outline" onClick={handleCancel}>
+                キャンセル
+              </Button>
+              <Button onClick={handleSubmit}>
+                入力を確定
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </div>
