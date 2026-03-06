@@ -386,19 +386,23 @@ export class SimRepository {
   async findInStockIccids(): Promise<string[]> {
     logger.debug('SimRepository.findInStockIccids');
 
-    // 全SIMを回線ステータス付きで取得（軽量）
-    const sims = await this.prisma.sim.findMany({
-      select: {
-        iccid: true,
-        applicationLines: {
-          select: { status: true, updatedAt: true },
-        },
-      },
-    });
+    // LATERAL JOINでDB側でIN_STOCKフィルタ（全SIMメモリ読み込みを回避）
+    const rows = await this.prisma.$queryRaw<{ iccid: string }[]>(
+      Prisma.sql`
+        SELECT s.iccid
+        FROM "Sim" s
+        LEFT JOIN LATERAL (
+          SELECT al.status
+          FROM "ApplicationLine" al
+          WHERE al."simId" = s.iccid
+          ORDER BY al."updatedAt" DESC LIMIT 1
+        ) latest ON true
+        WHERE latest.status IS NULL
+           OR latest.status NOT IN ('ACTIVATED', 'SHIPPED')
+      `
+    );
 
-    return sims
-      .filter((sim) => computeSimStatus(sim.applicationLines) === 'IN_STOCK')
-      .map((sim) => sim.iccid);
+    return rows.map(r => r.iccid);
   }
 
   /**
