@@ -345,7 +345,7 @@ export function IccidScanModal({
     setIccids((prev) => prev.filter((item) => item.iccid !== iccid));
   }, []);
 
-  // 「完了して保存」
+  // 「閉じる」
   const handleSubmit = async () => {
     if (iccids.length === 0) {
       setError("ICCIDを入力してください");
@@ -363,7 +363,7 @@ export function IccidScanModal({
     const failedCount = iccids.filter((i) => i.saveStatus === "failed").length;
     const conflictCount = iccids.filter((i) => i.saveStatus === "conflict").length;
     if (failedCount > 0 || conflictCount > 0) {
-      setError(`${failedCount + conflictCount}件の問題があります。解決してから完了してください。`);
+      setError(`${failedCount + conflictCount}件の問題があります。解決してから閉じてください。`);
       return;
     }
 
@@ -657,18 +657,15 @@ export function IccidScanModal({
         </div>
 
         {/* フッター */}
-        <div className="flex justify-end gap-2 px-6 py-4 border-t bg-gray-50">
-          <Button variant="outline" onClick={onClose} disabled={isClosing}>
-            キャンセル
-          </Button>
-          <Button onClick={handleSubmit} disabled={isClosing || iccids.length === 0}>
+        <div className="flex justify-end px-6 py-4 border-t bg-gray-50">
+          <Button variant="outline" onClick={handleSubmit} disabled={isClosing}>
             {isClosing ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 処理完了待ち...
               </>
             ) : (
-              `完了して保存 (${iccids.length}件)`
+              "閉じる"
             )}
           </Button>
         </div>
