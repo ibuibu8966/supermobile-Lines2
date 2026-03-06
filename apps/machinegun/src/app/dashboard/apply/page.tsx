@@ -22,6 +22,8 @@ import {
   X,
   AlertTriangle,
   CalendarDays,
+  Minus,
+  Plus,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";
@@ -590,26 +592,23 @@ export default function AdditionalApplyPage() {
               </div>
 
               <div>
-                <Label htmlFor="lineCount" className="text-base font-medium">
+                <Label className="text-base font-medium">
                   回線数 *
                 </Label>
-                <Input
-                  id="lineCount"
-                  type="number"
-                  min="10"
-                  step="10"
-                  value={lineCount}
-                  onChange={(e) => {
-                    const val = parseInt(e.target.value) || 10;
-                    setLineCount(Math.max(10, Math.round(val / 10) * 10));
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key !== "ArrowUp" && e.key !== "ArrowDown") {
-                      e.preventDefault();
-                    }
-                  }}
-                  className="w-32 mt-2"
-                />
+                <div className="flex items-center gap-2 mt-2">
+                  <Button type="button" variant="outline" size="icon"
+                    onClick={() => setLineCount(Math.max(10, lineCount - 10))}
+                    disabled={lineCount <= 10}>
+                    <Minus className="h-4 w-4" />
+                  </Button>
+                  <span className="w-16 text-center text-lg font-medium tabular-nums">
+                    {lineCount}
+                  </span>
+                  <Button type="button" variant="outline" size="icon"
+                    onClick={() => setLineCount(lineCount + 10)}>
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
 
               {selectedPlan && selectedPlan.pricings.length > 1 && (
