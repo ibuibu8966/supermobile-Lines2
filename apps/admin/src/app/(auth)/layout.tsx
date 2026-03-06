@@ -1,4 +1,4 @@
-import { auth } from "@/auth";
+import { getSession } from "@/lib/auth/cached-session";
 import { SidebarProvider } from "@/contexts/sidebar-context";
 import { Sidebar, MobileMenuButton } from "@/components/sidebar/sidebar";
 import { ErrorBoundary } from "@/components/error-boundary";
@@ -8,7 +8,7 @@ export default async function AuthLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const session = await auth();
+  const session = await getSession();
 
   return (
     <SidebarProvider>
