@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { prisma } from "@repo/database";
+import { prisma } from "@/lib/database";
 import { bulkUpdateAllLines } from "@/controllers/line.controller";
 
 export const dynamic = "force-dynamic";

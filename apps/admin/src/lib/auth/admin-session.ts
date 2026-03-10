@@ -1,4 +1,4 @@
-import { auth } from "@/auth";
+import { getSession } from "@/lib/auth/cached-session";
 import { NextResponse } from "next/server";
 
 export interface AdminSession {
@@ -11,7 +11,7 @@ export interface AdminSession {
 }
 
 export async function getAdminSession(): Promise<AdminSession | NextResponse> {
-  const session = await auth();
+  const session = await getSession();
   if (!session?.user) {
     return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
   }

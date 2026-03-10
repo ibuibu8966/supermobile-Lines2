@@ -1,3 +1,4 @@
+import { PrismaClient } from '@prisma/client';
 /**
  * Plan Controller
  *
@@ -47,7 +48,7 @@ const updatePlanSchema = z.object({
  */
 export async function getAllPlans(
   request: NextRequest,
-  prisma: any
+  prisma: PrismaClient
 ): Promise<NextResponse> {
   // 1. パラメータパース
   const searchParams = request.nextUrl.searchParams;
@@ -69,11 +70,18 @@ export async function getAllPlans(
  */
 export async function createPlan(
   request: NextRequest,
-  prisma: any
+  prisma: PrismaClient
 ): Promise<NextResponse> {
   // 1. バリデーション
   const body = await request.json();
-  const validated = planSchema.parse(body);
+  const result = planSchema.safeParse(body);
+  if (!result.success) {
+    return NextResponse.json(
+      { error: 'バリデーションエラー', details: result.error.flatten() },
+      { status: 400 }
+    );
+  }
+  const validated = result.data;
 
   // 2. Service呼び出し
   const planService = new PlanService(new PlanRepository(prisma), prisma);
@@ -88,7 +96,7 @@ export async function createPlan(
  */
 export async function getPlanById(
   id: string,
-  prisma: any
+  prisma: PrismaClient
 ): Promise<NextResponse> {
   logger.info('プラン詳細取得開始', { id });
 
@@ -110,13 +118,20 @@ export async function getPlanById(
 export async function updatePlan(
   id: string,
   request: NextRequest,
-  prisma: any
+  prisma: PrismaClient
 ): Promise<NextResponse> {
   logger.info('プラン更新開始', { id });
 
   // 1. リクエストボディのパース & バリデーション
   const body = await request.json();
-  const validated = updatePlanSchema.parse(body);
+  const result = updatePlanSchema.safeParse(body);
+  if (!result.success) {
+    return NextResponse.json(
+      { error: 'バリデーションエラー', details: result.error.flatten() },
+      { status: 400 }
+    );
+  }
+  const validated = result.data;
 
   // 2. Service呼び出し
   const planService = new PlanService(new PlanRepository(prisma), prisma);
@@ -132,7 +147,7 @@ export async function updatePlan(
  */
 export async function deletePlan(
   id: string,
-  prisma: any
+  prisma: PrismaClient
 ): Promise<NextResponse> {
   logger.info('プラン削除開始', { id });
 

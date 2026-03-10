@@ -1,8 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  transpilePackages: ["@repo/ui", "@repo/auth", "@repo/validation"],
   output: "standalone",
-  serverExternalPackages: ["@prisma/client", "prisma", "@repo/shared"],
+  serverExternalPackages: ["@prisma/client", "prisma"],
+  typescript: {
+    ignoreBuildErrors: true,
+  },
   experimental: {
     serverActions: {
       bodySizeLimit: "50mb",

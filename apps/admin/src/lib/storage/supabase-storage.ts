@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "@/lib/supabase/client";
 import { STORAGE_CONFIG } from "./constants";
 import type { UploadResult } from "@/types/storage";
+import { logger } from "@/shared/utils/logger";
 
 /**
  * Supabase Storageの操作を抽象化したクラス
@@ -57,10 +58,10 @@ export class SupabaseStorage {
         .remove([filePath]);
 
       if (error) {
-        console.error("Failed to delete file:", error);
+        logger.error("Failed to delete file", { error });
       }
     } catch (error) {
-      console.error("Error deleting file:", error);
+      logger.error("Error deleting file", { error });
     }
   }
 

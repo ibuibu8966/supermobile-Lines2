@@ -7,7 +7,7 @@
 
 import { PrismaClient, Prisma } from '@prisma/client';
 import { PlanRepository, PlanFilters } from '../repositories/plan.repository';
-import { PlanWithRelations, PlanUpdateInput } from '@repo/entities';
+import { PlanWithRelations, PlanUpdateInput, PlanCreateInput } from '@/entities';
 import { logger } from '../shared/utils/logger';
 import { NotFoundError, ConflictError } from '../shared/errors/custom-errors';
 
@@ -121,7 +121,7 @@ export class PlanService {
    * ビジネスロジック:
    * - コードの重複チェック（同一サービス内）
    */
-  async createPlan(input: any): Promise<PlanWithRelations> {
+  async createPlan(input: PlanCreateInput): Promise<PlanWithRelations> {
     logger.info('プラン作成開始', { input });
 
     const { usageTagIds, pricings, ...planData } = input;
@@ -140,12 +140,12 @@ export class PlanService {
     const plan = await this.planRepo.create({
       ...planData,
       usageTags: {
-        create: usageTagIds.map((usageTagId: number) => ({
+        create: (usageTagIds ?? []).map((usageTagId: number) => ({
           usageTagId,
         })),
       },
       pricings: {
-        create: pricings,
+        create: pricings ?? [],
       },
     });
 

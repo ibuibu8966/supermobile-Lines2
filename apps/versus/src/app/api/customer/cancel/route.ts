@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { auth } from "@/auth";
-import { prisma } from "@repo/database";
-import { requestCancellation } from "@repo/shared";
+import { prisma } from "@/lib/database";
+import { requestCancellation } from "@/lib";
 
 export const dynamic = "force-dynamic";
 

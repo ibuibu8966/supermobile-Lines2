@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
-import { prisma } from "@repo/database";
-import { completeShipping } from "@repo/shared";
+import { prisma } from "@/lib/database";
+import { completeShipping } from "@/lib";
 
 export const dynamic = "force-dynamic";
 

@@ -3,21 +3,12 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import {
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  Label,
-  Input,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  Textarea,
-} from "@repo/ui";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
 
@@ -86,7 +77,7 @@ export default function NewProcurementPage() {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <Link href="/procurement">
+        <Link href="/procurement" prefetch={false}>
           <Button variant="ghost" size="sm" className="mb-4">
             <ArrowLeft className="h-4 w-4 mr-2" />
             戻る
@@ -212,7 +203,7 @@ export default function NewProcurementPage() {
             </div>
 
             <div className="flex gap-3 pt-4">
-              <Link href="/procurement" className="flex-1">
+              <Link href="/procurement" prefetch={false} className="flex-1">
                 <Button type="button" variant="outline" className="w-full">
                   キャンセル
                 </Button>

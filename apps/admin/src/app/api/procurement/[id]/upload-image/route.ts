@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { prisma } from "@repo/database";
+import { prisma } from "@/lib/database";
 import { uploadPurchaseOrderImage, deletePurchaseOrderImage } from "@/controllers/procurement.controller";
 import { supabaseStorage } from "@/lib/storage/supabase-storage";
 import { IMAGE_TYPE_FIELD_MAP } from "@/lib/storage/constants";

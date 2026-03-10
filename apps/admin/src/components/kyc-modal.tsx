@@ -2,13 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  Badge,
-} from "@repo/ui";
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Loader2, ImageOff } from "lucide-react";
 
 interface KycModalProps {
@@ -158,11 +153,11 @@ export function KycModal({ applicationId, isOpen, onClose, initialImageType }: K
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
                   <span className="text-gray-500">申込タイプ</span>
-                  <p className="font-medium">
+                  <div className="font-medium">
                     <Badge variant={application.customer.type === "CORPORATE" ? "default" : "secondary"}>
                       {application.customer.type === "CORPORATE" ? "法人" : "個人"}
                     </Badge>
-                  </p>
+                  </div>
                 </div>
                 <div>
                   <span className="text-gray-500">申込番号</span>

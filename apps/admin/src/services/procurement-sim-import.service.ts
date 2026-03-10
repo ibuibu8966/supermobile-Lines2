@@ -23,6 +23,7 @@ export interface ImportSimData {
 export interface ImportRequest {
   sims: ImportSimData[];
   supplierId: number;
+  updateExisting?: boolean;
 }
 
 export interface ImportError {
@@ -32,6 +33,7 @@ export interface ImportError {
 
 export interface ImportResult {
   success: number;
+  updated: number;
   failed: number;
   errors: ImportError[];
 }
@@ -46,7 +48,8 @@ export class ProcurementSimImportService {
    * SIMを一括インポート
    * ビジネスルール:
    * - ICCIDは必須
-   * - 重複するICCIDはスキップ
+   * - updateExisting=false: 重複するICCIDはスキップ（デフォルト）
+   * - updateExisting=true: 重複するICCIDは更新（msisdn, supplierId, carrierType, plan等）
    * - 発注の仕入先とリクエストの仕入先が一致する必要がある
    */
   async importSims(
@@ -56,9 +59,10 @@ export class ProcurementSimImportService {
     logger.info('SIM一括インポート開始', {
       purchaseOrderId,
       count: request.sims.length,
+      updateExisting: request.updateExisting ?? false,
     });
 
-    const { sims, supplierId } = request;
+    const { sims, supplierId, updateExisting = false } = request;
 
     if (!sims || !Array.isArray(sims) || sims.length === 0) {
       throw new ValidationError('SIMデータが必要です');
@@ -80,6 +84,7 @@ export class ProcurementSimImportService {
 
     const errors: ImportError[] = [];
     let successCount = 0;
+    let updatedCount = 0;
 
     // 1. バリデーション: ICCID必須チェック
     const validSims: ImportSimData[] = [];
@@ -98,6 +103,7 @@ export class ProcurementSimImportService {
       logger.warn('有効なSIMデータがありません', { errorCount: errors.length });
       return {
         success: 0,
+        updated: 0,
         failed: errors.length,
         errors,
       };
@@ -112,72 +118,124 @@ export class ProcurementSimImportService {
 
     const existingIccidSet = new Set(existingSims.map((s) => s.iccid));
 
-    // 重複するICCIDをエラーに追加
-    const simsToInsert = validSims.filter((simData) => {
+    // 既存SIMと新規SIMを分類
+    const simsToInsert: ImportSimData[] = [];
+    const simsToUpdate: ImportSimData[] = [];
+
+    for (const simData of validSims) {
       if (existingIccidSet.has(simData.iccid)) {
-        errors.push({
-          iccid: simData.iccid,
-          error: 'このICCIDは既に登録されています',
-        });
-        return false;
+        if (updateExisting) {
+          simsToUpdate.push(simData);
+        } else {
+          errors.push({
+            iccid: simData.iccid,
+            error: 'このICCIDは既に登録されています',
+          });
+        }
+      } else {
+        simsToInsert.push(simData);
       }
-      return true;
+    }
+
+    // 3. 既存SIMの更新（updateExistingモード）
+    if (simsToUpdate.length > 0) {
+      try {
+        for (const simData of simsToUpdate) {
+          const updateData: Record<string, unknown> = {
+            supplierId,
+            purchaseOrderId,
+          };
+          if (simData.msisdn) updateData.msisdn = simData.msisdn;
+          if (simData.simType) updateData.simType = simData.simType;
+          if (simData.carrierType) updateData.carrierType = simData.carrierType;
+          if (simData.plan) updateData.plan = simData.plan;
+          if (simData.supplierContractEnd) updateData.supplierContractEnd = new Date(simData.supplierContractEnd);
+          if (simData.isAutoCancel !== undefined) updateData.isAutoCancel = simData.isAutoCancel;
+          if (simData.autoCancelDate) updateData.autoCancelDate = new Date(simData.autoCancelDate);
+          if (simData.eligibleTagIds) updateData.eligibleTagIds = simData.eligibleTagIds;
+
+          await this.prisma.sim.update({
+            where: { iccid: simData.iccid },
+            data: updateData,
+          });
+
+          // ApplicationLine.msisdnも連動更新
+          if (simData.msisdn) {
+            await this.prisma.applicationLine.updateMany({
+              where: { simId: simData.iccid },
+              data: { msisdn: simData.msisdn },
+            });
+          }
+
+          updatedCount++;
+        }
+
+        logger.info('既存SIM更新完了', {
+          purchaseOrderId,
+          updated: updatedCount,
+        });
+      } catch (err) {
+        logger.error('既存SIM更新エラー', { error: err });
+        throw new Error(
+          err instanceof Error
+            ? err.message
+            : '既存SIMの更新に失敗しました'
+        );
+      }
+    }
+
+    // 4. 新規SIMのバッチINSERT
+    if (simsToInsert.length > 0) {
+      try {
+        const insertData = simsToInsert.map((simData) => ({
+          iccid: simData.iccid,
+          msisdn: simData.msisdn || null,
+          simType: simData.simType || 'INDIVIDUAL',
+          carrierType: simData.carrierType || null,
+          plan: simData.plan || null,
+          supplierId: supplierId,
+          purchaseOrderId: purchaseOrderId,
+          supplierContractEnd: simData.supplierContractEnd
+            ? new Date(simData.supplierContractEnd)
+            : null,
+          isAutoCancel: simData.isAutoCancel || false,
+          autoCancelDate: simData.autoCancelDate
+            ? new Date(simData.autoCancelDate)
+            : null,
+          eligibleTagIds: simData.eligibleTagIds || [],
+        }));
+
+        const result = await this.prisma.sim.createMany({
+          data: insertData,
+          skipDuplicates: true,
+        });
+
+        successCount = result.count;
+
+        logger.info('新規SIMインポート完了', {
+          purchaseOrderId,
+          success: successCount,
+        });
+      } catch (err) {
+        logger.error('バッチINSERTエラー', { error: err });
+        throw new Error(
+          err instanceof Error
+            ? err.message
+            : 'バッチインポートに失敗しました'
+        );
+      }
+    }
+
+    logger.info('SIM一括インポート完了', {
+      purchaseOrderId,
+      success: successCount,
+      updated: updatedCount,
+      failed: errors.length,
     });
-
-    if (simsToInsert.length === 0) {
-      logger.warn('インポート可能なSIMがありません（全て重複）', {
-        duplicateCount: errors.length,
-      });
-      return {
-        success: 0,
-        failed: errors.length,
-        errors,
-      };
-    }
-
-    // 3. バッチINSERT
-    try {
-      const insertData = simsToInsert.map((simData) => ({
-        iccid: simData.iccid,
-        msisdn: simData.msisdn || null,
-        simType: simData.simType || 'INDIVIDUAL',
-        carrierType: simData.carrierType || null,
-        plan: simData.plan || null,
-        supplierId: supplierId,
-        purchaseOrderId: purchaseOrderId,
-        supplierContractEnd: simData.supplierContractEnd
-          ? new Date(simData.supplierContractEnd)
-          : null,
-        isAutoCancel: simData.isAutoCancel || false,
-        autoCancelDate: simData.autoCancelDate
-          ? new Date(simData.autoCancelDate)
-          : null,
-        eligibleTagIds: simData.eligibleTagIds || [],
-      }));
-
-      const result = await this.prisma.sim.createMany({
-        data: insertData,
-        skipDuplicates: true,
-      });
-
-      successCount = result.count;
-
-      logger.info('SIM一括インポート完了', {
-        purchaseOrderId,
-        success: successCount,
-        failed: errors.length,
-      });
-    } catch (err) {
-      logger.error('バッチINSERTエラー', { error: err });
-      throw new Error(
-        err instanceof Error
-          ? err.message
-          : 'バッチインポートに失敗しました'
-      );
-    }
 
     return {
       success: successCount,
+      updated: updatedCount,
       failed: errors.length,
       errors,
     };

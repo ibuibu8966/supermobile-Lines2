@@ -2,8 +2,8 @@ import NextAuth from "next-auth";
 import type { NextAuthConfig } from "next-auth";
 import type { Session } from "next-auth";
 import type { NextURL } from "next/dist/server/web/next-url";
-import { createAuthConfig } from "@repo/auth";
-import { prisma } from "@repo/database";
+import { createAuthConfig } from "@/lib/auth/config";
+import { prisma } from "@/lib/database";
 
 const authConfig = createAuthConfig(prisma);
 
@@ -12,8 +12,8 @@ interface AuthorizedParams {
   request: { nextUrl: NextURL };
 }
 
-// 物販用のページ設定を上書き
-const buppanAuthConfig: NextAuthConfig = {
+// Avaris用のページ設定を上書き
+const avarisAuthConfig: NextAuthConfig = {
   ...authConfig,
   pages: {
     signIn: "/login",
@@ -26,13 +26,13 @@ const buppanAuthConfig: NextAuthConfig = {
       const pathname = nextUrl.pathname;
 
       // 公開ページ（認証不要）
-      const publicPaths = ["/", "/apply", "/login", "/register", "/legal", "/privacy", "/terms"];
+      const publicPaths = ["/", "/apply", "/login", "/register", "/forgot-password", "/legal", "/privacy", "/terms"];
       const isPublicPage = publicPaths.some(
         (path) => pathname === path || pathname.startsWith("/apply/") || pathname.startsWith("/documents/")
       );
 
       // API Routes（認証不要のもの）
-      const publicApiPaths = ["/api/plans", "/api/applications", "/api/coupon"];
+      const publicApiPaths = ["/api/plans", "/api/applications", "/api/upload-url", "/api/coupon"];
       const isPublicApi = publicApiPaths.some((path) =>
         pathname.startsWith(path)
       );
@@ -48,7 +48,7 @@ const buppanAuthConfig: NextAuthConfig = {
 
       if (isAdminPage || isAdminApi) {
         if (!isLoggedIn) {
-          return false;
+          return Response.redirect(new URL(`/login?callbackUrl=${encodeURIComponent(nextUrl.pathname)}`, nextUrl));
         }
         const user = auth?.user;
         // ADMIN または SUPER_ADMIN のみアクセス可能
@@ -63,7 +63,10 @@ const buppanAuthConfig: NextAuthConfig = {
       const isCustomerApi = pathname.startsWith("/api/customer");
 
       if (isCustomerPage || isCustomerApi) {
-        return isLoggedIn;
+        if (!isLoggedIn) {
+          return Response.redirect(new URL(`/login?callbackUrl=${encodeURIComponent(nextUrl.pathname)}`, nextUrl));
+        }
+        return true;
       }
 
       // 認証ページ
@@ -75,9 +78,12 @@ const buppanAuthConfig: NextAuthConfig = {
       }
 
       // その他のページは認証必須
-      return isLoggedIn;
+      if (!isLoggedIn) {
+        return Response.redirect(new URL(`/login?callbackUrl=${encodeURIComponent(nextUrl.pathname)}`, nextUrl));
+      }
+      return true;
     },
   },
 };
 
-export const { handlers, signIn, signOut, auth } = NextAuth(buppanAuthConfig);
+export const { handlers, signIn, signOut, auth } = NextAuth(avarisAuthConfig);

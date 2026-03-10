@@ -5,8 +5,19 @@
  * Repository層を使ってデータアクセスし、ビジネスルールを適用
  */
 
+import { PrismaClient } from '@prisma/client';
 import { LineRepository, LineFilters } from '../repositories/line.repository';
-import { LineWithRelations, LineUpdateInput } from '@repo/entities';
+import { LineWithRelations, LineUpdateInput } from '@/entities';
+
+interface BulkLineUpdateInput {
+  lineTagId?: number | null;
+  lineReserveTagId?: number | null;
+  simLocationTagId?: number | null;
+  shippedAt?: Date | string | null;
+  returnedAt?: Date | string | null;
+  contractMonth?: Date | null;
+  status?: string;
+}
 import { PaginationInfo, createPaginationInfo } from '../shared/utils/helpers';
 import { logger } from '../shared/utils/logger';
 import { NotFoundError, ValidationError } from '../shared/errors/custom-errors';
@@ -25,7 +36,7 @@ export interface LineListResult {
 export class LineService {
   constructor(
     private lineRepo: LineRepository,
-    private prisma?: any
+    private prisma?: PrismaClient
   ) {}
 
   /**
@@ -174,13 +185,13 @@ export class LineService {
     }
 
     // lineTagIdの存在確認
-    const updateDataAny = updateData as any;
-    if (updateDataAny.lineTagId !== undefined && updateDataAny.lineTagId !== null) {
+    const updateDataExt = updateData as LineUpdateInput & { lineTagId?: number | null };
+    if (updateDataExt.lineTagId !== undefined && updateDataExt.lineTagId !== null) {
       const tag = await this.prisma.lineTag.findUnique({
-        where: { id: updateDataAny.lineTagId },
+        where: { id: updateDataExt.lineTagId },
       });
       if (!tag) {
-        logger.warn('回線タグが見つかりません', { lineTagId: updateDataAny.lineTagId });
+        logger.warn('回線タグが見つかりません', { lineTagId: updateDataExt.lineTagId });
         throw new ValidationError('指定された回線タグが見つかりません');
       }
     }
@@ -213,7 +224,7 @@ export class LineService {
 
     logger.info('回線更新完了', { applicationId, lineId });
 
-    return updated;
+    return updated as unknown as LineWithRelations;
   }
 
   /**
@@ -225,7 +236,7 @@ export class LineService {
    */
   async bulkUpdateAllLines(
     lineIds: string[],
-    updateData: any
+    updateData: BulkLineUpdateInput
   ): Promise<{ success: boolean; count: number }> {
     logger.info('全回線一括更新開始', { lineIds, updateData });
 
@@ -274,7 +285,7 @@ export class LineService {
       });
 
       const simIds = lines
-        .map((line: any) => line.simId)
+        .map((line: { simId: string | null }) => line.simId)
         .filter((simId: string | null): simId is string => simId !== null);
 
       if (simIds.length > 0) {
@@ -305,7 +316,7 @@ export class LineService {
   async bulkUpdateLines(
     applicationId: string,
     lineIds: string[],
-    updateData: any
+    updateData: BulkLineUpdateInput
   ): Promise<{ count: number; message: string }> {
     logger.info('回線一括更新開始', { applicationId, lineIds, updateData });
 
@@ -360,6 +371,9 @@ export class LineService {
 
     // 更新データを構築（undefinedは除外）
     const finalUpdateData: Record<string, unknown> = {};
+    if (updateData.status !== undefined) {
+      finalUpdateData.status = updateData.status;
+    }
     if (updateData.lineTagId !== undefined) {
       finalUpdateData.lineTagId = updateData.lineTagId;
     }

@@ -1,31 +1,14 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  Label,
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-  Badge,
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-} from "@repo/ui";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import {
   Upload,
   FileText,
@@ -84,9 +67,11 @@ export function CsvImportDialog({
   const [usageTags, setUsageTags] = useState<UsageTag[]>([]);
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [updateExisting, setUpdateExisting] = useState(false);
   const [error, setError] = useState<string>("");
   const [importResult, setImportResult] = useState<{
     success: number;
+    updated: number;
     failed: number;
     errors: Array<{ iccid: string; error: string }>;
   } | null>(null);
@@ -175,6 +160,7 @@ export function CsvImportDialog({
     setRawData([]);
     setMapping({});
     setManualSettings({});
+    setUpdateExisting(false);
     setSummary(null);
     setImportResult(null);
     setError("");
@@ -204,6 +190,7 @@ export function CsvImportDialog({
           body: JSON.stringify({
             sims: finalData,
             supplierId,
+            updateExisting,
           }),
         }
       );
@@ -416,7 +403,7 @@ export function CsvImportDialog({
                         <TableHead className="min-w-[100px]">SIMタイプ</TableHead>
                         <TableHead className="min-w-[120px]">キャリア</TableHead>
                         <TableHead className="min-w-[150px]">プラン</TableHead>
-                        <TableHead className="min-w-[120px]">解約日</TableHead>
+                        <TableHead className="min-w-[120px]">解約予定日</TableHead>
                         <TableHead className="min-w-[100px]">自動解約</TableHead>
                         <TableHead className="min-w-[200px]">用途タグ</TableHead>
                         <TableHead className="sticky right-[100px] bg-white z-10 w-[100px]">
@@ -476,8 +463,8 @@ export function CsvImportDialog({
                               {data.plan || "-"}
                             </TableCell>
                             <TableCell className="text-sm">
-                              {data.supplierContractEnd
-                                ? new Date(data.supplierContractEnd).toLocaleDateString("ja-JP")
+                              {data.autoCancelDate
+                                ? new Date(data.autoCancelDate).toLocaleDateString("ja-JP")
                                 : "-"}
                             </TableCell>
                             <TableCell className="text-sm">
@@ -508,6 +495,24 @@ export function CsvImportDialog({
                 </div>
               </CardContent>
             </Card>
+
+            <div className="flex items-center justify-between p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <div className="flex items-center gap-3">
+                <Checkbox
+                  id="update-existing"
+                  checked={updateExisting}
+                  onCheckedChange={(checked) => setUpdateExisting(checked === true)}
+                />
+                <Label htmlFor="update-existing" className="text-sm cursor-pointer">
+                  既存SIMを更新する
+                </Label>
+              </div>
+              <span className="text-xs text-amber-700">
+                {updateExisting
+                  ? "既に登録済みのICCIDがあれば、電話番号・仕入先・プラン等を上書き更新します"
+                  : "既に登録済みのICCIDはスキップされます"}
+              </span>
+            </div>
 
             <div className="flex justify-between">
               <Button variant="outline" onClick={handleBack}>
@@ -545,11 +550,17 @@ export function CsvImportDialog({
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div className="p-4 bg-green-50 rounded-lg">
-                    <div className="text-sm text-gray-600">成功</div>
+                    <div className="text-sm text-gray-600">新規登録</div>
                     <div className="text-2xl font-bold text-green-600">
                       {importResult.success}件
+                    </div>
+                  </div>
+                  <div className="p-4 bg-blue-50 rounded-lg">
+                    <div className="text-sm text-gray-600">更新</div>
+                    <div className="text-2xl font-bold text-blue-600">
+                      {importResult.updated}件
                     </div>
                   </div>
                   <div className="p-4 bg-red-50 rounded-lg">

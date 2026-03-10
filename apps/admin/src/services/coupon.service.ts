@@ -6,7 +6,7 @@
  */
 
 import { CouponRepository, CouponFilters } from '../repositories/coupon.repository';
-import { CouponWithRelations, CouponCreateInput } from '@repo/entities';
+import { CouponWithRelations, CouponCreateInput, CouponUpdateInput } from '@/entities';
 import { logger } from '../shared/utils/logger';
 import { ConflictError, ValidationError, NotFoundError } from '../shared/errors/custom-errors';
 
@@ -61,6 +61,7 @@ export class CouponService {
       ...input,
       validFrom,
       validUntil,
+      pricings: input.pricings,
     });
 
     logger.info('クーポン作成完了', { couponId: coupon.id, code: coupon.code });
@@ -101,7 +102,7 @@ export class CouponService {
    * - コード重複チェック（自分以外）
    * - 日付を当日の開始/終了時刻に正規化
    */
-  async updateCoupon(id: string, input: any): Promise<CouponWithRelations> {
+  async updateCoupon(id: string, input: CouponUpdateInput): Promise<CouponWithRelations> {
     logger.info('クーポン更新開始', { couponId: id, input });
 
     // 存在確認
@@ -121,7 +122,16 @@ export class CouponService {
     }
 
     // データ整形
-    const updateData: Record<string, unknown> = {};
+    const updateData: {
+      code?: string;
+      planId?: string;
+      unitPrice?: number | null;
+      description?: string | null;
+      maxUsages?: number | null;
+      validFrom?: Date;
+      validUntil?: Date;
+      isActive?: boolean;
+    } = {};
     if (input.code !== undefined) updateData.code = input.code;
     if (input.planId !== undefined) updateData.planId = input.planId;
     if (input.unitPrice !== undefined) updateData.unitPrice = input.unitPrice;
@@ -143,6 +153,17 @@ export class CouponService {
     if (input.isActive !== undefined) updateData.isActive = input.isActive;
 
     const coupon = await this.couponRepo.update(id, updateData);
+
+    // pricingsが送られてきた場合、削除→再作成
+    if (input.pricings !== undefined) {
+      await this.couponRepo.replacePricings(id, input.pricings);
+      // 最新のデータを返す
+      const updated = await this.couponRepo.findById(id);
+      if (updated) {
+        logger.info('クーポン更新完了（pricings含む）', { couponId: id });
+        return updated;
+      }
+    }
 
     logger.info('クーポン更新完了', { couponId: id });
 

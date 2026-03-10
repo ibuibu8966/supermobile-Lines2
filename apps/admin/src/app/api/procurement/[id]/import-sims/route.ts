@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { prisma } from "@repo/database";
+import { prisma } from "@/lib/database";
 import { importSimsToPurchaseOrder } from "@/controllers/procurement.controller";
 
 export const dynamic = "force-dynamic";

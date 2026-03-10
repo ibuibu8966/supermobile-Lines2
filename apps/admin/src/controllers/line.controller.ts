@@ -1,3 +1,4 @@
+import { PrismaClient } from '@prisma/client';
 /**
  * Line Controller
  *
@@ -9,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { LineService } from '../services/line.service';
 import { LineRepository } from '../repositories/line.repository';
+import { LineUpdateInput } from '@/entities';
 import {
   parsePaginationParams,
   parseNumberArrayParam,
@@ -24,7 +26,7 @@ import { logger } from '../shared/utils/logger';
  */
 export async function getAllLines(
   request: NextRequest,
-  prisma: any
+  prisma: PrismaClient
 ): Promise<NextResponse> {
   // 1. パラメータパース
   const searchParams = request.nextUrl.searchParams;
@@ -63,12 +65,12 @@ export async function getAllLines(
  */
 export async function getApplicationLines(
   applicationId: string,
-  prisma: any
+  prisma: PrismaClient
 ): Promise<NextResponse> {
   const lineService = new LineService(new LineRepository(prisma), prisma);
 
   // 申込の存在確認
-  const application = await (prisma as any).application.findUnique({
+  const application = await prisma.application.findUnique({
     where: { id: applicationId },
     select: { id: true },
   });
@@ -91,7 +93,7 @@ export async function getApplicationLines(
 export async function getApplicationLineDetail(
   applicationId: string,
   lineId: string,
-  prisma: any
+  prisma: PrismaClient
 ): Promise<NextResponse> {
   // Service呼び出し
   const lineService = new LineService(new LineRepository(prisma), prisma);
@@ -121,16 +123,23 @@ const updateLineSchema = z.object({
 export async function updateLine(
   id: string,
   request: NextRequest,
-  prisma: any
+  prisma: PrismaClient
 ): Promise<NextResponse> {
   // 1. バリデーション
   const body = await request.json();
-  const validated = updateLineSchema.parse(body);
+  const parseResult1 = updateLineSchema.safeParse(body);
+  if (!parseResult1.success) {
+    return NextResponse.json(
+      { error: 'バリデーションエラー', details: parseResult1.error.flatten() },
+      { status: 400 }
+    );
+  }
+  const validated = parseResult1.data;
 
   // 2. Service呼び出し
   const lineService = new LineService(new LineRepository(prisma));
 
-  const updated = await lineService.updateLine(id, validated as any);
+  const updated = await lineService.updateLine(id, validated as LineUpdateInput);
 
   // 3. レスポンス
   return NextResponse.json(updated);
@@ -145,6 +154,7 @@ const updateApplicationLineSchema = z.object({
   status: z.enum([
     "NOT_ACTIVATED",
     "ACTIVATED",
+    "SHIPPING_INSTRUCTED",
     "SHIPPED",
     "RETURNED",
     "CANCELLED",
@@ -161,16 +171,23 @@ export async function updateApplicationLine(
   applicationId: string,
   lineId: string,
   request: NextRequest,
-  prisma: any
+  prisma: PrismaClient
 ): Promise<NextResponse> {
   // 1. バリデーション
   const body = await request.json();
-  const validated = updateApplicationLineSchema.parse(body);
+  const parseResult2 = updateApplicationLineSchema.safeParse(body);
+  if (!parseResult2.success) {
+    return NextResponse.json(
+      { error: 'バリデーションエラー', details: parseResult2.error.flatten() },
+      { status: 400 }
+    );
+  }
+  const validated = parseResult2.data;
 
   // 2. Service呼び出し
   const lineService = new LineService(new LineRepository(prisma), prisma);
 
-  const updated = await lineService.updateLineWithValidation(applicationId, lineId, validated as any);
+  const updated = await lineService.updateLineWithValidation(applicationId, lineId, validated as LineUpdateInput);
 
   // 3. レスポンス
   return NextResponse.json(updated);
@@ -181,6 +198,14 @@ export async function updateApplicationLine(
  */
 const bulkUpdateLineSchema = z.object({
   lineIds: z.array(z.string()).min(1),
+  status: z.enum([
+    "NOT_ACTIVATED",
+    "ACTIVATED",
+    "SHIPPING_INSTRUCTED",
+    "SHIPPED",
+    "RETURNED",
+    "CANCELLED",
+  ]).optional(),
   lineTagId: z.number().int().positive().optional().nullable(),
   lineReserveTagId: z.number().int().positive().optional().nullable(),
   contractMonth: z.coerce.date().optional().nullable(),
@@ -191,11 +216,18 @@ const bulkUpdateLineSchema = z.object({
 export async function bulkUpdateApplicationLines(
   applicationId: string,
   request: NextRequest,
-  prisma: any
+  prisma: PrismaClient
 ): Promise<NextResponse> {
   // 1. バリデーション
   const body = await request.json();
-  const validated = bulkUpdateLineSchema.parse(body);
+  const parseResult3 = bulkUpdateLineSchema.safeParse(body);
+  if (!parseResult3.success) {
+    return NextResponse.json(
+      { error: 'バリデーションエラー', details: parseResult3.error.flatten() },
+      { status: 400 }
+    );
+  }
+  const validated = parseResult3.data;
 
   // 2. Service呼び出し
   const lineService = new LineService(new LineRepository(prisma), prisma);
@@ -224,11 +256,18 @@ const bulkUpdateAllLinesSchema = z.object({
 
 export async function bulkUpdateAllLines(
   request: NextRequest,
-  prisma: any
+  prisma: PrismaClient
 ): Promise<NextResponse> {
   // 1. バリデーション
   const body = await request.json();
-  const { lineIds, ...updateFields } = bulkUpdateAllLinesSchema.parse(body);
+  const parseResult4 = bulkUpdateAllLinesSchema.safeParse(body);
+  if (!parseResult4.success) {
+    return NextResponse.json(
+      { error: 'バリデーションエラー', details: parseResult4.error.flatten() },
+      { status: 400 }
+    );
+  }
+  const { lineIds, ...updateFields } = parseResult4.data;
 
   // 2. Service呼び出し
   const lineService = new LineService(new LineRepository(prisma), prisma);

@@ -4,7 +4,6 @@ import { SessionProvider } from "next-auth/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "sonner";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
-import { prefetchAdminData } from "@/lib/prefetch-admin-data";
 
 function makeQueryClient() {
   return new QueryClient({
@@ -35,7 +34,6 @@ function getQueryClient() {
   }
   if (!browserQueryClient) {
     browserQueryClient = makeQueryClient();
-    prefetchAdminData(browserQueryClient);
   }
   return browserQueryClient;
 }

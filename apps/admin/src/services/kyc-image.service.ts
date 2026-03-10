@@ -6,12 +6,41 @@
  */
 
 import { KycImageRepository } from '../repositories/kyc-image.repository';
-import { KycImageUpdateInput, KycImageUpdateResult } from '@repo/entities';
+import { KycImageUpdateInput, KycImageUpdateResult } from '@/entities';
 import { logger } from '../shared/utils/logger';
 import { NotFoundError, ValidationError } from '../shared/errors/custom-errors';
 
+interface KycImageEntry {
+  id: string;
+  status: string;
+}
+
+type KycVerificationStatus = 'PENDING' | 'DEFICIENT' | 'RESUBMIT' | 'COMPLETED';
+
 export class KycImageService {
   constructor(private kycImageRepo: KycImageRepository) {}
+
+  /**
+   * 申込のKYC画像の有効期限を一括更新
+   * kycImagesが空の場合は前回の申込からコピーしてから更新（既存データ対応）
+   */
+  async updateExpiryByApplicationId(
+    applicationId: string,
+    expiryDate: string | null
+  ): Promise<{ count: number; latestExpiryDate: Date | null }> {
+    logger.info('KYC有効期限一括更新開始', { applicationId, expiryDate });
+
+    const parsedDate = expiryDate ? new Date(expiryDate) : null;
+
+    // kycImagesが空なら前回の申込からコピー（既存データ対応）
+    await this.kycImageRepo.copyFromPreviousIfEmpty(applicationId);
+
+    const count = await this.kycImageRepo.updateExpiryByApplicationId(applicationId, parsedDate);
+
+    logger.info('KYC有効期限一括更新完了', { applicationId, count, expiryDate });
+
+    return { count, latestExpiryDate: parsedDate };
+  }
 
   /**
    * KYC画像を更新
@@ -33,7 +62,7 @@ export class KycImageService {
       throw new NotFoundError('KYC画像', id);
     }
 
-    // ビジネスルール: 有効期限のみの更新
+    // 有効期限のみの更新
     if (updateData.expiryDate !== undefined && !updateData.status) {
       const updatedKycImage = await this.kycImageRepo.update(id, {
         expiryDate: updateData.expiryDate ? new Date(updateData.expiryDate) : null,
@@ -41,11 +70,7 @@ export class KycImageService {
       logger.info('KYC画像有効期限更新完了', { id });
       return {
         kycImage: updatedKycImage,
-        kycStatus: kycImage.application.kycImages.some((img: any) => img.status === 'REJECTED')
-          ? 'DEFICIENT'
-          : kycImage.application.kycImages.every((img: any) => img.status === 'APPROVED')
-          ? 'COMPLETED'
-          : 'PENDING',
+        kycStatus: this.deriveKycStatus(kycImage.application.kycImages),
       };
     }
 
@@ -55,7 +80,7 @@ export class KycImageService {
       throw new ValidationError('statusまたはexpiryDateが必要です');
     }
 
-    // ビジネスルール: ステータス更新時にreviewedAtを自動設定
+    // ステータス更新時にreviewedAtを自動設定
     const updatedKycImage = await this.kycImageRepo.update(id, {
       status: updateData.status,
       reviewNote: updateData.reviewNote || null,
@@ -65,22 +90,13 @@ export class KycImageService {
       }),
     });
 
-    // ビジネスルール: 申込のkycStatusを自動更新
-    const allKycImages = kycImage.application.kycImages.map((img: any) =>
-      img.id === id ? { ...img, status: updateData.status } : img
-    );
+    // 申込のkycStatusを自動更新（今回の変更を反映した状態で判定）
+    const allKycImages: KycImageEntry[] = kycImage.application.kycImages.map((img) => ({
+      id: img.id,
+      status: img.id === id ? (updateData.status ?? img.status) : img.status,
+    }));
 
-    const hasRejected = allKycImages.some((img: any) => img.status === 'REJECTED');
-    const allApproved = allKycImages.every((img: any) => img.status === 'APPROVED');
-
-    type KycVerificationStatus = 'PENDING' | 'DEFICIENT' | 'RESUBMIT' | 'COMPLETED';
-    let newKycStatus: KycVerificationStatus = 'PENDING';
-    if (hasRejected) {
-      newKycStatus = 'DEFICIENT';
-    } else if (allApproved && allKycImages.length > 0) {
-      newKycStatus = 'COMPLETED';
-    }
-
+    const newKycStatus = this.deriveKycStatus(allKycImages);
     await this.kycImageRepo.updateApplicationKycStatus(kycImage.application.id, newKycStatus);
 
     logger.info('KYC画像更新完了', { id, newKycStatus });
@@ -89,5 +105,14 @@ export class KycImageService {
       kycImage: updatedKycImage,
       kycStatus: newKycStatus,
     };
+  }
+
+  /**
+   * KYC画像一覧からkycStatusを導出
+   */
+  private deriveKycStatus(kycImages: KycImageEntry[]): KycVerificationStatus {
+    if (kycImages.some((img) => img.status === 'REJECTED')) return 'DEFICIENT';
+    if (kycImages.length > 0 && kycImages.every((img) => img.status === 'APPROVED')) return 'COMPLETED';
+    return 'PENDING';
   }
 }

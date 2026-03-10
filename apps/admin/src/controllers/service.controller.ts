@@ -1,3 +1,4 @@
+import { PrismaClient } from '@prisma/client';
 /**
  * Service Controller
  *
@@ -18,7 +19,7 @@ import { NotFoundError } from '../shared/errors/custom-errors';
  */
 export async function getAllServices(
   request: NextRequest,
-  prisma: any
+  prisma: PrismaClient
 ): Promise<NextResponse> {
   // 1. パラメータパース
   const searchParams = request.nextUrl.searchParams;
@@ -45,11 +46,18 @@ const serviceSchema = z.object({
 
 export async function createService(
   request: NextRequest,
-  prisma: any
+  prisma: PrismaClient
 ): Promise<NextResponse> {
   // 1. バリデーション
   const body = await request.json();
-  const validated = serviceSchema.parse(body);
+  const result = serviceSchema.safeParse(body);
+  if (!result.success) {
+    return NextResponse.json(
+      { error: 'バリデーションエラー', details: result.error.flatten() },
+      { status: 400 }
+    );
+  }
+  const validated = result.data;
 
   // 2. Service呼び出し
   const serviceService = new ServiceService(new ServiceRepository(prisma));
@@ -64,7 +72,7 @@ export async function createService(
  */
 export async function getServiceDetail(
   id: string,
-  prisma: any
+  prisma: PrismaClient
 ): Promise<NextResponse> {
   logger.info('サービス詳細取得開始', { id });
 
@@ -92,13 +100,20 @@ const updateServiceSchema = z.object({
 export async function updateService(
   id: string,
   request: NextRequest,
-  prisma: any
+  prisma: PrismaClient
 ): Promise<NextResponse> {
   logger.info('サービス更新開始', { id });
 
   // 1. リクエストボディのパース & バリデーション
   const body = await request.json();
-  const validated = updateServiceSchema.parse(body);
+  const result = updateServiceSchema.safeParse(body);
+  if (!result.success) {
+    return NextResponse.json(
+      { error: 'バリデーションエラー', details: result.error.flatten() },
+      { status: 400 }
+    );
+  }
+  const validated = result.data;
 
   // 2. Service呼び出し
   const serviceService = new ServiceService(new ServiceRepository(prisma));
@@ -114,7 +129,7 @@ export async function updateService(
  */
 export async function deleteService(
   id: string,
-  prisma: any
+  prisma: PrismaClient
 ): Promise<NextResponse> {
   logger.info('サービス削除開始', { id });
 

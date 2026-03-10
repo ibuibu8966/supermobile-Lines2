@@ -1,328 +1,253 @@
-"use client";
+'use client'
 
-import { useState, useEffect } from "react";
-import Link from "next/link";
-import {
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  Badge,
-} from "@repo/ui";
-import { Search, Loader2, ExternalLink, LogOut, ArrowLeft } from "lucide-react";
+import { useState, useEffect, useMemo } from 'react'
+import Link from 'next/link'
+
+interface Customer {
+  id: string
+  type: string
+  lastName: string
+  firstName: string
+  lastNameKana: string
+  firstNameKana: string
+  companyName?: string | null
+  companyNameKana?: string | null
+  email: string
+  phone: string
+}
 
 interface Application {
-  id: string;
-  applicationNumber: string;
-  status: string;
-  lineCount: number;
-  totalAmount: number;
-  createdAt: string;
-  customer: {
-    id: string;
-    type: string;
-    name: string;
-    email: string;
-    phone: string;
-  };
-  plan: {
-    id: string;
-    name: string;
-  };
+  id: string
+  applicationNumber: string
+  lineCount: number
+  totalAmount: number
+  createdAt: string
+  customer: Customer
 }
-
-interface ApplicationsResponse {
-  applications: Application[];
-  pagination: {
-    page: number;
-    pageSize: number;
-    totalCount: number;
-    totalPages: number;
-  };
-}
-
-const STATUS_LABELS: Record<string, string> = {
-  COMPLETED: "完了",
-  CANCELLED: "キャンセル",
-};
-
-const STATUS_VARIANTS: Record<string, "default" | "secondary" | "destructive" | "success"> = {
-  COMPLETED: "success",
-  CANCELLED: "destructive",
-};
 
 export default function ArchivedApplicationsPage() {
-  const [applications, setApplications] = useState<Application[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [page, setPage] = useState(1);
-  const [pagination, setPagination] = useState<ApplicationsResponse["pagination"] | null>(null);
-
-  const fetchApplications = async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (search) params.set("search", search);
-      if (statusFilter) {
-        params.set("status", statusFilter);
-      } else {
-        params.set("archived", "true");
-      }
-      params.set("page", page.toString());
-
-      const res = await fetch(`/api/admin/applications?${params}`);
-      if (res.ok) {
-        const data: ApplicationsResponse = await res.json();
-        setApplications(data.applications);
-        setPagination(data.pagination);
-      }
-    } catch (error) {
-      console.error("申込一覧取得エラー:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [applications, setApplications] = useState<Application[]>([])
+  const [loading, setLoading] = useState(true)
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [sortConfig, setSortConfig] = useState<{
+    key: string | null
+    direction: 'asc' | 'desc'
+  }>({ key: null, direction: 'asc' })
 
   useEffect(() => {
-    fetchApplications();
-  }, [statusFilter, page]);
+    fetchApplications()
+  }, [page])
 
-  const handleSearch = () => {
-    setPage(1);
-    fetchApplications();
-  };
+  const fetchApplications = async () => {
+    try {
+      setLoading(true)
+      const params = new URLSearchParams({
+        page: page.toString(),
+        archived: 'true',
+      })
+      const response = await fetch(`/api/admin/applications?${params}`)
+      if (!response.ok) throw new Error('Failed to fetch')
+      const data = await response.json()
+      setApplications(data.applications || data.data || [])
+      setTotalPages(data.pagination.totalPages)
+    } catch (error) {
+      console.error('アーカイブ一覧の取得エラー:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString("ja-JP", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    });
-  };
+  const handleSort = (key: string) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }))
+  }
+
+  const sortedApplications = useMemo(() => {
+    if (!sortConfig.key) return applications
+
+    return [...applications].sort((a, b) => {
+      let aValue = ''
+      let bValue = ''
+
+      switch (sortConfig.key) {
+        case 'type':
+          aValue = a.customer.type
+          bValue = b.customer.type
+          break
+        case 'name':
+          aValue = a.customer.type === 'CORPORATE'
+            ? (a.customer.companyName || '')
+            : `${a.customer.lastName}${a.customer.firstName}`
+          bValue = b.customer.type === 'CORPORATE'
+            ? (b.customer.companyName || '')
+            : `${b.customer.lastName}${b.customer.firstName}`
+          break
+        case 'kana':
+          aValue = a.customer.type === 'CORPORATE'
+            ? (a.customer.companyNameKana || '')
+            : `${a.customer.lastNameKana}${a.customer.firstNameKana}`
+          bValue = b.customer.type === 'CORPORATE'
+            ? (b.customer.companyNameKana || '')
+            : `${b.customer.lastNameKana}${b.customer.firstNameKana}`
+          break
+        case 'phone':
+          aValue = a.customer.phone
+          bValue = b.customer.phone
+          break
+        case 'email':
+          aValue = a.customer.email
+          bValue = b.customer.email
+          break
+        case 'lineCount':
+          return sortConfig.direction === 'asc'
+            ? a.lineCount - b.lineCount
+            : b.lineCount - a.lineCount
+        case 'createdAt':
+          aValue = a.createdAt
+          bValue = b.createdAt
+          break
+        default:
+          return 0
+      }
+
+      return sortConfig.direction === 'asc'
+        ? aValue.localeCompare(bValue, 'ja')
+        : bValue.localeCompare(aValue, 'ja')
+    })
+  }, [applications, sortConfig])
+
+  const SortHeader = ({ label, sortKey }: { label: string; sortKey: string }) => (
+    <th
+      className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap"
+      onClick={() => handleSort(sortKey)}
+    >
+      {label} {sortConfig.key === sortKey && (sortConfig.direction === 'asc' ? '\u2191' : '\u2193')}
+    </th>
+  )
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-gray-500">読み込み中...</div>
+      </div>
+    )
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold text-primary">avaris管理画面</h1>
-            <Badge variant="secondary">ADMIN</Badge>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground">管理者</span>
-            <Button variant="ghost" size="sm">
-              <LogOut className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      <nav className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex gap-6">
-            <Link
-              href="/admin"
-              className="py-3 border-b-2 border-transparent text-sm text-muted-foreground hover:text-foreground"
-            >
-              ダッシュボード
-            </Link>
-            <Link
-              href="/admin/applications"
-              className="py-3 border-b-2 border-primary text-sm font-medium"
-            >
-              申込管理
-            </Link>
-            <Link
-              href="/admin/lines"
-              className="py-3 border-b-2 border-transparent text-sm text-muted-foreground hover:text-foreground"
-            >
-              回線管理
-            </Link>
-            <Link
-              href="/admin/kyc"
-              className="py-3 border-b-2 border-transparent text-sm text-muted-foreground hover:text-foreground"
-            >
-              KYC確認
-            </Link>
-            <Link
-              href="/admin/shipping"
-              className="py-3 border-b-2 border-transparent text-sm text-muted-foreground hover:text-foreground"
-            >
-              発送管理
-            </Link>
-          </div>
-        </div>
-      </nav>
-
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        <div className="flex justify-between items-center mb-6">
-          <div>
-            <h2 className="text-2xl font-bold">アーカイブ済み申込</h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              完了・キャンセル済みの申込
-            </p>
-          </div>
-          <Link href="/admin/applications">
-            <Button variant="outline">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              申込一覧に戻る
-            </Button>
+    <div className="h-full overflow-auto bg-gray-100 p-6">
+      <div className="mx-auto">
+        {/* ヘッダー */}
+        <div className="mb-6">
+          <Link
+            href="/admin/applications"
+            className="text-blue-600 hover:text-blue-800 mb-2 inline-block"
+          >
+            &larr; 申し込み一覧に戻る
           </Link>
+          <h1 className="text-2xl font-bold text-gray-900">アーカイブ済み申し込み</h1>
         </div>
 
-        <div className="flex gap-4 mb-6 flex-wrap">
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="申込番号/名前/メール/電話..."
-              className="px-4 py-2 border rounded-md w-72 pr-10"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-            />
+        {/* テーブル */}
+        <div className="overflow-x-auto">
+          <table className="min-w-full">
+            <thead>
+              <tr className="border-b border-gray-300">
+                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700 whitespace-nowrap">
+                  詳細
+                </th>
+                <SortHeader label="個人/法人" sortKey="type" />
+                <SortHeader label="名前/会社名" sortKey="name" />
+                <SortHeader label="カナ" sortKey="kana" />
+                <SortHeader label="電話番号" sortKey="phone" />
+                <SortHeader label="メール" sortKey="email" />
+                <SortHeader label="回線数" sortKey="lineCount" />
+                <SortHeader label="申込日" sortKey="createdAt" />
+                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700 whitespace-nowrap">
+                  詳細
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedApplications.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="px-3 py-8 text-center text-gray-500">
+                    アーカイブされた申し込みはありません
+                  </td>
+                </tr>
+              ) : (
+                sortedApplications.map((app) => (
+                  <tr key={app.id} className="border-b border-gray-200 hover:bg-gray-50">
+                    <td className="px-3 py-2 text-sm">
+                      <Link
+                        href={`/admin/applications/${app.id}`}
+                        className="text-blue-600 hover:text-blue-800"
+                      >
+                        詳細
+                      </Link>
+                    </td>
+                    <td className="px-3 py-2 text-sm text-gray-900">
+                      {app.customer.type === 'INDIVIDUAL' ? '個人' : '法人'}
+                    </td>
+                    <td className="px-3 py-2 text-sm text-gray-900">
+                      {app.customer.type === 'CORPORATE'
+                        ? app.customer.companyName
+                        : `${app.customer.lastName} ${app.customer.firstName}`}
+                    </td>
+                    <td className="px-3 py-2 text-sm text-gray-900">
+                      {app.customer.type === 'CORPORATE'
+                        ? app.customer.companyNameKana
+                        : `${app.customer.lastNameKana} ${app.customer.firstNameKana}`}
+                    </td>
+                    <td className="px-3 py-2 text-sm text-gray-900">
+                      {app.customer.phone}
+                    </td>
+                    <td className="px-3 py-2 text-sm text-gray-900">
+                      {app.customer.email}
+                    </td>
+                    <td className="px-3 py-2 text-sm text-gray-900 text-center">
+                      {app.lineCount}
+                    </td>
+                    <td className="px-3 py-2 text-sm text-gray-900 whitespace-nowrap">
+                      {new Date(app.createdAt).toLocaleDateString('ja-JP')}
+                    </td>
+                    <td className="px-3 py-2 text-sm">
+                      <Link
+                        href={`/admin/applications/${app.id}`}
+                        className="text-blue-600 hover:text-blue-800"
+                      >
+                        詳細
+                      </Link>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* ページネーション */}
+        {totalPages > 1 && (
+          <div className="flex justify-center items-center gap-4 mt-6">
             <button
-              onClick={handleSearch}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="px-4 py-2 border rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 bg-white"
             >
-              <Search className="h-4 w-4" />
+              前へ
+            </button>
+            <button
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              className="px-4 py-2 border rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 bg-white"
+            >
+              次へ
             </button>
           </div>
-          <select
-            className="px-4 py-2 border rounded-md"
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              setPage(1);
-            }}
-          >
-            <option value="">全て</option>
-            <option value="COMPLETED">完了</option>
-            <option value="CANCELLED">キャンセル</option>
-          </select>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              アーカイブ済み申込
-              {pagination && (
-                <span className="text-sm font-normal text-gray-500">
-                  {pagination.totalCount}件
-                </span>
-              )}
-              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading && applications.length === 0 ? (
-              <div className="flex justify-center items-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-              </div>
-            ) : applications.length === 0 ? (
-              <div className="text-center py-12 text-gray-500">
-                アーカイブ済みの申込はありません
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b bg-gray-50">
-                      <th className="text-left py-2 px-2">申込番号</th>
-                      <th className="text-left py-2 px-2">区分</th>
-                      <th className="text-left py-2 px-2">顧客名</th>
-                      <th className="text-left py-2 px-2">電話番号</th>
-                      <th className="text-left py-2 px-2">プラン</th>
-                      <th className="text-left py-2 px-2">回線数</th>
-                      <th className="text-left py-2 px-2">金額</th>
-                      <th className="text-left py-2 px-2">ステータス</th>
-                      <th className="text-left py-2 px-2">申込日</th>
-                      <th className="text-left py-2 px-2">操作</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {applications.map((app) => (
-                      <tr key={app.id} className="border-b hover:bg-gray-50">
-                        <td className="py-2 px-2 font-mono text-xs">
-                          {app.applicationNumber}
-                        </td>
-                        <td className="py-2 px-2">
-                          <Badge
-                            variant={
-                              app.customer.type === "CORPORATE"
-                                ? "default"
-                                : "secondary"
-                            }
-                          >
-                            {app.customer.type === "CORPORATE" ? "法人" : "個人"}
-                          </Badge>
-                        </td>
-                        <td className="py-2 px-2">{app.customer.name}</td>
-                        <td className="py-2 px-2 text-xs">{app.customer.phone}</td>
-                        <td className="py-2 px-2">{app.plan.name}</td>
-                        <td className="py-2 px-2 text-center">{app.lineCount}</td>
-                        <td className="py-2 px-2">
-                          {app.totalAmount.toLocaleString()}円
-                        </td>
-                        <td className="py-2 px-2">
-                          <Badge variant={STATUS_VARIANTS[app.status] || "secondary"}>
-                            {STATUS_LABELS[app.status] || app.status}
-                          </Badge>
-                        </td>
-                        <td className="py-2 px-2 text-xs">
-                          {formatDate(app.createdAt)}
-                        </td>
-                        <td className="py-2 px-2">
-                          <Link
-                            href={`/admin/applications/${app.id}`}
-                            className="text-blue-600 hover:underline flex items-center gap-1 text-xs"
-                          >
-                            <ExternalLink className="h-3 w-3" />
-                            詳細
-                          </Link>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {pagination && pagination.totalPages > 1 && (
-              <div className="mt-4 flex justify-between items-center text-sm text-gray-500">
-                <span>
-                  {pagination.totalCount}件中{" "}
-                  {(pagination.page - 1) * pagination.pageSize + 1}-
-                  {Math.min(
-                    pagination.page * pagination.pageSize,
-                    pagination.totalCount
-                  )}
-                  件を表示
-                </span>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={page <= 1}
-                    onClick={() => setPage(page - 1)}
-                  >
-                    前へ
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={page >= pagination.totalPages}
-                    onClick={() => setPage(page + 1)}
-                  >
-                    次へ
-                  </Button>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </main>
+        )}
+      </div>
     </div>
-  );
+  )
 }

@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { prisma } from "@repo/database";
+import { prisma } from "@/lib/database";
 import { getUserDetail, updateUser, deleteUser } from "@/controllers/user.controller";
 import { getAdminSession, assertServiceAccess } from "@/lib/auth/admin-session";
 

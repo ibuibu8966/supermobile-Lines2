@@ -1,13 +1,8 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@repo/ui";
-import { Loader2, Package, Smartphone, RotateCcw } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Loader2, Package, Smartphone } from "lucide-react";
 import { queryKeys, STALE_TIMES } from "@/lib/api/query-keys";
 import { api } from "@/lib/api/client";
 
@@ -15,17 +10,14 @@ interface DashboardStats {
   overview: {
     totalInStockSims: number;
     totalActiveLines: number;
-    totalReturningLines: number;
   };
   simInventoryByUsageTag: Array<{
     usageTagId: number;
-    usageTagCode: string;
     usageTagName: string;
     availableCount: number;
   }>;
   activeLinesByPlan: Array<{
     planId: string;
-    planCode: string;
     planName: string;
     serviceName: string;
     activeCount: number;
@@ -50,7 +42,7 @@ export function DashboardStats() {
   return (
     <div className="space-y-6">
       {/* Overview cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -59,8 +51,7 @@ export function DashboardStats() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">{stats.overview.totalInStockSims.toLocaleString()}</p>
-            <p className="text-sm text-muted-foreground">利用可能なSIM</p>
+            <p className="text-3xl font-bold">{stats.overview.totalInStockSims.toLocaleString()}<span className="text-lg font-medium ml-1">枚</span></p>
           </CardContent>
         </Card>
         <Card>
@@ -71,26 +62,13 @@ export function DashboardStats() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">{stats.overview.totalActiveLines.toLocaleString()}</p>
-            <p className="text-sm text-muted-foreground">アクティブな回線</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <RotateCcw className="h-4 w-4" />
-              返却済み
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">{stats.overview.totalReturningLines.toLocaleString()}</p>
-            <p className="text-sm text-muted-foreground">返却された回線</p>
+            <p className="text-3xl font-bold">{stats.overview.totalActiveLines.toLocaleString()}<span className="text-lg font-medium ml-1">回線</span></p>
           </CardContent>
         </Card>
       </div>
 
       {/* Detailed stats */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* SIM inventory by usage tag */}
         <Card>
           <CardHeader>
@@ -106,14 +84,8 @@ export function DashboardStats() {
                     key={item.usageTagId}
                     className="flex items-center justify-between py-2 border-b last:border-0"
                   >
-                    <div>
-                      <p className="font-medium text-sm">{item.usageTagName}</p>
-                      <p className="text-xs text-muted-foreground">{item.usageTagCode}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold text-lg">{item.availableCount.toLocaleString()}</p>
-                      <p className="text-xs text-muted-foreground">枚</p>
-                    </div>
+                    <p className="font-medium text-sm">{item.usageTagName}</p>
+                    <p className="font-bold text-lg">{item.availableCount.toLocaleString()}<span className="text-sm font-medium ml-0.5">枚</span></p>
                   </div>
                 ))}
               </div>
@@ -136,14 +108,8 @@ export function DashboardStats() {
                     key={item.planId}
                     className="flex items-center justify-between py-2 border-b last:border-0"
                   >
-                    <div>
-                      <p className="font-medium text-sm">{item.planName}</p>
-                      <p className="text-xs text-muted-foreground">{item.serviceName}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold text-lg">{item.activeCount.toLocaleString()}</p>
-                      <p className="text-xs text-muted-foreground">回線</p>
-                    </div>
+                    <p className="font-medium text-sm">{item.planName}</p>
+                    <p className="font-bold text-lg">{item.activeCount.toLocaleString()}<span className="text-sm font-medium ml-0.5">回線</span></p>
                   </div>
                 ))}
               </div>

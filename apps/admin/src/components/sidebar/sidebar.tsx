@@ -21,6 +21,7 @@ import {
   Archive,
   Ticket,
   ShoppingCart,
+  TrendingUp,
 } from "lucide-react";
 import { useSidebar } from "@/contexts/sidebar-context";
 import { SidebarItem } from "./sidebar-item";
@@ -44,7 +45,8 @@ const menuItems = [
 
   { title: "総合回線管理", href: "/lines", icon: ListChecks, superAdminOnly: true },
   { title: "SIM管理", href: "/sims", icon: Smartphone, superAdminOnly: true },
-  { title: "仕入れ管理", href: "/procurement", icon: ShoppingCart, superAdminOnly: true },
+  { title: "仕入れ(支出)管理", href: "/procurement", icon: ShoppingCart, superAdminOnly: true },
+  { title: "損益管理", href: "/profit-loss", icon: TrendingUp, superAdminOnly: true },
   { title: "タグ管理", href: "/tags", icon: Tags, superAdminOnly: true },
   { title: "サービス・プラン管理", href: "/services", icon: Package, superAdminOnly: true },
   { title: "クーポン管理", href: "/coupons", icon: Ticket, superAdminOnly: true },
@@ -146,7 +148,7 @@ export function Sidebar({ user }: SidebarProps) {
       {/* Desktop sidebar */}
       <aside
         className={`
-          hidden lg:flex flex-col bg-white border-r transition-all duration-300
+          hidden lg:flex flex-col bg-white border-r transition-all duration-300 sticky top-0 h-screen
           ${isCollapsed ? "w-16" : "w-64"}
         `}
       >

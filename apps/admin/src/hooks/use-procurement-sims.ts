@@ -14,7 +14,7 @@ export interface ProcurementSim {
   isAutoCancel: boolean;
   autoCancelDate: string | null;
   currentContractId: string | null;
-  status: "IN_STOCK" | "ACTIVE" | "RETURNING" | "RETIRED" | "CANCELLED";
+  status: "IN_STOCK" | "ACTIVE";
   consumedTagIds: number[];
   eligibleTagIds: number[];
   simLocationTagId: number | null;

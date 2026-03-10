@@ -3,7 +3,9 @@
 import { useState, useMemo, useEffect } from "react";
 import type { BaseTag } from "@/lib/api/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from "@repo/ui";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus, Pencil, Trash2, Loader2, X, GripVertical } from "lucide-react";
 import { toast } from "sonner";
 
@@ -140,8 +142,7 @@ export function TagManager({ config, createTrigger }: TagManagerProps) {
       } else {
         setError(data.error || "保存に失敗しました");
       }
-    } catch (err) {
-      console.error("保存エラー:", err);
+    } catch {
       setError("保存に失敗しました");
     } finally {
       setSaving(false);
@@ -165,8 +166,7 @@ export function TagManager({ config, createTrigger }: TagManagerProps) {
         const data = await res.json();
         toast.error(data.error || "削除に失敗しました");
       }
-    } catch (err) {
-      console.error("削除エラー:", err);
+    } catch {
       toast.error("削除に失敗しました");
     }
   };
@@ -192,8 +192,7 @@ export function TagManager({ config, createTrigger }: TagManagerProps) {
       } else {
         throw new Error("更新に失敗しました");
       }
-    } catch (err) {
-      console.error("ステータス変更エラー:", err);
+    } catch {
       toast.error("ステータスの変更に失敗しました");
       queryClient.invalidateQueries({ queryKey: config.queryKey });
     }
@@ -213,7 +212,7 @@ export function TagManager({ config, createTrigger }: TagManagerProps) {
 
   const renderTable = (tagsToRender: BaseTag[], showGripHandle = false) => (
     <table className="w-full text-sm">
-      <thead>
+      <thead className="sticky top-0 z-10 bg-white">
         <tr className="border-b">
           {showGripHandle && <th className="text-left py-2 px-4 w-8"></th>}
           <th className="text-left py-2 px-4">表示名</th>

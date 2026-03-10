@@ -1,6 +1,6 @@
 import { auth } from "@/auth";
-import { prisma } from "@repo/database";
-import { getCustomerLines } from "@repo/shared";
+import { prisma } from "@/lib/database";
+import { getCustomerLines } from "@/lib";
 
 export const dynamic = "force-dynamic";
 

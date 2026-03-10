@@ -1,3 +1,4 @@
+import { PrismaClient } from '@prisma/client';
 /**
  * Coupon Controller
  *
@@ -17,7 +18,7 @@ import { logger } from '../shared/utils/logger';
  */
 export async function getAllCoupons(
   request: NextRequest,
-  prisma: any
+  prisma: PrismaClient
 ): Promise<NextResponse> {
   // 1. パラメータパース
   const searchParams = request.nextUrl.searchParams;
@@ -36,24 +37,38 @@ export async function getAllCoupons(
 /**
  * クーポン作成コントローラー
  */
+const pricingSchema = z.object({
+  minQuantity: z.number().int().min(1),
+  maxQuantity: z.number().int().min(1).nullable(),
+  unitPrice: z.number().int().min(0),
+});
+
 const couponSchema = z.object({
   code: z.string().min(1, 'コードは必須です').max(50),
   planId: z.string().cuid('プランを選択してください'),
-  unitPrice: z.number().int().min(0, '単価は0以上で入力してください'),
+  unitPrice: z.number().int().min(0).optional().nullable(),
   description: z.string().max(200).optional().nullable(),
   maxUsages: z.number().int().min(1).optional().nullable(),
   validFrom: z.coerce.date({ error: '有効開始日は必須です' }),
   validUntil: z.coerce.date({ error: '有効終了日は必須です' }),
   isActive: z.boolean().optional().default(true),
+  pricings: z.array(pricingSchema).optional(),
 });
 
 export async function createCoupon(
   request: NextRequest,
-  prisma: any
+  prisma: PrismaClient
 ): Promise<NextResponse> {
   // 1. バリデーション
   const body = await request.json();
-  const validated = couponSchema.parse(body);
+  const result = couponSchema.safeParse(body);
+  if (!result.success) {
+    return NextResponse.json(
+      { error: 'バリデーションエラー', details: result.error.flatten() },
+      { status: 400 }
+    );
+  }
+  const validated = result.data;
 
   // 2. Service呼び出し
   const couponService = new CouponService(new CouponRepository(prisma));
@@ -69,22 +84,30 @@ export async function createCoupon(
 const updateCouponSchema = z.object({
   code: z.string().min(1).max(50).optional(),
   planId: z.string().cuid().optional(),
-  unitPrice: z.number().int().min(0).optional(),
+  unitPrice: z.number().int().min(0).optional().nullable(),
   description: z.string().max(200).optional().nullable(),
   maxUsages: z.number().int().min(1).optional().nullable(),
   validFrom: z.string().optional(),
   validUntil: z.string().optional(),
   isActive: z.boolean().optional(),
+  pricings: z.array(pricingSchema).optional(),
 });
 
 export async function updateCoupon(
   id: string,
   request: NextRequest,
-  prisma: any
+  prisma: PrismaClient
 ): Promise<NextResponse> {
   // 1. バリデーション
   const body = await request.json();
-  const validated = updateCouponSchema.parse(body);
+  const result = updateCouponSchema.safeParse(body);
+  if (!result.success) {
+    return NextResponse.json(
+      { error: 'バリデーションエラー', details: result.error.flatten() },
+      { status: 400 }
+    );
+  }
+  const validated = result.data;
 
   // 2. Service呼び出し
   const couponService = new CouponService(new CouponRepository(prisma));
@@ -99,7 +122,7 @@ export async function updateCoupon(
  */
 export async function deleteCoupon(
   id: string,
-  prisma: any
+  prisma: PrismaClient
 ): Promise<NextResponse> {
   // Service呼び出し
   const couponService = new CouponService(new CouponRepository(prisma));

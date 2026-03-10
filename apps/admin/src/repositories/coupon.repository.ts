@@ -5,7 +5,8 @@
  * Prismaとの直接的なやり取りを担当
  */
 
-import { CouponWithRelations, CouponCreateInput } from '@repo/entities';
+import { PrismaClient, Prisma } from '@prisma/client';
+import { CouponWithRelations, CouponCreateInput, CouponPricingInput } from '@/entities';
 import { logger } from '../shared/utils/logger';
 
 export interface CouponFilters {
@@ -13,7 +14,7 @@ export interface CouponFilters {
 }
 
 export class CouponRepository {
-  constructor(private prisma: any) {}
+  constructor(private prisma: PrismaClient) {}
 
   /**
    * クーポン一覧を取得
@@ -23,9 +24,10 @@ export class CouponRepository {
 
     logger.debug('CouponRepository.findMany', { where });
 
-    return await this.prisma.coupon.findMany({
+    const coupons = await this.prisma.coupon.findMany({
       where,
       include: {
+        pricings: { orderBy: { minQuantity: 'asc' } },
         plan: {
           include: {
             service: true,
@@ -39,6 +41,7 @@ export class CouponRepository {
       },
       orderBy: { createdAt: 'desc' },
     });
+    return coupons as unknown as CouponWithRelations[];
   }
 
   /**
@@ -47,9 +50,10 @@ export class CouponRepository {
   async findByCode(code: string): Promise<CouponWithRelations | null> {
     logger.debug('CouponRepository.findByCode', { code });
 
-    return await this.prisma.coupon.findUnique({
+    const coupon = await this.prisma.coupon.findUnique({
       where: { code },
       include: {
+        pricings: { orderBy: { minQuantity: 'asc' } },
         plan: {
           include: {
             service: true,
@@ -57,6 +61,7 @@ export class CouponRepository {
         },
       },
     });
+    return coupon as unknown as CouponWithRelations | null;
   }
 
   /**
@@ -65,9 +70,10 @@ export class CouponRepository {
   async findById(id: string): Promise<CouponWithRelations | null> {
     logger.debug('CouponRepository.findById', { id });
 
-    return await this.prisma.coupon.findUnique({
+    const coupon = await this.prisma.coupon.findUnique({
       where: { id },
       include: {
+        pricings: { orderBy: { minQuantity: 'asc' } },
         plan: {
           include: {
             service: true,
@@ -80,6 +86,7 @@ export class CouponRepository {
         },
       },
     });
+    return coupon as unknown as CouponWithRelations | null;
   }
 
   /**
@@ -88,18 +95,28 @@ export class CouponRepository {
   async create(data: CouponCreateInput): Promise<CouponWithRelations> {
     logger.debug('CouponRepository.create', { code: data.code, planId: data.planId });
 
-    return await this.prisma.coupon.create({
+    const coupon = await this.prisma.coupon.create({
       data: {
         code: data.code,
         planId: data.planId,
-        unitPrice: data.unitPrice,
+        unitPrice: data.unitPrice ?? null,
         description: data.description ?? null,
         maxUsages: data.maxUsages ?? null,
         validFrom: data.validFrom,
         validUntil: data.validUntil,
         isActive: data.isActive ?? true,
+        ...(data.pricings && data.pricings.length > 0 ? {
+          pricings: {
+            create: data.pricings.map((p) => ({
+              minQuantity: p.minQuantity,
+              maxQuantity: p.maxQuantity,
+              unitPrice: p.unitPrice,
+            })),
+          },
+        } : {}),
       },
       include: {
+        pricings: { orderBy: { minQuantity: 'asc' } },
         plan: {
           include: {
             service: true,
@@ -112,6 +129,7 @@ export class CouponRepository {
         },
       },
     });
+    return coupon as unknown as CouponWithRelations;
   }
 
   /**
@@ -150,24 +168,26 @@ export class CouponRepository {
   async findByCodeExcept(code: string, excludeId: string): Promise<CouponWithRelations | null> {
     logger.debug('CouponRepository.findByCodeExcept', { code, excludeId });
 
-    return await this.prisma.coupon.findFirst({
+    const coupon = await this.prisma.coupon.findFirst({
       where: {
         code,
         id: { not: excludeId },
       },
     });
+    return coupon as unknown as CouponWithRelations | null;
   }
 
   /**
    * クーポンを更新
    */
-  async update(id: string, data: any): Promise<CouponWithRelations> {
+  async update(id: string, data: Prisma.CouponUpdateInput): Promise<CouponWithRelations> {
     logger.debug('CouponRepository.update', { id, data });
 
-    return await this.prisma.coupon.update({
+    const coupon = await this.prisma.coupon.update({
       where: { id },
       data,
       include: {
+        pricings: { orderBy: { minQuantity: 'asc' } },
         plan: {
           include: {
             service: true,
@@ -180,6 +200,7 @@ export class CouponRepository {
         },
       },
     });
+    return coupon as unknown as CouponWithRelations;
   }
 
   /**
@@ -203,5 +224,26 @@ export class CouponRepository {
     await this.prisma.coupon.delete({
       where: { id },
     });
+  }
+
+  /**
+   * クーポンのpricingsを全削除して再作成（トランザクション内で使用）
+   */
+  async replacePricings(couponId: string, pricings: CouponPricingInput[]): Promise<void> {
+    logger.debug('CouponRepository.replacePricings', { couponId, count: pricings.length });
+
+    await this.prisma.$transaction([
+      this.prisma.couponPricing.deleteMany({ where: { couponId } }),
+      ...pricings.map((p) =>
+        this.prisma.couponPricing.create({
+          data: {
+            couponId,
+            minQuantity: p.minQuantity,
+            maxQuantity: p.maxQuantity,
+            unitPrice: p.unitPrice,
+          },
+        })
+      ),
+    ]);
   }
 }

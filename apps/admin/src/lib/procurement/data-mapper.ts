@@ -74,12 +74,11 @@ export function mapRowData(
         result.plan = strValue;
         break;
 
-      case "supplierContractEnd": {
+      case "autoCancelDate": {
         const date = parseDate(strValue);
         if (date) {
-          result.supplierContractEnd = date.toISOString();
-          result.isAutoCancel = true;
           result.autoCancelDate = date.toISOString();
+          result.isAutoCancel = true;
         }
         break;
       }
@@ -116,10 +115,12 @@ export function mapRowData(
     if (!result.plan && manualSettings.plan) {
       result.plan = manualSettings.plan;
     }
-    if (!result.supplierContractEnd && manualSettings.supplierContractEnd) {
-      result.supplierContractEnd = manualSettings.supplierContractEnd;
-      result.isAutoCancel = manualSettings.isAutoCancel ?? true;
-      result.autoCancelDate = manualSettings.supplierContractEnd;
+    if (!result.autoCancelDate && manualSettings.autoCancelDate) {
+      result.autoCancelDate = manualSettings.autoCancelDate;
+      result.isAutoCancel = true;
+    }
+    if (manualSettings.isAutoCancel !== undefined && result.autoCancelDate) {
+      result.isAutoCancel = manualSettings.isAutoCancel;
     }
     if (
       (!result.eligibleTagIds || result.eligibleTagIds.length === 0) &&
@@ -202,12 +203,12 @@ export function validateMappedData(
       }
     }
 
-    // 解約日チェック
-    if (mapped.supplierContractEnd) {
-      const date = new Date(mapped.supplierContractEnd);
+    // 解約予定日チェック
+    if (mapped.autoCancelDate) {
+      const date = new Date(mapped.autoCancelDate);
       const now = new Date();
       if (date < now) {
-        warnings.push("解約日が過去の日付です");
+        warnings.push("解約予定日が過去の日付です");
       }
     }
 

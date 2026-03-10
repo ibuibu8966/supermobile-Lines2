@@ -1,3 +1,4 @@
+import { PrismaClient } from '@prisma/client';
 /**
  * KYC Controller
  *
@@ -21,7 +22,7 @@ import { logger } from '../shared/utils/logger';
 export async function getKycList(
   serviceCode: string,
   request: NextRequest,
-  prisma: any,
+  prisma: PrismaClient,
   getSignedUrlFn: (bucket: string, path: string) => Promise<string>
 ): Promise<NextResponse> {
   try {

@@ -1,3 +1,4 @@
+import { PrismaClient } from '@prisma/client';
 /**
  * Shipping Controller
  *
@@ -7,7 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { ShippingService } from '../services/shipping.service';
-import { ShippingScanInput, ShippingCompleteInput } from '@repo/entities';
+import { ShippingScanInput, ShippingCompleteInput } from '@/entities';
 import { ValidationError, NotFoundError } from '../shared/errors/custom-errors';
 import { logger } from '../shared/utils/logger';
 
@@ -29,13 +30,20 @@ const scanSchema = z.object({
  */
 export async function scanBarcode(
   request: NextRequest,
-  prisma: any
+  prisma: PrismaClient
 ): Promise<NextResponse> {
-  try {
-    // 1. パラメータ取得・バリデーション
-    const body = await request.json();
-    const validated = scanSchema.parse(body);
+  // 1. パラメータ取得・バリデーション
+  const body = await request.json();
+  const parseResult = scanSchema.safeParse(body);
+  if (!parseResult.success) {
+    return NextResponse.json(
+      { error: 'バリデーションエラー', details: parseResult.error.flatten() },
+      { status: 400 }
+    );
+  }
+  const validated = parseResult.data;
 
+  try {
     // 2. 入力データを構築
     const input: ShippingScanInput = {
       applicationLineId: validated.applicationLineId,
@@ -53,13 +61,6 @@ export async function scanBarcode(
     return NextResponse.json(result);
   } catch (error) {
     logger.logError('SIMスキャンエラー', error);
-
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: error.issues.map((e) => e.message).join(', ') },
-        { status: 400 }
-      );
-    }
 
     if (error instanceof ValidationError || error instanceof NotFoundError) {
       return NextResponse.json(
@@ -90,13 +91,20 @@ const shipSchema = z.object({
  */
 export async function completeShipping(
   request: NextRequest,
-  prisma: any
+  prisma: PrismaClient
 ): Promise<NextResponse> {
-  try {
-    // 1. パラメータ取得・バリデーション
-    const body = await request.json();
-    const validated = shipSchema.parse(body);
+  // 1. パラメータ取得・バリデーション
+  const body = await request.json();
+  const parseResult = shipSchema.safeParse(body);
+  if (!parseResult.success) {
+    return NextResponse.json(
+      { error: 'バリデーションエラー', details: parseResult.error.flatten() },
+      { status: 400 }
+    );
+  }
+  const validated = parseResult.data;
 
+  try {
     // 2. 入力データを構築
     const input: ShippingCompleteInput = {
       applicationId: validated.applicationId,
@@ -114,13 +122,6 @@ export async function completeShipping(
     });
   } catch (error) {
     logger.logError('発送処理エラー', error);
-
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: error.issues.map((e) => e.message).join(', ') },
-        { status: 400 }
-      );
-    }
 
     if (error instanceof ValidationError || error instanceof NotFoundError) {
       return NextResponse.json(
@@ -147,7 +148,7 @@ export async function completeShipping(
 export async function getShippingPending(
   serviceCode: string,
   request: NextRequest,
-  prisma: any
+  prisma: PrismaClient
 ): Promise<NextResponse> {
   try {
     const searchParams = request.nextUrl.searchParams;

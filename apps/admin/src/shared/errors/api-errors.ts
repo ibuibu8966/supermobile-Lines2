@@ -17,6 +17,7 @@ import {
   BusinessRuleError,
   DataIntegrityError,
 } from './custom-errors';
+import { logger } from '../utils/logger';
 
 export interface ApiError {
   error: string;
@@ -27,7 +28,7 @@ export interface ApiError {
  * 共通のエラーレスポンス関数
  */
 export function createErrorResponse(message: string, status: number = 500): NextResponse<ApiError> {
-  console.error(`[API Error] ${status}: ${message}`);
+  logger.error(`[API Error] ${status}: ${message}`);
   return NextResponse.json({ error: message }, { status });
 }
 
@@ -88,7 +89,7 @@ export function handlePrismaError(error: unknown): NextResponse<ApiError> | null
         return createValidationErrorResponse('無効なIDが指定されました');
 
       default:
-        console.error('[Prisma Error]', error.code, error.message);
+        logger.error('[Prisma Error]', { code: error.code, message: error.message });
         return createErrorResponse('データベースエラーが発生しました', 500);
     }
   }
@@ -155,12 +156,12 @@ export function handleApiError(error: unknown): NextResponse<ApiError> {
 
   // 標準エラー
   if (error instanceof Error) {
-    console.error('[Unhandled Error]', error.name, error.message, error.stack);
+    logger.error('[Unhandled Error]', { name: error.name, message: error.message, stack: error.stack });
     return createErrorResponse('サーバーエラーが発生しました', 500);
   }
 
   // 不明なエラー
-  console.error('[Unknown Error]', error);
+  logger.error('[Unknown Error]', { error });
   return createErrorResponse('予期しないエラーが発生しました', 500);
 }
 

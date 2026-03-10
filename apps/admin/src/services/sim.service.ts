@@ -6,7 +6,7 @@
  */
 
 import { SimRepository, SimFilters } from '../repositories/sim.repository';
-import { SimWithRelations, SimUpdateInput } from '@repo/entities';
+import { SimWithRelations, SimUpdateInput } from '@/entities';
 import { PaginationInfo, createPaginationInfo } from '../shared/utils/helpers';
 import { logger } from '../shared/utils/logger';
 import { NotFoundError, ValidationError } from '../shared/errors/custom-errors';
@@ -43,7 +43,7 @@ export class SimService {
   ): Promise<SimListResult> {
     logger.info('SIM一覧取得開始', { filters, pagination });
 
-    // 1. Repository経由でデータ取得
+    // Repository経由でデータ取得（ステータスフィルタもDB側で処理）
     const { sims, total } = await this.simRepo.findMany(
       filters,
       { skip: pagination.skip, take: pagination.pageSize }
@@ -51,10 +51,10 @@ export class SimService {
 
     logger.debug('Repository取得完了', { count: sims.length, total });
 
-    // 2. ビジネスロジック: 消費済みタグIDからタグ名を取得
+    // ビジネスロジック: 消費済みタグIDからタグ名を取得
     const simsWithTags = await this.enrichWithConsumedTags(sims);
 
-    // 3. ページネーション情報生成
+    // ページネーション情報生成
     const paginationInfo = createPaginationInfo(
       pagination.page,
       pagination.pageSize,

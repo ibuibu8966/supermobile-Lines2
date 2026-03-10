@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { prisma } from "@repo/database";
+import { prisma } from "@/lib/database";
 import { getTagList, createTag, type TagConfig } from "@/controllers/tag-crud.controller";
 
 export const dynamic = "force-dynamic";

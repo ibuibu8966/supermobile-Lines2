@@ -1,3 +1,4 @@
+import { PrismaClient } from '@prisma/client';
 /**
  * User Controller
  *
@@ -13,7 +14,7 @@ import { parseBooleanParam } from '../shared/validators/validation';
 import { logger } from '../shared/utils/logger';
 import { NotFoundError } from '../shared/errors/custom-errors';
 import { AdminSession } from '../lib/auth/admin-session';
-import { UserCreateInput, UserUpdateInput } from '@repo/entities';
+import { UserCreateInput, UserUpdateInput } from '@/entities';
 
 type GetAdminSession = () => Promise<AdminSession | NextResponse>;
 
@@ -27,7 +28,7 @@ type AssertServiceAccess = (
  */
 export async function getAllUsers(
   request: NextRequest,
-  prisma: any,
+  prisma: PrismaClient,
   getAdminSession: GetAdminSession
 ): Promise<NextResponse> {
   // 1. 認証チェック
@@ -65,7 +66,7 @@ const createUserSchema = z.object({
 
 export async function createUser(
   request: NextRequest,
-  prisma: any,
+  prisma: PrismaClient,
   getAdminSession: GetAdminSession,
   hashPassword: (password: string) => Promise<string>
 ): Promise<NextResponse> {
@@ -76,7 +77,14 @@ export async function createUser(
 
   // 2. バリデーション
   const body = await request.json();
-  const validated = createUserSchema.parse(body);
+  const parseResult = createUserSchema.safeParse(body);
+  if (!parseResult.success) {
+    return NextResponse.json(
+      { error: 'バリデーションエラー', details: parseResult.error.flatten() },
+      { status: 400 }
+    );
+  }
+  const validated = parseResult.data;
 
   // 3. パスワードハッシュ化
   const hashedPassword = await hashPassword(validated.password);
@@ -100,7 +108,7 @@ export async function createUser(
  */
 export async function getUserDetail(
   id: string,
-  prisma: any,
+  prisma: PrismaClient,
   getAdminSession: GetAdminSession,
   assertServiceAccess: AssertServiceAccess
 ): Promise<NextResponse> {
@@ -140,7 +148,7 @@ const updateUserSchema = z.object({
 export async function updateUser(
   id: string,
   request: NextRequest,
-  prisma: any,
+  prisma: PrismaClient,
   getAdminSession: GetAdminSession,
   assertServiceAccess: AssertServiceAccess
 ): Promise<NextResponse> {
@@ -162,7 +170,14 @@ export async function updateUser(
 
   // 3. バリデーション
   const body = await request.json();
-  const validated = updateUserSchema.parse(body);
+  const parseResult = updateUserSchema.safeParse(body);
+  if (!parseResult.success) {
+    return NextResponse.json(
+      { error: 'バリデーションエラー', details: parseResult.error.flatten() },
+      { status: 400 }
+    );
+  }
+  const validated = parseResult.data;
 
   // 4. Service呼び出し
   const updated = await userService.updateUser(id, validated as UserUpdateInput & { password?: string }, session);
@@ -176,7 +191,7 @@ export async function updateUser(
  */
 export async function deleteUser(
   id: string,
-  prisma: any,
+  prisma: PrismaClient,
   getAdminSession: GetAdminSession,
   assertServiceAccess: AssertServiceAccess
 ): Promise<NextResponse> {

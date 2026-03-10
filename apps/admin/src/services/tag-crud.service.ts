@@ -14,7 +14,7 @@ export interface TagEntity {
   code: string;
   name: string;
   isActive: boolean;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface TagCreateInput {
@@ -24,7 +24,7 @@ export interface TagCreateInput {
   description?: string | null;
   displayOrder?: number;
   isActive?: boolean;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface TagUpdateInput {
@@ -34,7 +34,7 @@ export interface TagUpdateInput {
   description?: string | null;
   displayOrder?: number;
   isActive?: boolean;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface TagConfig {
@@ -42,8 +42,8 @@ export interface TagConfig {
   displayName: string;
   usageTableName?: string;
   usageColumnName?: string;
-  includeFields?: any;
-  orderBy?: any;
+  includeFields?: Record<string, unknown>;
+  orderBy?: Record<string, unknown> | Record<string, unknown>[];
 }
 
 /**
@@ -58,7 +58,7 @@ export class TagCrudService {
   /**
    * タグ一覧を取得
    */
-  async getTagList(includeInactive: boolean = false): Promise<any[]> {
+  async getTagList(includeInactive: boolean = false): Promise<TagEntity[]> {
     logger.info(`${this.config.displayName}一覧取得`, { includeInactive });
 
     const where = includeInactive ? {} : { isActive: true };
@@ -78,7 +78,7 @@ export class TagCrudService {
    * タグを作成
    * ビジネスルール: コードの重複チェック
    */
-  async createTag(createData: TagCreateInput): Promise<any> {
+  async createTag(createData: TagCreateInput): Promise<TagEntity> {
     logger.info(`${this.config.displayName}作成開始`, { code: createData.code });
 
     // ビジネスルール: コードの重複チェック
@@ -112,7 +112,7 @@ export class TagCrudService {
   /**
    * タグ詳細を取得
    */
-  async getTagDetail(id: number): Promise<any> {
+  async getTagDetail(id: number): Promise<TagEntity> {
     logger.info(`${this.config.displayName}詳細取得`, { id });
 
     if (isNaN(id)) {
@@ -137,7 +137,7 @@ export class TagCrudService {
    * タグを更新
    * ビジネスルール: コードの重複チェック（自分以外）
    */
-  async updateTag(id: number, updateData: TagUpdateInput): Promise<any> {
+  async updateTag(id: number, updateData: TagUpdateInput): Promise<TagEntity> {
     logger.info(`${this.config.displayName}更新開始`, { id });
 
     if (isNaN(id)) {

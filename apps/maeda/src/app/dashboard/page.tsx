@@ -1,19 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  Button,
-} from "@repo/ui";
-import {
-  User,
   Phone,
-  Mail,
-  MapPin,
   Plus,
   ChevronRight,
   FileText,
@@ -30,7 +21,7 @@ export default function DashboardPage() {
   if (loading && !data) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
@@ -42,10 +33,10 @@ export default function DashboardPage() {
   if (!customer) {
     return (
       <div className="text-center py-12">
-        <h1 className="text-2xl font-bold text-gray-900 mb-4">
+        <h1 className="text-2xl font-bold text-foreground mb-4">
           顧客情報が見つかりません
         </h1>
-        <p className="text-gray-600 mb-6">
+        <p className="text-muted-foreground mb-6">
           申し込みを完了してからマイページをご利用ください。
         </p>
         <Link href="/apply">
@@ -85,7 +76,7 @@ export default function DashboardPage() {
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">
             {status}
           </span>
         );
@@ -94,51 +85,6 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">ダッシュボード</h1>
-        <p className="text-gray-600">
-          {customer.lastName} {customer.firstName} 様
-        </p>
-      </div>
-
-      {/* 会員情報カード */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <User className="h-5 w-5" />
-            会員情報
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2">
-          <div className="flex items-center gap-3">
-            <Mail className="h-4 w-4 text-gray-400" />
-            <div>
-              <p className="text-sm text-gray-500">メールアドレス</p>
-              <p className="font-medium">{customer.email}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <Phone className="h-4 w-4 text-gray-400" />
-            <div>
-              <p className="text-sm text-gray-500">電話番号</p>
-              <p className="font-medium">{customer.phone}</p>
-            </div>
-          </div>
-          <div className="flex items-start gap-3 md:col-span-2">
-            <MapPin className="h-4 w-4 text-gray-400 mt-0.5" />
-            <div>
-              <p className="text-sm text-gray-500">住所</p>
-              <p className="font-medium">
-                〒{customer.postalCode} {customer.prefecture}
-                {customer.city}
-                {customer.address}
-                {customer.building && ` ${customer.building}`}
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* 回線サマリー */}
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
@@ -147,7 +93,7 @@ export default function DashboardPage() {
               <p className="text-3xl font-bold text-green-600">
                 {lineStats.active}
               </p>
-              <p className="text-sm text-gray-500 mt-1">契約中の回線</p>
+              <p className="text-sm text-muted-foreground mt-1">契約中の回線</p>
             </div>
           </CardContent>
         </Card>
@@ -157,17 +103,17 @@ export default function DashboardPage() {
               <p className="text-3xl font-bold text-yellow-600">
                 {lineStats.pending}
               </p>
-              <p className="text-sm text-gray-500 mt-1">処理中の回線</p>
+              <p className="text-sm text-muted-foreground mt-1">申込中の回線</p>
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
             <div className="text-center">
-              <p className="text-3xl font-bold text-gray-400">
+              <p className="text-3xl font-bold text-muted-foreground">
                 {lineStats.cancelled}
               </p>
-              <p className="text-sm text-gray-500 mt-1">解約済みの回線</p>
+              <p className="text-sm text-muted-foreground mt-1">解約済みの回線</p>
             </div>
           </CardContent>
         </Card>
@@ -192,23 +138,23 @@ export default function DashboardPage() {
         </CardHeader>
         <CardContent>
           {recentApplications.length === 0 ? (
-            <p className="text-gray-500 text-center py-4">申込がありません</p>
+            <p className="text-muted-foreground text-center py-4">申込がありません</p>
           ) : (
             <div className="space-y-3">
               {recentApplications.map((app) => (
                 <div
                   key={app.id}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                  className="flex items-center justify-between p-3 bg-muted rounded-lg"
                 >
                   <div>
                     <p className="font-medium">{app.applicationNumber}</p>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-muted-foreground">
                       {app.plan.name} × {app.lineCount}回線
                     </p>
                   </div>
                   <div className="text-right">
                     {getStatusBadge(app.status)}
-                    <p className="text-xs text-gray-400 mt-1">
+                    <p className="text-xs text-muted-foreground mt-1">
                       {new Date(app.createdAt).toLocaleDateString("ja-JP")}
                     </p>
                   </div>
@@ -230,7 +176,7 @@ export default function DashboardPage() {
                 </div>
                 <div>
                   <p className="font-medium">追加申込</p>
-                  <p className="text-sm text-gray-500">新しい回線を申し込む</p>
+                  <p className="text-sm text-muted-foreground">新しい回線を申し込む</p>
                 </div>
               </div>
             </CardContent>
@@ -245,7 +191,7 @@ export default function DashboardPage() {
                 </div>
                 <div>
                   <p className="font-medium">契約回線一覧</p>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-muted-foreground">
                     契約中の回線を確認する
                   </p>
                 </div>

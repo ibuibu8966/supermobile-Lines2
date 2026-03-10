@@ -3,15 +3,25 @@
 import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, Card, CardContent, CardHeader, CardTitle, Badge, Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, Input, Checkbox, Label, Popover, PopoverContent, PopoverTrigger, Calendar } from "@repo/ui";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ChevronDown, ChevronRight, ChevronUp, Search, Loader2, AlertCircle, Edit, CalendarIcon, Filter } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryState } from "nuqs";
 import { queryKeys, STALE_TIMES } from "@/lib/api/query-keys";
 import { api } from "@/lib/api/client";
+import type { SimUpdateInput } from "@/entities";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";
-import { cn } from "@repo/ui";
+import { cn } from "@/components/ui/lib/utils";
+import { TableSkeleton } from "@/components/ui/table-skeleton";
 
 interface Contract {
   id: string;
@@ -41,6 +51,7 @@ interface Sim {
   simType: string;
   carrierType: string | null;
   status: string;
+  isAutoCancel: boolean;
   autoCancelDate: string | null;
   supplier: {
     id: string;
@@ -89,17 +100,11 @@ interface SimsResponse {
 const STATUS_LABELS: Record<string, string> = {
   IN_STOCK: "在庫",
   ACTIVE: "利用中",
-  RETURNING: "返却中",
-  RETIRED: "廃止",
-  CANCELLED: "解約済",
 };
 
 const STATUS_VARIANTS: Record<string, "default" | "success" | "destructive" | "secondary" | "outline"> = {
   IN_STOCK: "default",
   ACTIVE: "success",
-  RETURNING: "secondary",
-  RETIRED: "destructive",
-  CANCELLED: "destructive",
 };
 
 const CONTRACT_STATUS_LABELS: Record<string, string> = {
@@ -285,7 +290,28 @@ export function SimsClient() {
     setEditModalOpen(true);
   };
 
-  // 自動解約予定日を自動保存
+  // 自動解約フラグを切り替え
+  const handleAutoCancelToggle = async (iccid: string, checked: boolean) => {
+    try {
+      const res = await fetch(`/api/sims/${iccid}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isAutoCancel: checked }),
+      });
+
+      if (res.ok) {
+        toast.success(checked ? '自動解約をONにしました' : '自動解約をOFFにしました');
+        queryClient.invalidateQueries({ queryKey: queryKeys.sims(queryParams) });
+      } else {
+        const data = await res.json();
+        toast.error(data.error || '更新に失敗しました');
+      }
+    } catch {
+      toast.error('更新に失敗しました');
+    }
+  };
+
+  // 解約予定日を自動保存
   const handleAutoCancelDateChange = async (iccid: string, date: Date | undefined) => {
     try {
       // ローカルタイムゾーンでYYYY-MM-DD形式に変換
@@ -306,7 +332,7 @@ export function SimsClient() {
       });
 
       if (res.ok) {
-        toast.success('自動解約予定日を更新しました');
+        toast.success('解約予定日を更新しました');
         queryClient.invalidateQueries({ queryKey: queryKeys.sims(queryParams) });
         // ポップオーバーを閉じる
         setAutoCancelPopoverOpen(prev => ({ ...prev, [iccid]: false }));
@@ -314,8 +340,7 @@ export function SimsClient() {
         const data = await res.json();
         toast.error(data.error || '更新に失敗しました');
       }
-    } catch (err) {
-      console.error('更新エラー:', err);
+    } catch {
       toast.error('更新に失敗しました');
     }
   };
@@ -352,8 +377,7 @@ export function SimsClient() {
         const data = await res.json();
         toast.error(data.error || '更新に失敗しました');
       }
-    } catch (err) {
-      console.error('更新エラー:', err);
+    } catch {
       toast.error('更新に失敗しました');
     } finally {
       setSaving(false);
@@ -362,11 +386,7 @@ export function SimsClient() {
 
   // Tab state
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">SIM管理</h1>
-      </div>
-
+    <div className="p-6 h-full flex flex-col">
       {error && (
         <div className="bg-red-50 text-red-600 px-4 py-3 rounded-md text-sm flex items-center gap-2 mb-4">
           <AlertCircle className="h-4 w-4" />
@@ -374,7 +394,7 @@ export function SimsClient() {
         </div>
       )}
 
-          <Card>
+          <Card className="flex-1 min-h-0 flex flex-col">
             <CardHeader>
               <div className="flex justify-between items-center mb-4">
                 <CardTitle className="text-base flex items-center gap-2">
@@ -514,9 +534,6 @@ export function SimsClient() {
                     <option value="">選択なし</option>
                     <option value="IN_STOCK">在庫</option>
                     <option value="ACTIVE">利用中</option>
-                    <option value="RETURNING">返却中</option>
-                    <option value="RETIRED">廃止</option>
-                    <option value="CANCELLED">解約済</option>
                   </select>
 
                   <div className="h-8 w-px bg-gray-300" />
@@ -585,19 +602,17 @@ export function SimsClient() {
                 </div>
               )}
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex-1 min-h-0 p-0 overflow-auto">
               {sims.length === 0 && !isLoadingSims ? (
-                <div className="text-center py-12 text-gray-500">
+                <div className="text-center py-12 px-6 text-gray-500">
                   SIMが見つかりません
                 </div>
               ) : sims.length === 0 && isLoadingSims ? (
-                <div className="flex justify-center items-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-                </div>
+                <TableSkeleton rows={10} cols={8} />
               ) : (
-                <div className="overflow-x-auto">
+                <>
                   <table className="w-full text-sm">
-                    <thead>
+                    <thead className="sticky top-0 z-10 bg-white">
                       <tr className="border-b">
                         {bulkEditMode && <th className="text-left py-3 px-4 w-8"></th>}
                         <th className="text-left py-3 px-4 w-8"></th>
@@ -609,7 +624,7 @@ export function SimsClient() {
                         <th className="text-left py-3 px-4 whitespace-nowrap min-w-[140px]">利用可能な用途タグ</th>
                         <th className="text-left py-3 px-4 whitespace-nowrap min-w-[110px]">SIMの場所</th>
                         <th className="text-left py-3 px-4 whitespace-nowrap min-w-[90px]">ステータス</th>
-                        <th className="text-left py-3 px-4 whitespace-nowrap min-w-[110px]">自動解約予定日</th>
+                        <th className="text-left py-3 px-4 whitespace-nowrap min-w-[110px]">解約予定日</th>
                         <th className="text-left py-3 px-4 whitespace-nowrap min-w-[100px]">仕入れ先</th>
                       </tr>
                     </thead>
@@ -653,7 +668,7 @@ export function SimsClient() {
                             </td>
                             <td className="py-3 px-4 font-mono text-xs">
                               <div className="flex items-center gap-2">
-                                <Link href={`/sims/${sim.iccid}`} className="hover:underline text-blue-600">
+                                <Link href={`/sims/${sim.iccid}`} prefetch={false} className="hover:underline text-blue-600">
                                   {sim.iccid}
                                 </Link>
                                 {hasArchivedApplication(sim) && (
@@ -742,17 +757,22 @@ export function SimsClient() {
                               </Badge>
                             </td>
                             <td className="py-3 px-4">
-                              <Popover
-                                open={autoCancelPopoverOpen[sim.iccid] || false}
-                                onOpenChange={(open) => setAutoCancelPopoverOpen(prev => ({ ...prev, [sim.iccid]: open }))}
-                              >
-                                <PopoverTrigger asChild>
-                                  <button className="hover:underline text-left text-sm">
-                                    {sim.autoCancelDate
-                                      ? new Date(sim.autoCancelDate).toLocaleDateString("ja-JP")
-                                      : "—"}
-                                  </button>
-                                </PopoverTrigger>
+                              <div className="flex items-center gap-2">
+                                <Checkbox
+                                  checked={sim.isAutoCancel}
+                                  onCheckedChange={(checked) => handleAutoCancelToggle(sim.iccid, !!checked)}
+                                />
+                                <Popover
+                                  open={autoCancelPopoverOpen[sim.iccid] || false}
+                                  onOpenChange={(open) => setAutoCancelPopoverOpen(prev => ({ ...prev, [sim.iccid]: open }))}
+                                >
+                                  <PopoverTrigger asChild>
+                                    <button className="hover:underline text-left text-sm">
+                                      {sim.autoCancelDate
+                                        ? new Date(sim.autoCancelDate).toLocaleDateString("ja-JP")
+                                        : "—"}
+                                    </button>
+                                  </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0" align="start">
                                   <Calendar
                                     mode="single"
@@ -774,6 +794,7 @@ export function SimsClient() {
                                   )}
                                 </PopoverContent>
                               </Popover>
+                              </div>
                             </td>
                             <td className="py-3 px-4">{sim.supplier.name}</td>
                           </tr>
@@ -816,11 +837,11 @@ export function SimsClient() {
                       ))}
                     </tbody>
                   </table>
-                </div>
+                </>
               )}
 
               {pagination && pagination.totalPages > 1 && (
-                <div className="mt-4 flex justify-between items-center text-sm text-gray-500">
+                <div className="px-6 py-4 border-t flex justify-between items-center text-sm text-gray-500">
                   <span>
                     {pagination.totalCount}件中{" "}
                     {(pagination.currentPage - 1) * pagination.limit + 1}-
@@ -965,7 +986,7 @@ export function SimsClient() {
                   // 各SIMを個別に更新
                   await Promise.all(
                     iccids.map(async (iccid) => {
-                      const updateData: any = {};
+                      const updateData: Partial<SimUpdateInput & { eligibleTagIds: number[]; autoCancelDate: string }> = {};
 
                       // タグが選択されている場合のみ更新
                       if (bulkSelectedTagIds.length > 0) {
@@ -999,8 +1020,7 @@ export function SimsClient() {
                   setSelectedSimIds(new Set());
                   setBulkEditMode(false);
                   queryClient.invalidateQueries({ queryKey: queryKeys.sims(queryParams) });
-                } catch (err) {
-                  console.error('一括更新エラー:', err);
+                } catch {
                   toast.error('一括更新に失敗しました');
                 } finally {
                   setSaving(false);

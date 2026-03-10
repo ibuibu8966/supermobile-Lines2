@@ -1,9 +1,4 @@
-import { auth } from "./auth";
-import { NextResponse } from "next/server";
-
-export default auth(() => {
-  return NextResponse.next();
-});
+export { auth as default } from "./auth";
 
 export const config = {
   matcher: [

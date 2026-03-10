@@ -4,10 +4,11 @@
  * 発送・配送に関するビジネスロジックを担当
  */
 
-import { ShippingScanInput, ShippingScanResult, ShippingCompleteInput, ShippingCompleteResult, ShippingPendingResult, ShippingPendingApplication } from '@repo/entities';
+import { ShippingScanInput, ShippingScanResult, ShippingCompleteInput, ShippingCompleteResult, ShippingPendingResult, ShippingPendingApplication } from '@/entities';
 import { ValidationError, NotFoundError } from '../shared/errors/custom-errors';
 import { logger } from '../shared/utils/logger';
 import type { PrismaClient } from '@prisma/client';
+import { computeSimStatus } from '../repositories/sim.repository';
 
 export class ShippingService {
   constructor(private readonly prisma: PrismaClient) {}
@@ -61,21 +62,22 @@ export class ShippingService {
     // 4. SIMの存在確認
     const sim = await this.prisma.sim.findUnique({
       where: { iccid: input.iccid },
+      include: {
+        applicationLines: {
+          select: { status: true, updatedAt: true },
+        },
+      },
     });
 
     if (!sim) {
       throw new NotFoundError('このICCIDのSIMは登録されていません');
     }
 
-    // 5. SIMステータスチェック
-    if (sim.status !== 'IN_STOCK') {
-      const statusLabels: Record<string, string> = {
-        ACTIVE: '利用中',
-        RETURNING: '返却中',
-        RETIRED: '廃止済み',
-      };
+    // 5. SIMステータスチェック（ApplicationLineから導出）
+    const simStatus = computeSimStatus(sim.applicationLines || []);
+    if (simStatus !== 'IN_STOCK') {
       throw new ValidationError(
-        `このSIMは${statusLabels[sim.status] || sim.status}のため割り当てできません`
+        `このSIMは利用中のため割り当てできません`
       );
     }
 
@@ -188,62 +190,72 @@ export class ShippingService {
 
     // トランザクションで発送処理を実行
     const result = await this.prisma.$transaction(async (tx) => {
-      const contracts = [];
       const now = new Date();
 
-      for (const line of application.lines) {
-        if (!line.sim) continue;
+      // 対象回線（SIM割当済みのみ）
+      const assignedLines = application.lines.filter((line) => line.sim);
 
-        // 1. Contract作成
-        const contract = await tx.contract.create({
-          data: {
-            iccid: line.sim.iccid,
-            serviceName: application.service.name,
-            customerId: application.customer.id,
-            contractStart: now,
-            status: 'SHIPPED',
-            shippedAt: now,
-          },
-        });
-
-        // 2. ContractUsageTag作成（用途タグを紐付け）
-        for (const tagId of usageTagIds) {
-          await tx.contractUsageTag.create({
+      // Step1: Contract を並列作成
+      const contractResults = await Promise.all(
+        assignedLines.map(async (line) => {
+          const contract = await tx.contract.create({
             data: {
+              iccid: line.sim!.iccid,
+              serviceName: application.service.name,
+              customerId: application.customer.id,
+              contractStart: now,
+              status: 'SHIPPED',
+              shippedAt: now,
+            },
+          });
+          const currentConsumedTagIds = (line.sim!.consumedTagIds as number[]) || [];
+          return {
+            contract,
+            lineId: line.id,
+            iccid: line.sim!.iccid,
+            newConsumedTagIds: [...new Set([...currentConsumedTagIds, ...usageTagIds])],
+          };
+        })
+      );
+
+      // Step2: ContractUsageTag を createMany で一括挿入
+      if (usageTagIds.length > 0 && contractResults.length > 0) {
+        await tx.contractUsageTag.createMany({
+          data: contractResults.flatMap(({ contract }) =>
+            usageTagIds.map((tagId) => ({
               contractId: contract.id,
               usageTagId: tagId,
               appliedAt: now,
-            },
-          });
-        }
-
-        // 3. ApplicationLine更新
-        await tx.applicationLine.update({
-          where: { id: line.id },
-          data: {
-            contractId: contract.id,
-            status: 'SHIPPED',
-            shippedAt: now,
-          },
+            }))
+          ),
         });
-
-        // 4. SIM更新
-        const currentConsumedTagIds = (line.sim.consumedTagIds as number[]) || [];
-        const newConsumedTagIds = [
-          ...new Set([...currentConsumedTagIds, ...usageTagIds]),
-        ];
-
-        await tx.sim.update({
-          where: { iccid: line.sim.iccid },
-          data: {
-            status: 'ACTIVE',
-            currentContractId: contract.id,
-            consumedTagIds: newConsumedTagIds,
-          },
-        });
-
-        contracts.push(contract);
       }
+
+      // Step3: ApplicationLine + SIM を並列更新
+      await Promise.all([
+        ...contractResults.map(({ lineId, contract }) =>
+          tx.applicationLine.update({
+            where: { id: lineId },
+            data: {
+              contractId: contract.id,
+              status: 'SHIPPED',
+              shippedAt: now,
+            },
+          })
+        ),
+        ...contractResults.map(({ iccid, contract, newConsumedTagIds }) =>
+          tx.sim.update({
+            where: { iccid },
+            data: {
+              // status はApplicationLineから導出するため更新不要
+              currentContractId: contract.id,
+              consumedTagIds: newConsumedTagIds,
+            },
+          })
+        ),
+      ]);
+
+      const contracts = contractResults.map((r) => r.contract);
 
       // 5. Application更新
       // 全回線発送済みならSHIPPING、一部ならそのまま
@@ -327,7 +339,13 @@ export class ShippingService {
           },
           lines: {
             include: {
-              sim: true,
+              sim: {
+                include: {
+                  applicationLines: {
+                    select: { status: true, updatedAt: true },
+                  },
+                },
+              },
             },
             orderBy: { lineNumber: 'asc' },
           },
@@ -387,7 +405,7 @@ export class ShippingService {
                 iccid: line.sim.iccid,
                 msisdn: line.sim.msisdn,
                 carrierType: line.sim.carrierType,
-                status: line.sim.status,
+                status: computeSimStatus(line.sim.applicationLines || []),
               }
             : null,
         })),

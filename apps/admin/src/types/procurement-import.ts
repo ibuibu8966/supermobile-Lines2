@@ -4,7 +4,7 @@ export type FieldMapping =
   | "simType"
   | "carrierType"
   | "plan"
-  | "supplierContractEnd"
+  | "autoCancelDate"
   | "usageTag"
   | "none";
 
@@ -18,7 +18,6 @@ export interface MappedSimData {
   simType?: "INDIVIDUAL" | "CORPORATE" | "BOTH";
   carrierType?: "DOCOMO" | "AU" | "SOFTBANK" | "RAKUTEN";
   plan?: string;
-  supplierContractEnd?: string; // ISO date string
   isAutoCancel?: boolean;
   autoCancelDate?: string; // ISO date string
   eligibleTagIds?: number[];
@@ -42,7 +41,7 @@ export interface ManualSettings {
   simType?: "INDIVIDUAL" | "CORPORATE" | "BOTH";
   carrierType?: "DOCOMO" | "AU" | "SOFTBANK" | "RAKUTEN";
   plan?: string;
-  supplierContractEnd?: string; // ISO date string
   isAutoCancel?: boolean;
+  autoCancelDate?: string; // ISO date string
   eligibleTagIds?: number[];
 }

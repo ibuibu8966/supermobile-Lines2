@@ -1,19 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  Button,
-} from "@repo/ui";
-import {
-  User,
   Phone,
-  Mail,
-  MapPin,
   Plus,
   ChevronRight,
   FileText,
@@ -94,51 +85,6 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">ダッシュボード</h1>
-        <p className="text-muted-foreground">
-          {customer.lastName} {customer.firstName} 様
-        </p>
-      </div>
-
-      {/* 会員情報カード */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <User className="h-5 w-5" />
-            会員情報
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2">
-          <div className="flex items-center gap-3">
-            <Mail className="h-4 w-4 text-muted-foreground" />
-            <div>
-              <p className="text-sm text-muted-foreground">メールアドレス</p>
-              <p className="font-medium">{customer.email}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <Phone className="h-4 w-4 text-muted-foreground" />
-            <div>
-              <p className="text-sm text-muted-foreground">電話番号</p>
-              <p className="font-medium">{customer.phone}</p>
-            </div>
-          </div>
-          <div className="flex items-start gap-3 md:col-span-2">
-            <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
-            <div>
-              <p className="text-sm text-muted-foreground">住所</p>
-              <p className="font-medium">
-                〒{customer.postalCode} {customer.prefecture}
-                {customer.city}
-                {customer.address}
-                {customer.building && ` ${customer.building}`}
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* 回線サマリー */}
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
@@ -157,7 +103,7 @@ export default function DashboardPage() {
               <p className="text-3xl font-bold text-yellow-600">
                 {lineStats.pending}
               </p>
-              <p className="text-sm text-muted-foreground mt-1">処理中の回線</p>
+              <p className="text-sm text-muted-foreground mt-1">申込中の回線</p>
             </div>
           </CardContent>
         </Card>

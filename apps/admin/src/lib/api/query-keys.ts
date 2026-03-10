@@ -4,8 +4,8 @@ export const STALE_TIMES = {
   STATS: 60_000,
   /** SIM履歴など、30秒間はキャッシュをfreshに保つ */
   SHORT: 30_000,
-  /** 申込・回線・SIM一覧など、フィルタ変更時のみ再フェッチ */
-  LIST: 0,
+  /** 申込・回線・SIM一覧など、30秒間はHydrationBoundaryのデータをfreshとして使う */
+  LIST: 30_000,
   /** services/plans/tags などマスターデータはセッション中に変わらない */
   MASTER: Infinity,
 } as const;
@@ -27,7 +27,10 @@ export const queryKeys = {
   applications: (filters?: Record<string, string>) => ["applications", filters] as const,
   lines: (filters?: Record<string, string>) => ["lines", filters] as const,
   linesWithTags: (filters?: Record<string, string>) => ["linesWithTags", filters] as const,
+  profitLoss: (year: number, month: number) => ["profit-loss", year, month] as const,
   procurement: ["procurement"] as const,
   procurementSims: (purchaseOrderId: string) => ["procurement-sims", purchaseOrderId] as const,
   applicationKyc: (applicationId: string) => ["application-kyc", applicationId] as const,
+  inStockIccids: ["inStockIccids"] as const,
+  applicationDetail: (id: string) => ["application", id] as const,
 };

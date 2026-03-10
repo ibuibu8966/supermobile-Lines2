@@ -5,7 +5,8 @@
  * Prismaとの直接的なやり取りを担当
  */
 
-import { UserWithRelations, UserCreateInput } from '@repo/entities';
+import { PrismaClient, Prisma, $Enums } from '@prisma/client';
+import { UserWithRelations, UserCreateInput } from '@/entities';
 import { logger } from '../shared/utils/logger';
 
 export interface UserFilters {
@@ -16,7 +17,7 @@ export interface UserFilters {
 }
 
 export class UserRepository {
-  constructor(private prisma: any) {}
+  constructor(private prisma: PrismaClient) {}
 
   /**
    * ユーザー一覧を取得（フィルタリング対応）
@@ -29,7 +30,18 @@ export class UserRepository {
     const users = await this.prisma.user.findMany({
       where,
       include: {
-        service: true,
+        service: {
+          select: { id: true, code: true, name: true },
+        },
+        customers: {
+          select: {
+            type: true,
+            lastName: true,
+            firstName: true,
+            companyName: true,
+          },
+          take: 1,
+        },
         _count: {
           select: {
             customers: true,
@@ -40,7 +52,7 @@ export class UserRepository {
     });
 
     // パスワードを除外
-    return users.map(({ password, ...rest }: any) => rest);
+    return users.map(({ password, ...rest }) => rest) as unknown as UserWithRelations[];
   }
 
   /**
@@ -60,7 +72,7 @@ export class UserRepository {
 
     // パスワードを除外
     const { password, ...sanitizedUser } = user;
-    return sanitizedUser;
+    return sanitizedUser as unknown as UserWithRelations;
   }
 
   /**
@@ -80,16 +92,16 @@ export class UserRepository {
 
     // パスワードを除外
     const { password, ...sanitizedUser } = user;
-    return sanitizedUser;
+    return sanitizedUser as unknown as UserWithRelations;
   }
 
   /**
    * IDからユーザーを取得（詳細版：customers含む）
    */
-  async findByIdWithDetails(id: string): Promise<any> {
+  async findByIdWithDetails(id: string): Promise<UserWithRelations | null> {
     logger.debug('UserRepository.findByIdWithDetails', { id });
 
-    return await this.prisma.user.findUnique({
+    const user = await this.prisma.user.findUnique({
       where: { id },
       include: {
         service: true,
@@ -104,6 +116,7 @@ export class UserRepository {
         },
       },
     });
+    return user as unknown as UserWithRelations | null;
   }
 
   /**
@@ -117,7 +130,7 @@ export class UserRepository {
         email: data.email,
         name: data.name || null,
         password: data.password,
-        role: data.role,
+        role: data.role as $Enums.UserRole,
         serviceId: data.serviceId || null,
         isActive: data.isActive ?? true,
       },
@@ -128,7 +141,7 @@ export class UserRepository {
 
     // パスワードを除外
     const { password, ...sanitizedUser } = user;
-    return sanitizedUser;
+    return sanitizedUser as unknown as UserWithRelations;
   }
 
   /**
@@ -154,16 +167,17 @@ export class UserRepository {
   /**
    * ユーザーを更新
    */
-  async update(id: string, data: any): Promise<any> {
+  async update(id: string, data: Prisma.UserUpdateInput): Promise<UserWithRelations> {
     logger.debug('UserRepository.update', { id, data });
 
-    return await this.prisma.user.update({
+    const user = await this.prisma.user.update({
       where: { id },
       data,
       include: {
         service: true,
       },
     });
+    return user as unknown as UserWithRelations;
   }
 
   /**
@@ -192,8 +206,8 @@ export class UserRepository {
   /**
    * フィルタ条件からWhere句を構築
    */
-  private buildWhereClause(filters: UserFilters): any {
-    const where: any = {};
+  private buildWhereClause(filters: UserFilters): Prisma.UserWhereInput {
+    const where: Prisma.UserWhereInput = {};
 
     // isActive filter
     if (!filters.includeInactive) {
@@ -203,11 +217,11 @@ export class UserRepository {
     // スコープ制限（ADMINは自分のサービスのCUSTOMERのみ）
     if (filters.scopedServiceId) {
       where.serviceId = filters.scopedServiceId;
-      where.role = 'CUSTOMER';
+      where.role = 'CUSTOMER' as $Enums.UserRole;
     } else {
       // Role filter
       if (filters.role) {
-        where.role = filters.role;
+        where.role = filters.role as $Enums.UserRole;
       }
 
       // Service filter

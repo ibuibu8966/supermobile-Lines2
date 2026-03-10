@@ -1,11 +1,15 @@
 import { NextRequest } from "next/server";
-import { prisma, uploadFile } from "@repo/database";
-import { hashPassword } from "@repo/auth";
-import { createCustomerApplication, withErrorHandling } from "@repo/shared";
+import { prisma } from "@/lib/database";
+import { uploadFile as _uploadFile } from "@/lib/supabase";
+import { hashPassword } from "@/lib/auth/config";
+import { createCustomerApplication, withErrorHandling } from "@/lib";
 
 export const dynamic = "force-dynamic";
 
-// 申込作成
+const uploadFile = async (bucket: string, path: string, buffer: Buffer, contentType: string): Promise<void> => {
+  await _uploadFile(bucket, path, buffer, contentType);
+};
+
 export const POST = withErrorHandling(async (request: NextRequest) => {
   return await createCustomerApplication(
     'avaris',

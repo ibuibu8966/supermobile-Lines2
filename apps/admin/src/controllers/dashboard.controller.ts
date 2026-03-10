@@ -1,3 +1,4 @@
+import { PrismaClient } from '@prisma/client';
 /**
  * Dashboard Controller
  *
@@ -18,7 +19,7 @@ import { logger } from '../shared/utils/logger';
  */
 export async function getDashboard(
   serviceCode: string,
-  prisma: any
+  prisma: PrismaClient
 ): Promise<NextResponse> {
   try {
     // Service呼び出し

@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { prisma } from "@repo/database";
+import { prisma } from "@/lib/database";
 import { updateKycImage } from "@/controllers/kyc-image.controller";
 
 export const dynamic = "force-dynamic";

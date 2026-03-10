@@ -8,10 +8,19 @@ import {
   useCallback,
   ReactNode,
 } from "react";
+import { useRouter } from "next/navigation";
+
+interface KycImage {
+  id: string;
+  type: string;
+  status: string;
+  expiryDate: string | null;
+  reviewedAt: string | null;
+  reviewNote: string | null;
+}
 
 interface Customer {
   id: string;
-  userId: string | null;
   type: string;
   email: string;
   phone: string;
@@ -26,6 +35,18 @@ interface Customer {
   address: string;
   building: string | null;
   companyName: string | null;
+  companyNameKana: string | null;
+  establishedDate: string | null;
+  companyPostalCode: string | null;
+  companyPrefecture: string | null;
+  companyCity: string | null;
+  companyAddress: string | null;
+  companyBuilding: string | null;
+  representativeLastName: string | null;
+  representativeFirstName: string | null;
+  representativeLastNameKana: string | null;
+  representativeFirstNameKana: string | null;
+  kycImages: KycImage[];
 }
 
 interface ApplicationLine {
@@ -78,6 +99,7 @@ const DashboardContext = createContext<DashboardContextType>({
 export function DashboardProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   const fetchData = useCallback(async () => {
     try {
@@ -94,6 +116,10 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       }
 
       const res = await fetch("/api/customer/dashboard");
+      if (res.status === 401) {
+        router.replace("/login");
+        return;
+      }
       if (res.ok) {
         const freshData = await res.json();
         setData(freshData);
@@ -103,7 +129,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     fetchData();

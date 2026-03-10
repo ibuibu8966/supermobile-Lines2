@@ -1,19 +1,8 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "@repo/ui";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { AlertCircle } from "lucide-react";
 import type { RawDataRow } from "@/lib/procurement/generic-parser";
 import type { ColumnMapping, FieldMapping } from "@/types/procurement-import";
@@ -32,7 +21,7 @@ const FIELD_LABELS: Record<FieldMapping, string> = {
   simType: "SIMタイプ",
   carrierType: "キャリア",
   plan: "プラン名",
-  supplierContractEnd: "解約日",
+  autoCancelDate: "解約予定日",
   usageTag: "用途タグ",
 };
 
@@ -73,9 +62,10 @@ export function ColumnMapper({
       } else if (
         lowerHeader.includes("解約") ||
         lowerHeader.includes("終了") ||
-        lowerHeader.includes("end")
+        lowerHeader.includes("end") ||
+        (lowerHeader.includes("auto") && lowerHeader.includes("cancel"))
       ) {
-        initial[header] = "supplierContractEnd";
+        initial[header] = "autoCancelDate";
       } else if (
         lowerHeader.includes("用途") ||
         lowerHeader.includes("タグ") ||

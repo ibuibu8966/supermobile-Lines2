@@ -1,26 +1,35 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { queryKeys, STALE_TIMES } from "@/lib/api/query-keys";
-import type { PurchaseOrder } from "@/types/procurement";
+import type { PurchaseOrder, PurchaseOrderType, SimplePaymentStatus } from "@/types/procurement";
 
 /**
  * Procurement管理用カスタムフック
  * 発注データの取得と更新を管理
  */
-export function useProcurement() {
+export function useProcurement(typeFilter?: PurchaseOrderType) {
   const queryClient = useQueryClient();
+
+  const queryKey = typeFilter
+    ? [...queryKeys.procurement, typeFilter]
+    : queryKeys.procurement;
 
   // 発注データの取得
   const { data: orders, isLoading, error } = useQuery<PurchaseOrder[]>({
-    queryKey: queryKeys.procurement,
-    queryFn: () => fetch("/api/procurement").then((r) => r.json()),
-    staleTime: STALE_TIMES.MASTER, // 楽観的更新後の不要な再フェッチを防止
-    refetchInterval: 60000, // 60秒ごとに自動再フェッチ（他ユーザーの更新を取得）
-    refetchOnWindowFocus: false, // 楽観的更新後の即座な再フェッチを防止（UIフリッカー対策）
+    queryKey,
+    queryFn: () => {
+      const url = typeFilter
+        ? `/api/procurement?type=${typeFilter}`
+        : "/api/procurement";
+      return fetch(url).then((r) => r.json());
+    },
+    staleTime: STALE_TIMES.MASTER,
+    refetchInterval: 60000,
+    refetchOnWindowFocus: false,
   });
 
   // 発注データの更新
   const updateMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+    mutationFn: async ({ id, data }: { id: string; data: Record<string, unknown> }) => {
       const res = await fetch(`/api/procurement/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -30,18 +39,33 @@ export function useProcurement() {
       return res.json();
     },
     onMutate: async ({ id, data }) => {
-      // 進行中のクエリをキャンセル
-      await queryClient.cancelQueries({ queryKey: queryKeys.procurement });
+      await queryClient.cancelQueries({ queryKey });
+      const previousOrders = queryClient.getQueryData<PurchaseOrder[]>(queryKey);
 
-      // 以前の値をスナップショット
-      const previousOrders = queryClient.getQueryData<PurchaseOrder[]>(queryKeys.procurement);
-
-      // 楽観的更新
-      queryClient.setQueryData<PurchaseOrder[]>(queryKeys.procurement, (old) => {
+      queryClient.setQueryData<PurchaseOrder[]>(queryKey, (old) => {
         if (!old) return old;
         return old.map((order) => {
           if (order.id === id) {
-            return { ...order, ...data };
+            const update: Partial<PurchaseOrder> = {};
+            if (data.status !== undefined) update.status = data.status as string;
+            if (data.paymentStatus !== undefined) update.paymentStatus = data.paymentStatus as SimplePaymentStatus | null;
+            if (data.totalAmount !== undefined) update.totalAmount = data.totalAmount as number;
+            if (data.invoiceDate !== undefined) {
+              update.invoiceDate = data.invoiceDate instanceof Date
+                ? data.invoiceDate.toISOString()
+                : (data.invoiceDate as string | null);
+            }
+            if (data.deliveryDate !== undefined) {
+              update.deliveryDate = data.deliveryDate instanceof Date
+                ? data.deliveryDate.toISOString()
+                : (data.deliveryDate as string | null);
+            }
+            if (data.paymentDueDate !== undefined) {
+              update.paymentDueDate = data.paymentDueDate instanceof Date
+                ? data.paymentDueDate.toISOString()
+                : (data.paymentDueDate as string | null);
+            }
+            return { ...order, ...update };
           }
           return order;
         });
@@ -51,7 +75,7 @@ export function useProcurement() {
     },
     onSuccess: (updatedOrder, { id }) => {
       // APIレスポンスで該当データのみ更新（再フェッチ不要）
-      queryClient.setQueryData<PurchaseOrder[]>(queryKeys.procurement, (old) => {
+      queryClient.setQueryData<PurchaseOrder[]>(queryKey, (old) => {
         if (!old) return old;
         return old.map((order) =>
           order.id === id ? updatedOrder : order
@@ -61,7 +85,7 @@ export function useProcurement() {
     onError: (err, variables, context) => {
       // エラー時はロールバック
       if (context?.previousOrders) {
-        queryClient.setQueryData(queryKeys.procurement, context.previousOrders);
+        queryClient.setQueryData(queryKey, context.previousOrders);
       }
     },
   });
@@ -89,13 +113,10 @@ export function useProcurement() {
       return res.json();
     },
     onMutate: async ({ id, imageType, file }) => {
-      // 進行中のクエリをキャンセル
-      await queryClient.cancelQueries({ queryKey: queryKeys.procurement });
+      await queryClient.cancelQueries({ queryKey });
 
-      // 以前の値をスナップショット
-      const previousOrders = queryClient.getQueryData<PurchaseOrder[]>(queryKeys.procurement);
+      const previousOrders = queryClient.getQueryData<PurchaseOrder[]>(queryKey);
 
-      // 画像タイプに応じたフィールド名
       const fieldMap = {
         purchaseOrder: "purchaseOrderImagePath",
         quote: "quoteImagePath",
@@ -104,11 +125,9 @@ export function useProcurement() {
 
       const fieldName = fieldMap[imageType as keyof typeof fieldMap];
 
-      // ローカルプレビュー用のURLを作成
       const previewUrl = URL.createObjectURL(file);
 
-      // 楽観的更新（該当フィールドのみ更新）
-      queryClient.setQueryData<PurchaseOrder[]>(queryKeys.procurement, (old) => {
+      queryClient.setQueryData<PurchaseOrder[]>(queryKey, (old) => {
         if (!old) return old;
         return old.map((order) => {
           if (order.id === id) {
@@ -120,30 +139,21 @@ export function useProcurement() {
 
       return { previousOrders, previewUrl };
     },
-    onSuccess: (updatedOrder, { id, imageType }) => {
-      // 成功時は該当の発注データのみ更新（全体の再フェッチを避ける）
-      queryClient.setQueryData<PurchaseOrder[]>(queryKeys.procurement, (old) => {
+    onSuccess: (updatedOrder, { id }) => {
+      queryClient.setQueryData<PurchaseOrder[]>(queryKey, (old) => {
         if (!old) return old;
-        return old.map((order) => {
-          if (order.id === id) {
-            return updatedOrder;
-          }
-          return order;
-        });
+        return old.map((order) => (order.id === id ? updatedOrder : order));
       });
     },
     onError: (err, variables, context) => {
-      // エラー時はロールバック
       if (context?.previousOrders) {
-        queryClient.setQueryData(queryKeys.procurement, context.previousOrders);
+        queryClient.setQueryData(queryKey, context.previousOrders);
       }
-      // プレビューURLをクリーンアップ
       if (context?.previewUrl) {
         URL.revokeObjectURL(context.previewUrl);
       }
     },
     onSettled: (data, error, variables, context) => {
-      // プレビューURLをクリーンアップ
       if (context?.previewUrl) {
         URL.revokeObjectURL(context.previewUrl);
       }
@@ -155,31 +165,23 @@ export function useProcurement() {
     mutationFn: async ({ id, imageType }: { id: string; imageType: string }) => {
       const res = await fetch(
         `/api/procurement/${id}/upload-image?imageType=${imageType}`,
-        {
-          method: "DELETE",
-        }
+        { method: "DELETE" }
       );
       if (!res.ok) throw new Error("Failed to delete image");
       return res.json();
     },
     onMutate: async ({ id, imageType }) => {
-      // 進行中のクエリをキャンセル
-      await queryClient.cancelQueries({ queryKey: queryKeys.procurement });
+      await queryClient.cancelQueries({ queryKey });
+      const previousOrders = queryClient.getQueryData<PurchaseOrder[]>(queryKey);
 
-      // 以前の値をスナップショット
-      const previousOrders = queryClient.getQueryData<PurchaseOrder[]>(queryKeys.procurement);
-
-      // 画像タイプに応じたフィールド名
       const fieldMap = {
         purchaseOrder: "purchaseOrderImagePath",
         quote: "quoteImagePath",
         invoice: "invoiceImagePath",
       } as const;
-
       const fieldName = fieldMap[imageType as keyof typeof fieldMap];
 
-      // 楽観的更新（該当フィールドをnullに）
-      queryClient.setQueryData<PurchaseOrder[]>(queryKeys.procurement, (old) => {
+      queryClient.setQueryData<PurchaseOrder[]>(queryKey, (old) => {
         if (!old) return old;
         return old.map((order) => {
           if (order.id === id) {
@@ -192,21 +194,15 @@ export function useProcurement() {
       return { previousOrders };
     },
     onSuccess: (updatedOrder, { id }) => {
-      // 成功時は該当の発注データのみ更新（全体の再フェッチを避ける）
-      queryClient.setQueryData<PurchaseOrder[]>(queryKeys.procurement, (old) => {
+      queryClient.setQueryData<PurchaseOrder[]>(queryKey, (old) => {
         if (!old) return old;
-        return old.map((order) => {
-          if (order.id === id) {
-            return updatedOrder;
-          }
-          return order;
-        });
+        return old.map((order) => (order.id === id ? updatedOrder : order));
       });
     },
     onError: (err, variables, context) => {
       // エラー時はロールバック
       if (context?.previousOrders) {
-        queryClient.setQueryData(queryKeys.procurement, context.previousOrders);
+        queryClient.setQueryData(queryKey, context.previousOrders);
       }
     },
   });
