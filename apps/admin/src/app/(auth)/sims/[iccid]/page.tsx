@@ -15,8 +15,8 @@ export default async function SimDetailPage({
     await Promise.all([
       queryClient.prefetchQuery({
         queryKey: ["sim", iccid],
-        queryFn: () =>
-          prisma.sim.findUnique({
+        queryFn: async () => {
+          const data = await prisma.sim.findUnique({
             where: { iccid },
             include: {
               supplier: { select: { id: true, name: true } },
@@ -39,17 +39,21 @@ export default async function SimDetailPage({
                 orderBy: { createdAt: "desc" },
               },
             },
-          }),
+          });
+          return JSON.parse(JSON.stringify(data));
+        },
         staleTime: STALE_TIMES.SHORT,
       }),
       queryClient.prefetchQuery({
         queryKey: queryKeys.usageTags,
-        queryFn: () =>
-          prisma.usageTag.findMany({
+        queryFn: async () => {
+          const data = await prisma.usageTag.findMany({
             where: { isActive: true },
             select: { id: true, code: true, name: true, category: true },
             orderBy: [{ displayOrder: "asc" }, { name: "asc" }],
-          }),
+          });
+          return JSON.parse(JSON.stringify(data));
+        },
         staleTime: STALE_TIMES.MASTER,
       }),
     ]);

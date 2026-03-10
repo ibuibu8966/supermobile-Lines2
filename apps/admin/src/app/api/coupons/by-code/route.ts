@@ -19,7 +19,16 @@ export async function GET(request: NextRequest) {
 
   const coupon = await prisma.coupon.findFirst({
     where: { code: code.trim().toUpperCase(), isActive: true },
-    select: { id: true, code: true, unitPrice: true, description: true },
+    select: {
+      id: true,
+      code: true,
+      unitPrice: true,
+      description: true,
+      pricings: {
+        select: { id: true, minQuantity: true, maxQuantity: true, unitPrice: true },
+        orderBy: { minQuantity: "asc" as const },
+      },
+    },
   });
 
   if (!coupon) {

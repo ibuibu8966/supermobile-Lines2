@@ -15,8 +15,8 @@ export default async function PlanDetailPage({
     await Promise.all([
       queryClient.prefetchQuery({
         queryKey: ["plan", id],
-        queryFn: () =>
-          prisma.plan.findUnique({
+        queryFn: async () => {
+          const data = await prisma.plan.findUnique({
             where: { id },
             include: {
               service: { select: { id: true, code: true, name: true } },
@@ -24,17 +24,21 @@ export default async function PlanDetailPage({
               pricings: { orderBy: { minQuantity: "asc" } },
               _count: { select: { applications: true } },
             },
-          }),
+          });
+          return JSON.parse(JSON.stringify(data));
+        },
         staleTime: STALE_TIMES.MASTER,
       }),
       queryClient.prefetchQuery({
         queryKey: ["usageTags"],
-        queryFn: () =>
-          prisma.usageTag.findMany({
+        queryFn: async () => {
+          const data = await prisma.usageTag.findMany({
             where: { isActive: true },
             select: { id: true, code: true, name: true },
             orderBy: [{ displayOrder: "asc" }, { name: "asc" }],
-          }),
+          });
+          return JSON.parse(JSON.stringify(data));
+        },
         staleTime: STALE_TIMES.MASTER,
       }),
     ]);

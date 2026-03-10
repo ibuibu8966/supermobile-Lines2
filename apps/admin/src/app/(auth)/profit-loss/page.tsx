@@ -38,7 +38,7 @@ export default async function ProfitLossPage() {
 
     await queryClient.prefetchQuery({
       queryKey: ["profit-loss", year, month],
-      queryFn: () => service.getProfitLoss(periodStart, periodEnd, periodLabel),
+      queryFn: () => service.getProfitLoss(periodStart, periodEnd, periodLabel).then((r) => JSON.parse(JSON.stringify(r))),
       staleTime: STALE_TIMES.STATS,
     });
   } catch {

@@ -26,12 +26,12 @@ export default async function ProcurementPage() {
     await Promise.all([
       queryClient.prefetchQuery({
         queryKey: queryKeys.procurement,
-        queryFn: () => service.getAllPurchaseOrders(),
+        queryFn: () => service.getAllPurchaseOrders().then((r) => JSON.parse(JSON.stringify(r))),
         staleTime: STALE_TIMES.MASTER,
       }),
       queryClient.prefetchQuery({
         queryKey: queryKeys.suppliers,
-        queryFn: () => supplierService.getTagList(),
+        queryFn: () => supplierService.getTagList().then((r) => JSON.parse(JSON.stringify(r))),
         staleTime: STALE_TIMES.MASTER,
       }),
     ]);

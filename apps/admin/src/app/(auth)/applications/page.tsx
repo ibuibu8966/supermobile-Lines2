@@ -32,7 +32,7 @@ export default async function ApplicationsPage() {
                 { page: 1, pageSize: 50, skip: 0 },
                 session
               )
-              .then((result) => ({
+              .then((result) => JSON.parse(JSON.stringify({
                 data: result.applications,
                 pagination: {
                   page: result.pagination.currentPage,
@@ -40,34 +40,38 @@ export default async function ApplicationsPage() {
                   total: result.pagination.totalCount,
                   totalPages: result.pagination.totalPages,
                 },
-              })),
+              }))),
           staleTime: STALE_TIMES.LIST,
         }),
         // サービス一覧（フィルター用マスターデータ）
         queryClient.prefetchQuery({
           queryKey: queryKeys.services,
-          queryFn: () => serviceService.getServiceList({}),
+          queryFn: () => serviceService.getServiceList({}).then((r) => JSON.parse(JSON.stringify(r))),
           staleTime: STALE_TIMES.MASTER,
         }),
         // スタッフ一覧（担当者フィルター用）
         queryClient.prefetchQuery({
           queryKey: ["users", "staff"],
-          queryFn: () =>
-            prisma.user.findMany({
+          queryFn: async () => {
+            const data = await prisma.user.findMany({
               where: { role: { in: ["SUPER_ADMIN", "EMPLOYEE"] } },
               select: { id: true, name: true, email: true, role: true },
               orderBy: { name: "asc" },
-            }),
+            });
+            return JSON.parse(JSON.stringify(data));
+          },
           staleTime: STALE_TIMES.MASTER,
         }),
         // 紹介者タグ（ワークフロー用）
         queryClient.prefetchQuery({
           queryKey: queryKeys.referrerTags,
-          queryFn: () =>
-            prisma.referrerTag.findMany({
+          queryFn: async () => {
+            const data = await prisma.referrerTag.findMany({
               where: { isActive: true },
               orderBy: { displayOrder: "asc" },
-            }),
+            });
+            return JSON.parse(JSON.stringify(data));
+          },
           staleTime: STALE_TIMES.MASTER,
         }),
       ]);

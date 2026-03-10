@@ -37,11 +37,11 @@ export default async function LinesPage() {
           simLocationTagService.getTagList(),
           lineReserveTagService.getTagList(),
         ]);
-        return {
+        return JSON.parse(JSON.stringify({
           lines: { data: linesResult.lines, pagination: linesResult.pagination },
           simLocationTags,
           lineReserveTags,
-        };
+        }));
       },
       staleTime: STALE_TIMES.LIST,
     });

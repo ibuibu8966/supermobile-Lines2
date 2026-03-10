@@ -10,8 +10,8 @@ export default async function PlansPage() {
     await Promise.all([
       queryClient.prefetchQuery({
         queryKey: queryKeys.plans,
-        queryFn: () =>
-          prisma.plan.findMany({
+        queryFn: async () => {
+          const data = await prisma.plan.findMany({
             include: {
               service: { select: { id: true, code: true, name: true } },
               usageTags: { include: { usageTag: true } },
@@ -19,27 +19,33 @@ export default async function PlansPage() {
               _count: { select: { applications: true } },
             },
             orderBy: [{ service: { name: "asc" } }, { name: "asc" }],
-          }),
+          });
+          return JSON.parse(JSON.stringify(data));
+        },
         staleTime: STALE_TIMES.MASTER,
       }),
       queryClient.prefetchQuery({
         queryKey: queryKeys.services,
-        queryFn: () =>
-          prisma.service.findMany({
+        queryFn: async () => {
+          const data = await prisma.service.findMany({
             where: { isActive: true },
             select: { id: true, code: true, name: true },
             orderBy: { name: "asc" },
-          }),
+          });
+          return JSON.parse(JSON.stringify(data));
+        },
         staleTime: STALE_TIMES.MASTER,
       }),
       queryClient.prefetchQuery({
         queryKey: queryKeys.usageTags,
-        queryFn: () =>
-          prisma.usageTag.findMany({
+        queryFn: async () => {
+          const data = await prisma.usageTag.findMany({
             where: { isActive: true },
             select: { id: true, code: true, name: true },
             orderBy: [{ displayOrder: "asc" }, { name: "asc" }],
-          }),
+          });
+          return JSON.parse(JSON.stringify(data));
+        },
         staleTime: STALE_TIMES.MASTER,
       }),
     ]);

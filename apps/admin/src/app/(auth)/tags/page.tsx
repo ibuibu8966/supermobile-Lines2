@@ -10,47 +10,57 @@ export default async function TagsPage() {
     await Promise.all([
       queryClient.prefetchQuery({
         queryKey: queryKeys.usageTags,
-        queryFn: () =>
-          prisma.usageTag.findMany({
+        queryFn: async () => {
+          const data = await prisma.usageTag.findMany({
             include: { _count: { select: { contractTags: true, planTags: true } } },
             orderBy: [{ displayOrder: "asc" }, { name: "asc" }],
-          }),
+          });
+          return JSON.parse(JSON.stringify(data));
+        },
         staleTime: STALE_TIMES.MASTER,
       }),
       queryClient.prefetchQuery({
         queryKey: queryKeys.simLocationTags,
-        queryFn: () =>
-          prisma.simLocationTag.findMany({
+        queryFn: async () => {
+          const data = await prisma.simLocationTag.findMany({
             include: { _count: { select: { sims: true } } },
             orderBy: [{ displayOrder: "asc" }, { name: "asc" }],
-          }),
+          });
+          return JSON.parse(JSON.stringify(data));
+        },
         staleTime: STALE_TIMES.MASTER,
       }),
       queryClient.prefetchQuery({
         queryKey: queryKeys.lineTags,
-        queryFn: () =>
-          prisma.lineTag.findMany({
+        queryFn: async () => {
+          const data = await prisma.lineTag.findMany({
             include: { _count: { select: { applicationLines: true } } },
             orderBy: [{ displayOrder: "asc" }, { name: "asc" }],
-          }),
+          });
+          return JSON.parse(JSON.stringify(data));
+        },
         staleTime: STALE_TIMES.MASTER,
       }),
       queryClient.prefetchQuery({
         queryKey: queryKeys.lineReserveTags,
-        queryFn: () =>
-          prisma.lineReserveTag.findMany({
+        queryFn: async () => {
+          const data = await prisma.lineReserveTag.findMany({
             include: { _count: { select: { applicationLines: true } } },
             orderBy: [{ displayOrder: "asc" }, { name: "asc" }],
-          }),
+          });
+          return JSON.parse(JSON.stringify(data));
+        },
         staleTime: STALE_TIMES.MASTER,
       }),
       queryClient.prefetchQuery({
         queryKey: queryKeys.referrerTags,
-        queryFn: () =>
-          prisma.referrerTag.findMany({
+        queryFn: async () => {
+          const data = await prisma.referrerTag.findMany({
             include: { _count: { select: { customers: true } } },
             orderBy: [{ displayOrder: "asc" }, { name: "asc" }],
-          }),
+          });
+          return JSON.parse(JSON.stringify(data));
+        },
         staleTime: STALE_TIMES.MASTER,
       }),
     ]);

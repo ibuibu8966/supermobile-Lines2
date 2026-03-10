@@ -47,7 +47,7 @@ export default async function CouponsPage() {
             orderBy: { createdAt: "desc" },
           }),
         ]);
-        return { services, plans, coupons };
+        return JSON.parse(JSON.stringify({ services, plans, coupons }));
       },
       staleTime: STALE_TIMES.MASTER,
     });

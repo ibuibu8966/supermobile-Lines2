@@ -9,8 +9,8 @@ export default async function ServicesPage() {
   try {
     await queryClient.prefetchQuery({
       queryKey: queryKeys.services,
-      queryFn: () =>
-        prisma.service.findMany({
+      queryFn: async () => {
+        const data = await prisma.service.findMany({
           include: {
             plans: {
               include: {
@@ -22,7 +22,9 @@ export default async function ServicesPage() {
             _count: { select: { plans: true, applications: true, users: true } },
           },
           orderBy: { name: "asc" },
-        }),
+        });
+        return JSON.parse(JSON.stringify(data));
+      },
       staleTime: STALE_TIMES.MASTER,
     });
   } catch {

@@ -23,7 +23,7 @@ export default async function UsersPage() {
 
       queryClient.setQueryData(
         ["users", { includeInactive: "true" }],
-        users
+        JSON.parse(JSON.stringify(users))
       );
     }
   } catch {

@@ -18,37 +18,43 @@ export default async function ApplicationDetailPage({
     await Promise.all([
       queryClient.prefetchQuery({
         queryKey: queryKeys.applicationDetail(id),
-        queryFn: () => applicationRepo.findById(id),
+        queryFn: () => applicationRepo.findById(id).then((r) => JSON.parse(JSON.stringify(r))),
         staleTime: STALE_TIMES.LIST,
       }),
       queryClient.prefetchQuery({
         queryKey: queryKeys.lineTags,
-        queryFn: () =>
-          prisma.lineTag.findMany({
+        queryFn: async () => {
+          const data = await prisma.lineTag.findMany({
             where: { isActive: true },
             select: { id: true, name: true },
             orderBy: [{ displayOrder: "asc" }, { name: "asc" }],
-          }),
+          });
+          return JSON.parse(JSON.stringify(data));
+        },
         staleTime: STALE_TIMES.MASTER,
       }),
       queryClient.prefetchQuery({
         queryKey: queryKeys.lineReserveTags,
-        queryFn: () =>
-          prisma.lineReserveTag.findMany({
+        queryFn: async () => {
+          const data = await prisma.lineReserveTag.findMany({
             where: { isActive: true },
             select: { id: true, name: true },
             orderBy: [{ displayOrder: "asc" }, { name: "asc" }],
-          }),
+          });
+          return JSON.parse(JSON.stringify(data));
+        },
         staleTime: STALE_TIMES.MASTER,
       }),
       queryClient.prefetchQuery({
         queryKey: queryKeys.simLocationTags,
-        queryFn: () =>
-          prisma.simLocationTag.findMany({
+        queryFn: async () => {
+          const data = await prisma.simLocationTag.findMany({
             where: { isActive: true },
             select: { id: true, name: true },
             orderBy: [{ displayOrder: "asc" }, { name: "asc" }],
-          }),
+          });
+          return JSON.parse(JSON.stringify(data));
+        },
         staleTime: STALE_TIMES.MASTER,
       }),
     ]);

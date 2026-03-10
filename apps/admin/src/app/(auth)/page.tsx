@@ -110,7 +110,7 @@ export default async function DashboardPage() {
 
   await queryClient.prefetchQuery({
     queryKey: queryKeys.dashboardStats,
-    queryFn: fetchDashboardStats,
+    queryFn: () => fetchDashboardStats().then((r) => JSON.parse(JSON.stringify(r))),
     staleTime: STALE_TIMES.STATS,
   });
 

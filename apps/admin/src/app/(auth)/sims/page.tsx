@@ -45,26 +45,26 @@ export default async function SimsPage() {
         queryFn: () =>
           simService
             .getSimList({}, { page: 1, pageSize: 50, skip: 0 })
-            .then((result) => ({
+            .then((result) => JSON.parse(JSON.stringify({
               data: result.sims,
               pagination: result.pagination,
-            })),
+            }))),
         staleTime: STALE_TIMES.LIST,
       }),
       // マスターデータ（フィルター用・MASTER = Infinity）
       queryClient.prefetchQuery({
         queryKey: queryKeys.simLocationTags,
-        queryFn: () => simLocationTagService.getTagList(),
+        queryFn: () => simLocationTagService.getTagList().then((r) => JSON.parse(JSON.stringify(r))),
         staleTime: STALE_TIMES.MASTER,
       }),
       queryClient.prefetchQuery({
         queryKey: queryKeys.usageTags,
-        queryFn: () => usageTagService.getTagList(),
+        queryFn: () => usageTagService.getTagList().then((r) => JSON.parse(JSON.stringify(r))),
         staleTime: STALE_TIMES.MASTER,
       }),
       queryClient.prefetchQuery({
         queryKey: queryKeys.suppliers,
-        queryFn: () => supplierService.getTagList(),
+        queryFn: () => supplierService.getTagList().then((r) => JSON.parse(JSON.stringify(r))),
         staleTime: STALE_TIMES.MASTER,
       }),
     ]);

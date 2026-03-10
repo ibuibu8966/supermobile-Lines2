@@ -1039,7 +1039,7 @@ export function ApplicationDetailClient() {
                       {couponLookupResult && (
                         <div className="text-xs bg-green-50 border border-green-200 rounded p-2 space-y-0.5">
                           <p className="font-mono font-medium text-green-700">{couponLookupResult.code}</p>
-                          <p className="text-gray-600">単価: {couponLookupResult.unitPrice.toLocaleString()}円</p>
+                          <p className="text-gray-600">単価: {couponLookupResult.unitPrice != null ? `${couponLookupResult.unitPrice.toLocaleString()}円` : "数量に応じた単価"}</p>
                           {couponLookupResult.description && (
                             <p className="text-gray-500">{couponLookupResult.description}</p>
                           )}
@@ -1864,12 +1864,12 @@ export function ApplicationDetailClient() {
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">単価変更:</span>
                   <span className="font-medium">
-                    {application.unitPrice.toLocaleString()}円 → {couponLookupResult.unitPrice.toLocaleString()}円
+                    {application.unitPrice.toLocaleString()}円 → {couponLookupResult.unitPrice != null ? `${couponLookupResult.unitPrice.toLocaleString()}円` : "—"}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">新しい合計金額:</span>
-                  <span className="font-bold">{(application.lineCount * couponLookupResult.unitPrice).toLocaleString()}円</span>
+                  <span className="font-bold">{couponLookupResult.unitPrice != null ? `${(application.lineCount * couponLookupResult.unitPrice).toLocaleString()}円` : "—"}</span>
                 </div>
               </>
             )}
